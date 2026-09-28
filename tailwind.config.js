@@ -4,19 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#18211d",
-        paper: "#f7f4ee",
-        line: "#d8d0c2",
-        moss: "#4f6f52",
-        clay: "#a15d45",
-        signal: "#e5b84b"
+        ink: "#17211c",
+        paper: "#f4f7f5",
+        line: "#dfe6e1",
+        moss: "#287353",
+        clay: "#b25d3b",
+        signal: "#dcae35"
       },
       fontFamily: {
-        sans: ["Aptos", "Segoe UI", "system-ui", "sans-serif"],
-        display: ["Georgia", "Cambria", "serif"]
+        sans: ["Segoe UI Variable", "Aptos", "Segoe UI", "system-ui", "sans-serif"],
+        display: ["Segoe UI Variable Display", "Aptos Display", "Segoe UI", "sans-serif"]
       },
       boxShadow: {
-        panel: "0 18px 60px rgba(24, 33, 29, 0.10)"
+        panel: "0 1px 2px rgba(23, 33, 28, 0.04), 0 8px 24px rgba(23, 33, 28, 0.05)"
       }
     }
   },

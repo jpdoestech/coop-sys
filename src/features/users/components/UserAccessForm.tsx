@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { X } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { roleDefinitions } from "../../../services/access/accessControl";
 import { branches, HEAD_OFFICE_ID } from "../../../services/lookups/organization";
 import type { SystemUser, SystemUserInput } from "../../../types/systemUser";
@@ -64,7 +64,7 @@ export function UserAccessForm({ user, saving, error, onCancel, onSubmit, offlin
           <label className="flex items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={value.is_active} onChange={(event) => setValue({ ...value, is_active: event.target.checked })} />Active system access</label>
           {validationError || error ? <p className="text-sm text-red-700 sm:col-span-2">{validationError || error}</p> : null}
         </div>
-        <div className="flex justify-end gap-3 border-t border-line bg-paper/50 px-6 py-4"><button type="button" onClick={onCancel} className="focus-ring rounded border border-line bg-white px-4 py-2 text-sm font-semibold">Cancel</button><button disabled={saving} className="focus-ring rounded bg-moss px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving..." : "Save user"}</button></div>
+        <div className="flex justify-end gap-3 border-t border-line bg-paper/50 px-6 py-4"><button type="button" onClick={onCancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button disabled={saving} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : "Save user"}</button></div>
       </form>
     </div>
   );

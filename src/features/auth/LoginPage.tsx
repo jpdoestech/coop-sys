@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { LockKeyhole } from "lucide-react";
+import { ArrowLeft, KeyRound, LockKeyhole, LogIn, Mail } from "lucide-react";
 import { useAuth } from "../../services/auth/useAuth";
 import { getAppMode } from "../../utils/env";
 
@@ -41,8 +41,8 @@ export function LoginPage() {
         {offline ? <p className="rounded border border-line bg-paper px-3 py-2 text-xs text-ink/65">Offline account authentication is active on this device.</p> : null}
         {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
         {message ? <p role="status" className="text-sm text-emerald-700">{message}</p> : null}
-        <button disabled={busy} className="focus-ring w-full rounded bg-moss px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Please wait..." : resetMode ? "Send reset link" : "Sign in"}</button>
-        <button type="button" onClick={() => { clearError(); setMessage(""); setResetMode(!resetMode); }} className="focus-ring w-full rounded p-2 text-sm font-semibold text-moss hover:bg-paper">{resetMode ? "Return to sign in" : "Forgot password?"}</button>
+        <button disabled={busy} className="primary-button w-full">{resetMode ? <Mail className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}{busy ? "Please wait..." : resetMode ? "Send reset link" : "Sign in"}</button>
+        <button type="button" onClick={() => { clearError(); setMessage(""); setResetMode(!resetMode); }} className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-md p-2 text-sm font-semibold text-moss hover:bg-paper">{resetMode ? <ArrowLeft className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}{resetMode ? "Return to sign in" : "Forgot password?"}</button>
       </form>
     </section>
   </main>;

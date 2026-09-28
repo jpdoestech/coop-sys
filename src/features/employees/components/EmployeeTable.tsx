@@ -29,24 +29,24 @@ export function EmployeeTable({ employees, loading, onEdit, onArchive, canManage
   if (!employees.length) return <div className="border-t border-line px-5 py-14 text-center"><UserRoundCog className="mx-auto h-7 w-7 text-moss" /><p className="mt-3 text-sm font-semibold">No matching employees</p></div>;
 
   return (
-    <div className="max-h-[60vh] overflow-auto border-t border-line">
+    <div className="max-h-[62vh] overflow-auto border-t border-line">
       <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-        <thead className="sticky top-0 z-10"><tr className="bg-ink text-xs uppercase text-white">
-          <th className="px-5 py-3">Employee</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Placement</th><th className="px-4 py-3">Beneficiaries</th><th className="px-4 py-3">Member</th>{canManage ? <th className="w-24 px-4 py-3 text-right">Actions</th> : null}
+        <thead className="sticky top-0 z-10"><tr className="border-b border-line bg-[#f8faf8] text-[11px] font-semibold uppercase text-ink/45">
+          <th className="px-5 py-3">Employee</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Placement</th><th className="px-4 py-3">Dependents</th><th className="px-4 py-3">Member</th>{canManage ? <th className="w-24 px-4 py-3 text-right">Actions</th> : null}
         </tr></thead>
         <tbody className="divide-y divide-line bg-white">
           {employees.map((employee) => {
             const placement = placementFor(employee, branches, clients);
-            return <tr key={employee.id} className="hover:bg-paper/70">
-              <td className="px-5 py-3.5"><p className="font-semibold">{employee.last_name}, {employee.first_name}</p><p className="mt-0.5 font-mono text-xs text-ink/55">{employee.employee_number}</p></td>
-              <td className="px-4 py-3.5"><p>{labelFor(positions, employee.position_id)}</p><p className="mt-0.5 text-xs text-ink/55">{labelFor(departments, employee.department_id)}</p></td>
-              <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${employee.employment_status_id === employmentStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />{labelFor(employmentStatuses, employee.employment_status_id)}</span></td>
-              <td className="px-4 py-3.5"><p>{placement.primary}</p><p className="mt-0.5 text-xs text-ink/55">{placement.secondary}</p></td>
-              <td className="px-4 py-3.5">{activeBeneficiaryCount(employee.beneficiaries)} / 3</td>
-              <td className="px-4 py-3.5">{employee.member_id ? <span className="font-semibold text-moss">Linked</span> : <span className="text-ink/50">Not a member</span>}</td>
-              {canManage ? <td className="px-4 py-3.5"><div className="flex justify-end gap-1">
-                <button className="focus-ring rounded p-2 text-ink/65 hover:bg-paper hover:text-moss" onClick={() => onEdit(employee)} title="Edit employee" aria-label={`Edit ${employee.first_name} ${employee.last_name}`}><Pencil className="h-4 w-4" /></button>
-                <button className="focus-ring rounded p-2 text-ink/65 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(employee)} title="Archive employee" aria-label={`Archive ${employee.first_name} ${employee.last_name}`}><Archive className="h-4 w-4" /></button>
+            return <tr key={employee.id} className="transition-colors hover:bg-[#f8faf8]">
+              <td className="px-5 py-2.5"><p className="font-semibold">{employee.last_name}, {employee.first_name}</p><p className="mt-0.5 font-mono text-[11px] text-ink/45">{employee.employee_number}</p></td>
+              <td className="px-4 py-2.5"><p>{labelFor(positions, employee.position_id)}</p><p className="mt-0.5 text-xs text-ink/55">{labelFor(departments, employee.department_id)}</p></td>
+              <td className="px-4 py-2.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${employee.employment_status_id === employmentStatuses[0].id ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><span className={`h-1.5 w-1.5 rounded-full ${employee.employment_status_id === employmentStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />{labelFor(employmentStatuses, employee.employment_status_id)}</span></td>
+              <td className="px-4 py-2.5"><p>{placement.primary}</p><p className="mt-0.5 text-xs text-ink/55">{placement.secondary}</p></td>
+              <td className="px-4 py-2.5"><span className="font-semibold">{activeBeneficiaryCount(employee.beneficiaries)}</span><span className="text-ink/35"> / 3</span></td>
+              <td className="px-4 py-2.5">{employee.member_id ? <span className="font-semibold text-moss">Linked</span> : <span className="text-ink/50">Not a member</span>}</td>
+              {canManage ? <td className="px-4 py-2.5"><div className="flex justify-end gap-1">
+                <button className="icon-button" onClick={() => onEdit(employee)} title="Edit employee" aria-label={`Edit ${employee.first_name} ${employee.last_name}`}><Pencil className="h-4 w-4" /></button>
+                <button className="icon-button hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(employee)} title="Archive employee" aria-label={`Archive ${employee.first_name} ${employee.last_name}`}><Archive className="h-4 w-4" /></button>
               </div></td> : null}
             </tr>;
           })}

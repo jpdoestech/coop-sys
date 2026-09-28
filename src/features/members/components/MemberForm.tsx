@@ -23,7 +23,7 @@ type MemberFormProps = {
 };
 
 const inputClass =
-  "focus-ring mt-1.5 w-full rounded border border-line bg-white px-3 py-2.5 text-sm text-ink placeholder:text-ink/35";
+  "control mt-1.5 w-full";
 
 function emptyDraft(): Draft {
   return {
@@ -155,7 +155,7 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/35" role="presentation">
-      <div className="h-full w-full max-w-3xl overflow-y-auto bg-paper shadow-panel" role="dialog" aria-modal="true" aria-labelledby="member-form-title">
+      <div className="h-full w-full max-w-3xl overflow-y-auto bg-white shadow-panel" role="dialog" aria-modal="true" aria-labelledby="member-form-title">
         <form onSubmit={submit}>
           <header className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
             <div>
@@ -240,8 +240,8 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
           </Section>
 
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper/95 px-6 py-4 backdrop-blur sm:px-8">
-            <button type="button" className="focus-ring rounded border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={onCancel}>Cancel</button>
-            <button type="submit" disabled={saving} className="focus-ring inline-flex items-center gap-2 rounded bg-moss px-4 py-2.5 text-sm font-semibold text-white hover:bg-moss/90 disabled:cursor-wait disabled:opacity-60">
+            <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={onCancel}><X className="h-4 w-4" /> Cancel</button>
+            <button type="submit" disabled={saving} className="primary-button">
               <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save member"}
             </button>
           </footer>

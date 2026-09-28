@@ -11,7 +11,7 @@ import {
   UserCog,
   LogOut,
   Wifi,
-  X
+  Landmark
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
@@ -48,16 +48,16 @@ export function AppShell({ children }: AppShellProps) {
   const visibleNavItems = navItems.filter((item) => can(item.permission));
 
   const sidebar = (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-[#fbfaf6]">
-      <div className="border-b border-line px-5 py-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-moss">
-          Cooperative
-        </p>
-        <h1 className="mt-1 font-display text-2xl font-semibold text-ink">
-          Records Desk
-        </h1>
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-line bg-white">
+      <div className="flex h-14 items-center gap-3 border-b border-line px-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-moss text-white"><Landmark className="h-5 w-5" /></span>
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-bold text-ink">Records Desk</h1>
+          <p className="truncate text-[11px] text-ink/50">Cooperative operations</p>
+        </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-ink/35">Workspace</p>
         {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
@@ -65,28 +65,31 @@ export function AppShell({ children }: AppShellProps) {
             onClick={() => setIsOpen(false)}
             className={({ isActive }) =>
               clsx(
-                "focus-ring flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition",
+                "focus-ring relative flex min-h-10 items-center gap-3 rounded-md px-3 text-[13px] font-medium transition",
                 isActive
-                  ? "bg-moss text-white shadow-sm"
-                  : "text-ink hover:bg-[#ece6dc]"
+                  ? "bg-emerald-50 text-moss before:absolute before:-left-3 before:h-5 before:w-0.5 before:rounded-r before:bg-moss"
+                  : "text-ink/65 hover:bg-paper hover:text-ink"
               )
             }
           >
-            <item.icon className="h-4 w-4" aria-hidden="true" />
+            <item.icon className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
             {item.label}
           </NavLink>
         ))}
       </nav>
-      <div className="border-t border-line px-5 py-4 text-xs text-ink/70">
-        <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink">{profile.displayName}</p><p className="mt-0.5">{roleLabel(profile.role)}</p><p className="mt-0.5">{session?.mode === "online" ? "Online account" : "Offline account"}</p></div><button onClick={() => void signOut()} className="focus-ring rounded p-2 text-ink/60 hover:bg-[#ece6dc] hover:text-red-700" title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button></div>
-        <p className="mt-2">Mode: {appMode}</p>
-        <p className="mt-1">Last sync: Not yet synchronized</p>
+      <div className="border-t border-line p-3">
+        <div className="flex items-center gap-2 rounded-md p-2 hover:bg-paper">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e4efe9] text-xs font-bold text-moss">{profile.displayName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>
+          <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-ink">{profile.displayName}</p><p className="truncate text-[11px] text-ink/50">{roleLabel(profile.role)}</p></div>
+          <button onClick={() => void signOut()} className="icon-button h-8 w-8" title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-2 flex items-center justify-between px-2 text-[10px] text-ink/40"><span>{session?.mode === "online" ? "Online account" : "Offline account"}</span><span>{appMode}</span></div>
       </div>
     </aside>
   );
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen bg-paper font-sans text-ink">
       <div className="flex min-h-screen">
         <div className="hidden lg:block">{sidebar}</div>
         {isOpen ? (
@@ -101,8 +104,8 @@ export function AppShell({ children }: AppShellProps) {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur">
-            <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur">
+            <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
               <button
                 className="focus-ring rounded-md border border-line bg-white p-2 lg:hidden"
                 onClick={() => setIsOpen(true)}
@@ -110,30 +113,22 @@ export function AppShell({ children }: AppShellProps) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <div>
-                <p className="text-sm font-semibold">Membership + Employee Information</p>
-                <p className="text-xs text-ink/60">
-                  Small cooperative records system
-                </p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">Membership &amp; Workforce</p>
+                <p className="truncate text-xs text-ink/45">Head Office / Operations</p>
               </div>
-              <div className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-sm">
+              <div className="flex items-center gap-2 rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-ink/65">
                 <span
                   className={clsx(
-                    "h-2.5 w-2.5 rounded-full",
+                    "h-2 w-2 rounded-full",
                     online ? "bg-emerald-500" : "bg-red-500"
                   )}
                 />
                 {online ? "Online" : "Working Offline"}
               </div>
-              <button
-                className="focus-ring hidden rounded-md p-2 text-ink/70 hover:bg-[#ece6dc] lg:hidden"
-                aria-label="Close navigation"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
           </header>
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+          <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
         </div>
       </div>
     </div>

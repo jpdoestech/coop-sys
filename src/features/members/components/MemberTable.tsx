@@ -32,10 +32,10 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage }: 
   }
 
   return (
-    <div className="max-h-[60vh] overflow-auto border-t border-line">
+    <div className="max-h-[62vh] overflow-auto border-t border-line">
       <table className="w-full min-w-[850px] border-collapse text-left text-sm">
         <thead className="sticky top-0 z-10">
-          <tr className="bg-ink text-xs uppercase text-white">
+          <tr className="border-b border-line bg-[#f8faf8] text-[11px] uppercase text-ink/45">
             <th className="px-5 py-3 font-semibold">Member</th>
             <th className="px-4 py-3 font-semibold">Type</th>
             <th className="px-4 py-3 font-semibold">Status</th>
@@ -46,35 +46,35 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage }: 
         </thead>
         <tbody className="divide-y divide-line bg-white">
           {members.map((member) => (
-            <tr key={member.id} className="transition-colors hover:bg-paper/70">
-              <td className="px-5 py-3.5">
+            <tr key={member.id} className="transition-colors hover:bg-[#f8faf8]">
+              <td className="px-5 py-2.5">
                 <p className="font-semibold text-ink">{displayName(member)}</p>
-                <p className="mt-0.5 font-mono text-xs text-ink/55">{member.membership_number}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-ink/45">{member.membership_number}</p>
               </td>
-              <td className="px-4 py-3.5 text-ink/75">
+              <td className="px-4 py-2.5 text-ink/75">
                 {optionLabel(memberTypes, member.membership_type_id)}
               </td>
-              {canManage ? <td className="px-4 py-3.5">
-                <span className="inline-flex items-center gap-1.5 text-ink/75">
-                  <span className={`h-2 w-2 rounded-full ${member.membership_status_id === memberStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />
+              <td className="px-4 py-2.5">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${member.membership_status_id === memberStatuses[0].id ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${member.membership_status_id === memberStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />
                   {optionLabel(memberStatuses, member.membership_status_id)}
                 </span>
-              </td> : null}
-              <td className="px-4 py-3.5">
+              </td>
+              <td className="px-4 py-2.5">
                 <p className="text-ink/80">{member.mobile_number || "No mobile"}</p>
                 <p className="mt-0.5 text-xs text-ink/55">{member.email || "No email"}</p>
               </td>
-              <td className="px-4 py-3.5 text-ink/70">{member.membership_date || "Not set"}</td>
-              <td className="px-4 py-3.5">
+              <td className="px-4 py-2.5 text-ink/70">{member.membership_date || "Not set"}</td>
+              {canManage ? <td className="px-4 py-2.5">
                 <div className="flex justify-end gap-1">
-                  <button className="focus-ring rounded p-2 text-ink/65 hover:bg-paper hover:text-moss" onClick={() => onEdit(member)} title="Edit member" aria-label={`Edit ${displayName(member)}`}>
+                  <button className="icon-button" onClick={() => onEdit(member)} title="Edit member" aria-label={`Edit ${displayName(member)}`}>
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button className="focus-ring rounded p-2 text-ink/65 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(member)} title="Archive member" aria-label={`Archive ${displayName(member)}`}>
+                  <button className="icon-button hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(member)} title="Archive member" aria-label={`Archive ${displayName(member)}`}>
                     <Archive className="h-4 w-4" />
                   </button>
                 </div>
-              </td>
+              </td> : null}
             </tr>
           ))}
         </tbody>

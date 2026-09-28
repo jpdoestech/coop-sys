@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { ListFilter, Plus, Search } from "lucide-react";
+import { ArrowUpDown, Plus, Search } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import type { Member, MemberInput } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
@@ -10,6 +10,7 @@ import { isBranchScoped } from "../../services/access/accessControl";
 import { memberStatuses, memberTypes } from "./data/memberOptions";
 import { useOrganization } from "../../services/organization/useOrganization";
 import { PaginationControls } from "../../components/ui/PaginationControls";
+import { FilterMenu } from "../../components/ui/FilterMenu";
 
 export function MembersPage() {
   const [search, setSearch] = useState("");
@@ -28,6 +29,7 @@ export function MembersPage() {
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const activeFilterCount = [statusFilter, typeFilter, branchFilter, clientFilter].filter(Boolean).length;
   const filteredMembers = useMemo(() => {
     const employees = placementEmployees.data ?? [];
     return [...(query.data ?? [])].filter((member) => {
@@ -57,33 +59,39 @@ export function MembersPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader
           eyebrow="Members"
           title="Cooperative members"
           description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
         />
-        {canCreate ? <button className="focus-ring mb-6 inline-flex items-center justify-center gap-2 rounded bg-moss px-4 py-2.5 text-sm font-semibold text-white hover:bg-moss/90" onClick={openCreate}>
+        {canCreate ? <button className="primary-button mb-3" onClick={openCreate}>
           <Plus className="h-4 w-4" /> New member
         </button> : null}
       </div>
 
-      <section className="overflow-hidden rounded border border-line bg-white shadow-panel">
-        <div className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(240px,1fr)_repeat(3,minmax(130px,180px))]">
-          <div className="relative w-full max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/45" />
+      <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1 sm:max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
             <input
-              className="focus-ring w-full rounded border border-line bg-paper/40 py-2.5 pl-9 pr-3 text-sm text-ink placeholder:text-ink/45"
+              className="control w-full pl-9"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name or membership number"
+              placeholder="Search members"
               aria-label="Search members"
             />
           </div>
-          <select aria-label="Filter member status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="focus-ring rounded border border-line bg-white px-3 py-2.5 text-sm"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-          <select aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="focus-ring rounded border border-line bg-white px-3 py-2.5 text-sm"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-          <select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="focus-ring rounded border border-line bg-white px-3 py-2.5 text-sm"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select>
-          <div className="flex items-center gap-2 lg:col-span-4"><ListFilter className="h-4 w-4 text-ink/45" /><select aria-label="Filter member branch" value={branchFilter} onChange={(event) => { setBranchFilter(event.target.value); setClientFilter(""); }} className="focus-ring min-w-0 flex-1 rounded border border-line bg-white px-3 py-2 text-sm"><option value="">All offices and branches</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><select aria-label="Filter member client" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="focus-ring min-w-0 flex-1 rounded border border-line bg-white px-3 py-2 text-sm"><option value="">All clients</option>{clients.filter((item) => !branchFilter || item.branchId === branchFilter).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+          <p className="hidden whitespace-nowrap text-xs text-ink/45 md:block">{filteredMembers.length} records</p>
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <FilterMenu activeCount={activeFilterCount} onClear={() => { setStatusFilter(""); setTypeFilter(""); setBranchFilter(""); setClientFilter(""); }}>
+              <label className="block text-xs font-semibold text-ink/60">Membership status<select aria-label="Filter member status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+              <label className="block text-xs font-semibold text-ink/60">Membership type<select aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+              <label className="block text-xs font-semibold text-ink/60">Office or branch<select aria-label="Filter member branch" value={branchFilter} onChange={(event) => { setBranchFilter(event.target.value); setClientFilter(""); }} className="control mt-1.5 w-full font-normal"><option value="">All offices and branches</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+              <label className="block text-xs font-semibold text-ink/60">Client<select aria-label="Filter member client" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All clients</option>{clients.filter((item) => !branchFilter || item.branchId === branchFilter).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+            </FilterMenu>
+            <div className="relative flex-1 sm:flex-none"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" /><select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="control w-full pl-9 sm:w-40"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select></div>
+          </div>
         </div>
         {query.isError ? (
           <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load member records.</div>

@@ -6,14 +6,12 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, eyebrow, description }: PageHeaderProps) {
   return (
-    <div className="mb-6">
-      {eyebrow ? (
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-clay">
-          {eyebrow}
-        </p>
-      ) : null}
-      <h2 className="mt-1 font-display text-3xl font-semibold text-ink">{title}</h2>
-      {description ? <p className="mt-2 max-w-3xl text-sm text-ink/70">{description}</p> : null}
+    <div className="mb-3 min-w-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 className="font-display text-xl font-semibold leading-7 text-ink">{title}</h2>
+        {eyebrow ? <span className="rounded bg-[#e4efe9] px-2 py-1 text-[10px] font-bold uppercase text-moss">{eyebrow}</span> : null}
+      </div>
+      {description ? <p className="sr-only">{description}</p> : null}
     </div>
   );
 }
