@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Save, X } from "lucide-react";
+import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
+import { educationalAttainments } from "../../../services/lookups/educationalAttainments";
 import { memberInputSchema } from "../../../services/validation/memberSchema";
 import { religionAffiliations } from "../../../services/lookups/religionAffiliations";
 import type { Member, MemberInput } from "../../../types/member";
@@ -45,7 +47,7 @@ function emptyDraft(): Draft {
     tax_identification_number: null,
     acceptance_resolution_number: null,
     highest_educational_attainment: null,
-    occupation_income_source: null,
+    occupation_income_source: "Employed / Salary",
     annual_income: "",
     number_of_dependents: "",
     beneficiary_name: null,
@@ -96,6 +98,13 @@ function Section({ title, description, children }: { title: string; description:
 export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(member));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const addressValue: AddressValue = {
+    address: draft.address,
+    barangay: draft.barangay,
+    city_municipality: draft.city_municipality,
+    province: draft.province,
+    postal_code: draft.postal_code,
+  };
 
   useEffect(() => {
     setDraft(toDraft(member));
@@ -178,18 +187,17 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
               </select>
             </Field>
             <Field label="Highest educational attainment">
-              <input className={inputClass} value={draft.highest_educational_attainment ?? ""} onChange={(event) => setValue("highest_educational_attainment", event.target.value || null)} />
+              <select className={inputClass} value={draft.highest_educational_attainment ?? ""} onChange={(event) => setValue("highest_educational_attainment", event.target.value || null)}>
+                <option value="">Not set</option>
+                {educationalAttainments.map((attainment) => <option key={attainment} value={attainment}>{attainment}</option>)}
+              </select>
             </Field>
           </Section>
 
           <Section title="Contact" description="Current contact and residential information.">
             <Field label="Mobile number"><input className={inputClass} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", event.target.value || null)} /></Field>
             <Field label="Email" error={errors.email}><input type="email" className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
-            <div className="sm:col-span-2"><Field label="Street address"><input className={inputClass} value={draft.address ?? ""} onChange={(event) => setValue("address", event.target.value || null)} /></Field></div>
-            <Field label="Barangay"><input className={inputClass} value={draft.barangay ?? ""} onChange={(event) => setValue("barangay", event.target.value || null)} /></Field>
-            <Field label="City / municipality"><input className={inputClass} value={draft.city_municipality ?? ""} onChange={(event) => setValue("city_municipality", event.target.value || null)} /></Field>
-            <Field label="Province"><input className={inputClass} value={draft.province ?? ""} onChange={(event) => setValue("province", event.target.value || null)} /></Field>
-            <Field label="Postal code"><input className={inputClass} value={draft.postal_code ?? ""} onChange={(event) => setValue("postal_code", event.target.value || null)} /></Field>
+            <AddressFields value={addressValue} onChange={(address) => setDraft((current) => ({ ...current, ...address }))} />
             <div className="sm:col-span-2"><Field label="Emergency contact"><input className={inputClass} value={draft.emergency_contact ?? ""} onChange={(event) => setValue("emergency_contact", event.target.value || null)} /></Field></div>
           </Section>
 

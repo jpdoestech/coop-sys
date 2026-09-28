@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   barangaysForCity,
   cities,
@@ -6,7 +6,7 @@ import {
   provinces,
   provincesForRegion,
   regions,
-  type Barangay
+  type Barangay,
 } from "../../address/addressService";
 
 export type AddressValue = {
@@ -23,7 +23,8 @@ type AddressFieldsProps = {
   onChange: (value: AddressValue) => void;
 };
 
-const inputClass = "focus-ring mt-1.5 w-full rounded border border-line bg-white px-3 py-2.5 text-sm text-ink disabled:bg-line/20 disabled:text-ink/55";
+const inputClass =
+  "focus-ring mt-1.5 w-full rounded border border-line bg-white px-3 py-2.5 text-sm text-ink disabled:bg-line/20 disabled:text-ink/55";
 
 function normalizedLocationName(name: string | null) {
   return (name ?? "")
@@ -34,27 +35,37 @@ function normalizedLocationName(name: string | null) {
 }
 
 export function AddressFields({ value, disabled = false, onChange }: AddressFieldsProps) {
-  const initialProvince = provinces.find((item) => item.name === value.province);
+  const initialProvince = provinces.find(
+    (item) => normalizedLocationName(item.name) === normalizedLocationName(value.province),
+  );
   const initialCity = cities.find(
     (item) =>
       normalizedLocationName(item.name) === normalizedLocationName(value.city_municipality) &&
-      (!initialProvince || item.provinceCode === initialProvince.code)
+      (!initialProvince || item.provinceCode === initialProvince.code),
   );
   const [regionCode, setRegionCode] = useState(initialProvince?.regionCode ?? "");
+  const [regionName, setRegionName] = useState(
+    regions.find((item) => item.code === initialProvince?.regionCode)?.name ?? "",
+  );
   const [provinceCode, setProvinceCode] = useState(initialProvince?.code ?? "");
   const [cityCode, setCityCode] = useState(initialCity?.code ?? "");
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const listId = useId().replace(/:/g, "");
   const provinceOptions = useMemo(() => provincesForRegion(regionCode), [regionCode]);
   const cityOptions = useMemo(() => citiesForProvince(provinceCode), [provinceCode]);
 
   useEffect(() => {
-    const matchedProvince = provinces.find((item) => item.name === value.province);
+    const matchedProvince = provinces.find(
+      (item) => normalizedLocationName(item.name) === normalizedLocationName(value.province),
+    );
     const matchedCity = cities.find(
       (item) =>
         normalizedLocationName(item.name) === normalizedLocationName(value.city_municipality) &&
-        (!matchedProvince || item.provinceCode === matchedProvince.code)
+        (!matchedProvince || item.provinceCode === matchedProvince.code),
     );
+    const matchedRegion = regions.find((item) => item.code === matchedProvince?.regionCode);
     setRegionCode(matchedProvince?.regionCode ?? "");
+    if (matchedRegion) setRegionName(matchedRegion.name);
     setProvinceCode(matchedProvince?.code ?? "");
     setCityCode(matchedCity?.code ?? "");
   }, [value.province, value.city_municipality]);
@@ -77,6 +88,51 @@ export function AddressFields({ value, disabled = false, onChange }: AddressFiel
     onChange({ ...value, ...next });
   }
 
+  function changeRegion(nextName: string) {
+    const match = regions.find(
+      (item) => normalizedLocationName(item.name) === normalizedLocationName(nextName),
+    );
+    setRegionName(nextName);
+    setRegionCode(match?.code ?? "");
+    setProvinceCode("");
+    setCityCode("");
+    patch({ province: null, city_municipality: null, barangay: null });
+  }
+
+  function changeProvince(nextName: string) {
+    const options = regionCode ? provinceOptions : provinces;
+    const match = options.find(
+      (item) => normalizedLocationName(item.name) === normalizedLocationName(nextName),
+    );
+    if (match && match.regionCode !== regionCode) {
+      setRegionCode(match.regionCode);
+      setRegionName(regions.find((item) => item.code === match.regionCode)?.name ?? "");
+    }
+    setProvinceCode(match?.code ?? "");
+    setCityCode("");
+    patch({ province: nextName || null, city_municipality: null, barangay: null });
+  }
+
+  function changeCity(nextName: string) {
+    const options = provinceCode ? cityOptions : cities;
+    const match = options.find(
+      (item) => normalizedLocationName(item.name) === normalizedLocationName(nextName),
+    );
+    if (match && match.provinceCode !== provinceCode) {
+      const province = provinces.find((item) => item.code === match.provinceCode);
+      setProvinceCode(match.provinceCode);
+      if (province) {
+        setRegionCode(province.regionCode);
+        setRegionName(regions.find((item) => item.code === province.regionCode)?.name ?? "");
+        setCityCode(match.code);
+        patch({ province: province.name, city_municipality: nextName || null, barangay: null });
+        return;
+      }
+    }
+    setCityCode(match?.code ?? "");
+    patch({ city_municipality: nextName || null, barangay: null });
+  }
+
   return (
     <>
       <label className="block text-xs font-semibold text-ink/75 sm:col-span-2">
@@ -85,60 +141,31 @@ export function AddressFields({ value, disabled = false, onChange }: AddressFiel
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Region
-        <select
-          className={inputClass}
-          disabled={disabled}
-          value={regionCode}
-          onChange={(event) => {
-            setRegionCode(event.target.value);
-            setProvinceCode("");
-            setCityCode("");
-            patch({ province: null, city_municipality: null, barangay: null });
-          }}
-        >
-          <option value="">Select region</option>
-          {regions.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-        </select>
+        <input className={inputClass} disabled={disabled} value={regionName} list={`${listId}-regions`} placeholder="Select or type a region" onChange={(event) => changeRegion(event.target.value)} />
+        <datalist id={`${listId}-regions`}>
+          {regions.map((item) => <option key={item.code} value={item.name} />)}
+        </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Province
-        <select
-          className={inputClass}
-          disabled={disabled || !regionCode}
-          value={provinceCode}
-          onChange={(event) => {
-            const selected = provinces.find((item) => item.code === event.target.value);
-            setProvinceCode(event.target.value);
-            setCityCode("");
-            patch({ province: selected?.name ?? null, city_municipality: null, barangay: null });
-          }}
-        >
-          <option value="">Select province</option>
-          {provinceOptions.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-        </select>
+        <input className={inputClass} disabled={disabled} value={value.province ?? ""} list={`${listId}-provinces`} placeholder="Select or type a province" onChange={(event) => changeProvince(event.target.value)} />
+        <datalist id={`${listId}-provinces`}>
+          {(regionCode ? provinceOptions : provinces).map((item) => <option key={item.code} value={item.name} />)}
+        </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         City / municipality
-        <select
-          className={inputClass}
-          disabled={disabled || !provinceCode}
-          value={cityCode}
-          onChange={(event) => {
-            const selected = cities.find((item) => item.code === event.target.value);
-            setCityCode(event.target.value);
-            patch({ city_municipality: selected?.name ?? null, barangay: null });
-          }}
-        >
-          <option value="">Select city / municipality</option>
-          {cityOptions.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-        </select>
+        <input className={inputClass} disabled={disabled} value={value.city_municipality ?? ""} list={`${listId}-cities`} placeholder="Select or type a city / municipality" onChange={(event) => changeCity(event.target.value)} />
+        <datalist id={`${listId}-cities`}>
+          {(provinceCode ? cityOptions : cities).map((item) => <option key={item.code} value={item.name} />)}
+        </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Barangay
-        <select className={inputClass} disabled={disabled || !cityCode} value={value.barangay ?? ""} onChange={(event) => patch({ barangay: event.target.value || null })}>
-          <option value="">Select barangay</option>
-          {barangays.map((item) => <option key={item.code} value={item.name}>{item.name}</option>)}
-        </select>
+        <input className={inputClass} disabled={disabled} value={value.barangay ?? ""} list={`${listId}-barangays`} placeholder="Select or type a barangay" onChange={(event) => patch({ barangay: event.target.value || null })} />
+        <datalist id={`${listId}-barangays`}>
+          {barangays.map((item) => <option key={item.code} value={item.name} />)}
+        </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Postal code

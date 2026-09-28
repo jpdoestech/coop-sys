@@ -9,6 +9,7 @@ coop-sys/
 |   |-- address/                  Philippine geographic reference data and query service
 |   |-- app/                      Routing, providers, and application composition
 |   |-- components/
+|   |   |-- forms/                Shared domain-aware form controls
 |   |   |-- layout/               Shared page shells and navigation
 |   |   `-- ui/                   Reusable presentation components
 |   |-- database/
