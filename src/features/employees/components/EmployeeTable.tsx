@@ -31,8 +31,8 @@ export function EmployeeTable({ employees, loading, onEdit, onArchive, canManage
   return (
     <div className="max-h-[62vh] overflow-auto border-t border-line">
       <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-        <thead className="sticky top-0 z-10"><tr className="border-b border-line bg-[#f8faf8] text-[11px] font-semibold uppercase text-ink/45">
-          <th className="px-5 py-3">Employee</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Placement</th><th className="px-4 py-3">Dependents</th><th className="px-4 py-3">Member</th>{canManage ? <th className="w-24 px-4 py-3 text-right">Actions</th> : null}
+        <thead className="sticky top-0 z-10"><tr className="border-b border-line bg-[#f8faf8] text-[10px] font-semibold uppercase text-ink/45">
+          <th className="px-5 py-2.5">Employee</th><th className="px-4 py-2.5">Role</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Placement</th><th className="px-4 py-2.5">Dependents</th><th className="px-4 py-2.5">Member</th>{canManage ? <th className="w-24 px-4 py-2.5 text-right">Actions</th> : null}
         </tr></thead>
         <tbody className="divide-y divide-line bg-white">
           {employees.map((employee) => {
@@ -45,8 +45,8 @@ export function EmployeeTable({ employees, loading, onEdit, onArchive, canManage
               <td className="px-4 py-2.5"><span className="font-semibold">{activeBeneficiaryCount(employee.beneficiaries)}</span><span className="text-ink/35"> / 3</span></td>
               <td className="px-4 py-2.5">{employee.member_id ? <span className="font-semibold text-moss">Linked</span> : <span className="text-ink/50">Not a member</span>}</td>
               {canManage ? <td className="px-4 py-2.5"><div className="flex justify-end gap-1">
-                <button className="icon-button" onClick={() => onEdit(employee)} title="Edit employee" aria-label={`Edit ${employee.first_name} ${employee.last_name}`}><Pencil className="h-4 w-4" /></button>
-                <button className="icon-button hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(employee)} title="Archive employee" aria-label={`Archive ${employee.first_name} ${employee.last_name}`}><Archive className="h-4 w-4" /></button>
+                <button className="icon-button h-8 w-8" onClick={() => onEdit(employee)} title="Edit employee" aria-label={`Edit ${employee.first_name} ${employee.last_name}`}><Pencil className="h-4 w-4" /></button>
+                <button className="icon-button h-8 w-8 hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(employee)} title="Archive employee" aria-label={`Archive ${employee.first_name} ${employee.last_name}`}><Archive className="h-4 w-4" /></button>
               </div></td> : null}
             </tr>;
           })}

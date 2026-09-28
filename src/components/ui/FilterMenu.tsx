@@ -5,9 +5,10 @@ type FilterMenuProps = {
   activeCount: number;
   children: ReactNode;
   onClear: () => void;
+  label?: string;
 };
 
-export function FilterMenu({ activeCount, children, onClear }: FilterMenuProps) {
+export function FilterMenu({ activeCount, children, onClear, label = "Filters" }: FilterMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -21,9 +22,9 @@ export function FilterMenu({ activeCount, children, onClear }: FilterMenuProps) 
 
   return (
     <div className="relative" ref={rootRef}>
-      <button type="button" onClick={() => setOpen((value) => !value)} className={`focus-ring inline-flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm font-semibold transition ${open || activeCount ? "border-moss/30 bg-emerald-50 text-moss" : "border-line bg-white text-ink/65 hover:bg-paper"}`} aria-expanded={open}>
+      <button type="button" onClick={() => setOpen((value) => !value)} className={`focus-ring inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-xs font-semibold transition ${open || activeCount ? "border-moss/30 bg-emerald-50 text-moss" : "border-line bg-white text-ink/65 hover:bg-paper"}`} aria-expanded={open}>
         <SlidersHorizontal className="h-4 w-4" />
-        Filters
+        {label}
         {activeCount ? <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-moss px-1 text-[10px] text-white">{activeCount}</span> : null}
       </button>
       {open ? (

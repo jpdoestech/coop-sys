@@ -1,35 +1,15 @@
 import type { Member, MemberInput } from "../../../types/member";
-import { developmentMembers } from "../../../database/seeds/memberSeed";
 import type { ListOptions } from "../Repository";
 import type { MemberRepository } from "../MemberRepository";
-
-const STORAGE_KEY = "coop_sys_members";
+import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 
 function now() {
   return new Date().toISOString();
 }
 
-function readMembers(): Member[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    return JSON.parse(raw) as Member[];
-  }
-
-  if (import.meta.env.DEV) {
-    writeMembers(developmentMembers);
-    return developmentMembers;
-  }
-
-  return [];
-}
-
-function writeMembers(members: Member[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-}
-
 export class LocalMemberRepository implements MemberRepository {
   async list(options: ListOptions = {}) {
-    let members = readMembers();
+    let members = readStoredMembers();
 
     if (!options.includeDeleted) {
       members = members.filter((member) => !member.deleted_at);
@@ -51,12 +31,12 @@ export class LocalMemberRepository implements MemberRepository {
   }
 
   async getById(id: string) {
-    return readMembers().find((member) => member.id === id) ?? null;
+    return readStoredMembers().find((member) => member.id === id) ?? null;
   }
 
   async findByMembershipNumber(membershipNumber: string) {
     return (
-      readMembers().find((member) => member.membership_number === membershipNumber) ?? null
+      readStoredMembers().find((member) => member.membership_number === membershipNumber) ?? null
     );
   }
 
@@ -64,18 +44,19 @@ export class LocalMemberRepository implements MemberRepository {
     const timestamp = now();
     const member: Member = {
       ...input,
+      beneficiaries: input.beneficiaries.map((beneficiary) => ({ ...beneficiary, deactivated_at: beneficiary.is_active ? null : timestamp })),
       id: crypto.randomUUID(),
       created_at: timestamp,
       updated_at: timestamp,
       deleted_at: null,
       sync_status: "pending_create"
     };
-    writeMembers([...readMembers(), member]);
+    writeStoredMembers([...readStoredMembers(), member]);
     return member;
   }
 
   async update(id: string, input: Partial<MemberInput>) {
-    const members = readMembers();
+    const members = readStoredMembers();
     const index = members.findIndex((member) => member.id === id);
 
     if (index === -1) {
@@ -85,17 +66,21 @@ export class LocalMemberRepository implements MemberRepository {
     const member: Member = {
       ...members[index],
       ...input,
+      beneficiaries: (input.beneficiaries ?? members[index].beneficiaries).map((beneficiary) => ({
+        ...beneficiary,
+        deactivated_at: beneficiary.is_active ? null : members[index].beneficiaries.find((item) => item.id === beneficiary.id)?.deactivated_at ?? now(),
+      })),
       updated_at: now(),
       sync_status:
         members[index].sync_status === "pending_create" ? "pending_create" : "pending_update"
     };
     members[index] = member;
-    writeMembers(members);
+    writeStoredMembers(members);
     return member;
   }
 
   async archive(id: string) {
-    const members = readMembers();
+    const members = readStoredMembers();
     const index = members.findIndex((member) => member.id === id);
 
     if (index === -1) {
@@ -109,11 +94,11 @@ export class LocalMemberRepository implements MemberRepository {
       sync_status:
         members[index].sync_status === "pending_create" ? "pending_create" : "pending_delete"
     };
-    writeMembers(members);
+    writeStoredMembers(members);
   }
 
   async restore(id: string) {
-    const members = readMembers();
+    const members = readStoredMembers();
     const index = members.findIndex((member) => member.id === id);
 
     if (index === -1) {
@@ -128,7 +113,7 @@ export class LocalMemberRepository implements MemberRepository {
         members[index].sync_status === "pending_create" ? "pending_create" : "pending_update"
     };
     members[index] = restored;
-    writeMembers(members);
+    writeStoredMembers(members);
     return restored;
   }
 }

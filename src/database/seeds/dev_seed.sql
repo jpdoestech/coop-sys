@@ -78,17 +78,14 @@ insert into public.members (
 )
 select
   ('40000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid,
-  'MEM-' || lpad(series::text, 4, '0'),
+  lpad(series::text, 6, '0'),
   'Member' || lpad(series::text, 2, '0'),
   'Sample' || lpad(series::text, 2, '0'),
   'member' || lpad(series::text, 2, '0') || '@example.test',
   '+6391700' || lpad(series::text, 4, '0'),
   date '2021-01-01' + series,
   '31000000-0000-4000-8000-000000000001',
-  case when series % 4 = 0
-    then '30000000-0000-4000-8000-000000000002'::uuid
-    else '30000000-0000-4000-8000-000000000001'::uuid
-  end,
+  '30000000-0000-4000-8000-000000000002'::uuid,
   'San Isidro',
   'Laguna'
 from generate_series(1, 50) as series;
@@ -99,7 +96,7 @@ insert into public.employees (
 )
 select
   ('50000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid,
-  'EMP-' || lpad(series::text, 4, '0'),
+  lpad(series::text, 6, '0'),
   ('40000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid,
   'Employee' || lpad(series::text, 2, '0'),
   'Demo' || lpad(series::text, 2, '0'),

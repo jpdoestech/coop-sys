@@ -9,6 +9,8 @@ import { religionAffiliations } from "../../../services/lookups/religionAffiliat
 import type { Member, MemberInput } from "../../../types/member";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
 import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { BeneficiaryEditor } from "../../../components/forms/BeneficiaryEditor";
+import { activeBeneficiaryCount } from "../../../types/beneficiary";
 
 type Draft = Omit<MemberInput, "annual_income" | "number_of_dependents"> & {
   annual_income: string;
@@ -17,6 +19,7 @@ type Draft = Omit<MemberInput, "annual_income" | "number_of_dependents"> & {
 
 type MemberFormProps = {
   member: Member | null;
+  suggestedNumber: string;
   saving: boolean;
   onCancel: () => void;
   onSubmit: (input: MemberInput) => void;
@@ -25,9 +28,9 @@ type MemberFormProps = {
 const inputClass =
   "control mt-1.5 w-full";
 
-function emptyDraft(): Draft {
+function emptyDraft(suggestedNumber = ""): Draft {
   return {
-    membership_number: "",
+    membership_number: suggestedNumber,
     first_name: "",
     middle_name: null,
     last_name: "",
@@ -43,7 +46,7 @@ function emptyDraft(): Draft {
     province: null,
     postal_code: null,
     membership_date: null,
-    membership_status_id: memberStatuses[0].id,
+    membership_status_id: memberStatuses[1].id,
     membership_type_id: memberTypes[1].id,
     member_category: null,
     religion_affiliation_id: null,
@@ -52,6 +55,8 @@ function emptyDraft(): Draft {
     philhealth_number: null,
     tax_identification_number: null,
     acceptance_resolution_number: null,
+    acceptance_date: null,
+    bod_approval_status: "pending",
     highest_educational_attainment: null,
     occupation_income_source: "Employed / Salary",
     annual_income: "",
@@ -62,16 +67,17 @@ function emptyDraft(): Draft {
     termination_reason: null,
     emergency_contact: null,
     notes: null,
-    profile_photo_ref: null
+    profile_photo_ref: null,
+    beneficiaries: [],
   };
 }
 
-function toDraft(member: Member | null): Draft {
-  if (!member) return emptyDraft();
+function toDraft(member: Member | null, suggestedNumber = ""): Draft {
+  if (!member) return emptyDraft(suggestedNumber);
   const recordFields = new Set(["id", "created_at", "updated_at", "deleted_at", "sync_status"]);
   const input = Object.fromEntries(
     Object.entries(member).filter(([field]) => !recordFields.has(field))
-  ) as MemberInput;
+  ) as unknown as MemberInput;
   return {
     ...input,
     annual_income: input.annual_income?.toString() ?? "",
@@ -101,8 +107,8 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormProps) {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(member));
+export function MemberForm({ member, suggestedNumber, saving, onCancel, onSubmit }: MemberFormProps) {
+  const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const addressValue: AddressValue = {
     address: draft.address,
@@ -122,9 +128,9 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
   );
 
   useEffect(() => {
-    setDraft(toDraft(member));
+    setDraft(toDraft(member, suggestedNumber));
     setErrors({});
-  }, [member]);
+  }, [member, suggestedNumber]);
 
   function setValue<K extends keyof Draft>(field: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -136,8 +142,7 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
     const result = memberInputSchema.safeParse({
       ...draft,
       annual_income: draft.annual_income === "" ? null : Number(draft.annual_income),
-      number_of_dependents:
-        draft.number_of_dependents === "" ? null : Number(draft.number_of_dependents)
+      number_of_dependents: activeBeneficiaryCount(draft.beneficiaries),
     });
 
     if (!result.success) {
@@ -171,7 +176,7 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
 
           <Section title="Identity" description="Core details shared with an employee profile when this person has both roles.">
             <Field label="Membership number" error={errors.membership_number}>
-              <input className={inputClass} value={draft.membership_number} onChange={(event) => setValue("membership_number", event.target.value)} placeholder="MEM-0001" />
+              <input className={`${inputClass} bg-paper font-mono`} value={draft.membership_number} readOnly aria-readonly="true" />
             </Field>
             <Field label="First name" error={errors.first_name}>
               <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} />
@@ -219,7 +224,8 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
 
           <Section title="Membership" description="Cooperative registration and board acceptance details.">
             <Field label="Membership date"><input type="date" className={inputClass} value={draft.membership_date ?? ""} onChange={(event) => setValue("membership_date", event.target.value || null)} /></Field>
-            <Field label="Acceptance resolution number"><input className={inputClass} value={draft.acceptance_resolution_number ?? ""} onChange={(event) => setValue("acceptance_resolution_number", event.target.value || null)} /></Field>
+            <Field label="BOD approval"><input className={`${inputClass} bg-paper`} readOnly value={draft.bod_approval_status === "approved" ? "Approved" : "Pending approval"} /></Field>
+            {draft.bod_approval_status === "approved" ? <Field label="Date & BOD resolution #"><input className={`${inputClass} bg-paper font-mono`} readOnly value={`${draft.acceptance_date ?? "Date not set"} / ${draft.acceptance_resolution_number ?? "Number not set"}`} /></Field> : null}
             <Field label="Membership type"><select className={inputClass} value={draft.membership_type_id ?? ""} onChange={(event) => setValue("membership_type_id", event.target.value || null)}>{memberTypes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
             <Field label="Membership status"><select className={inputClass} value={draft.membership_status_id ?? ""} onChange={(event) => { const status = event.target.value || null; setValue("membership_status_id", status); if (!status || !terminalMemberStatuses.has(status)) { setValue("termination_date", null); setValue("termination_reason", null); } }}>{memberStatuses.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
             {membershipEnded ? (
@@ -235,8 +241,12 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
           <Section title="Background" description="Optional details from the cooperative registration record; financial ledger entries are excluded.">
             <Field label="Occupation / income source"><input className={inputClass} value={draft.occupation_income_source ?? ""} onChange={(event) => setValue("occupation_income_source", event.target.value || null)} /></Field>
             <Field label="Annual income"><input type="number" min="0" step="0.01" className={inputClass} value={draft.annual_income} onChange={(event) => setValue("annual_income", event.target.value)} /></Field>
-            <div className="sm:col-span-2 border-l-4 border-moss bg-white px-4 py-3 text-xs leading-5 text-ink/65">Dependent totals are calculated from active beneficiary records on the linked employee profile. Up to three beneficiaries may be active at once.</div>
             <div className="sm:col-span-2"><Field label="Notes"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></Field></div>
+          </Section>
+
+          <Section title="Beneficiaries" description="Maintain up to three active dependents. Inactive records remain available with their reason.">
+            {errors.beneficiaries ? <p className="sm:col-span-2 text-xs text-red-700">{errors.beneficiaries}</p> : null}
+            <BeneficiaryEditor value={draft.beneficiaries} onChange={(value) => setValue("beneficiaries", value)} />
           </Section>
 
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper/95 px-6 py-4 backdrop-blur sm:px-8">

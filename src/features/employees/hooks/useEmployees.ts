@@ -7,6 +7,7 @@ import { terminalEmploymentStatuses } from "../../../services/lookups/statuses";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
 import { useAccess } from "../../../services/access/useAccess";
 import { assertPermission, branchIsInScope, employeeIsInScope } from "../../../services/access/accessControl";
+import { nextPersonNumber } from "../../../services/identity/personNumber";
 
 export function useEmployees(search: string) {
   const repositories = useMemo(() => createRepositories(), []);
@@ -39,11 +40,19 @@ export function useEmployees(search: string) {
       );
     }
   });
+  const personNumber = useQuery({
+    queryKey: ["next-person-number"],
+    queryFn: async () => nextPersonNumber(
+      await repositories.members.list({ limit: 10000 }),
+      await repositories.employees.list({ limit: 10000 }),
+    ),
+  });
   const saveEmployee = useMutation({
     mutationFn: async ({ employee, submission }: { employee: Employee | null; submission: EmployeeSubmission }) => {
       assertPermission(profile, "employees.manage");
       if (employee && !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your assigned branches.");
       let input: EmployeeInput = submission.input;
+      if (!employee) input = { ...input, employee_number: personNumber.data ?? input.employee_number };
       if (!branchIsInScope(input.active_assignment?.branch_id, profile)) {
         throw new Error("Select one of your assigned branches for this employee.");
       }
@@ -57,7 +66,9 @@ export function useEmployees(search: string) {
         );
         input = { ...input, member_id: member.id };
       } else if (submission.membership.mode === "existing") {
-        input = { ...input, member_id: submission.membership.memberId };
+        const member = await repositories.members.getById(submission.membership.memberId);
+        if (!member) throw new Error("Member record not found.");
+        input = { ...input, member_id: member.id, employee_number: member.membership_number };
         await repositories.members.update(
           submission.membership.memberId,
           governmentIdsFromEmployee(input),
@@ -74,6 +85,7 @@ export function useEmployees(search: string) {
       queryClient.invalidateQueries({ queryKey: ["former-employees"] });
       queryClient.invalidateQueries({ queryKey: ["members"] });
       queryClient.invalidateQueries({ queryKey: ["member-options"] });
+      queryClient.invalidateQueries({ queryKey: ["next-person-number"] });
     }
   });
   const archiveEmployee = useMutation({
@@ -85,5 +97,5 @@ export function useEmployees(search: string) {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] })
   });
-  return { query, members, formerEmployees, saveEmployee, archiveEmployee };
+  return { query, members, formerEmployees, personNumber, saveEmployee, archiveEmployee };
 }

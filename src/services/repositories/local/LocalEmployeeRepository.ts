@@ -2,6 +2,9 @@ import { developmentEmployees } from "../../../database/seeds/employeeSeed";
 import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { EmployeeRepository } from "../EmployeeRepository";
 import type { ListOptions } from "../Repository";
+import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
+import { readStoredMembers, writeStoredMembers } from "./memberStorage";
+import { normalizePersonNumber } from "../../identity/personNumber";
 
 const STORAGE_KEY = "coop_sys_employees";
 
@@ -13,12 +16,51 @@ function writeEmployees(employees: Employee[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
 }
 
+function normalizeBeneficiaries(input: BeneficiaryInput[], existing: Beneficiary[], timestamp: string): Beneficiary[] {
+  return input.map((beneficiary) => ({
+    ...beneficiary,
+    deactivated_at: beneficiary.is_active ? null : existing.find((item) => item.id === beneficiary.id)?.deactivated_at ?? timestamp,
+  }));
+}
+
+function saveMemberBeneficiaries(memberId: string, input: BeneficiaryInput[], timestamp: string) {
+  const members = readStoredMembers();
+  const index = members.findIndex((member) => member.id === memberId);
+  if (index === -1) return normalizeBeneficiaries(input, [], timestamp);
+  const beneficiaries = normalizeBeneficiaries(input, members[index].beneficiaries, timestamp);
+  members[index] = {
+    ...members[index], beneficiaries, number_of_dependents: beneficiaries.filter((item) => item.is_active).length,
+    updated_at: timestamp, sync_status: members[index].sync_status === "pending_create" ? "pending_create" : "pending_update",
+  };
+  writeStoredMembers(members);
+  return beneficiaries;
+}
+
+function linkedMemberIdentity(employee: Employee) {
+  if (!employee.member_id) return null;
+  const members = readStoredMembers();
+  const index = members.findIndex((member) => member.id === employee.member_id);
+  if (index === -1) return null;
+  if (!members[index].beneficiaries.length && employee.beneficiaries?.length) {
+    members[index] = {
+      ...members[index],
+      beneficiaries: employee.beneficiaries,
+      number_of_dependents: employee.beneficiaries.filter((item) => item.is_active).length,
+    };
+    writeStoredMembers(members);
+  }
+  return members[index];
+}
+
 function normalizeEmployee(employee: Employee): Employee {
+  const linkedMember = linkedMemberIdentity(employee);
   const history = (employee.assignment_history ?? (employee.active_assignment ? [employee.active_assignment] : []))
     .map((assignment) => ({ ...assignment, transfer_reason: assignment.transfer_reason ?? null }))
     .sort((a, b) => b.start_date.localeCompare(a.start_date));
   return {
     ...employee,
+    employee_number: linkedMember?.membership_number ?? normalizePersonNumber(employee.employee_number),
+    beneficiaries: linkedMember?.beneficiaries ?? employee.beneficiaries ?? [],
     assignment_history: history,
     active_assignment: history.find((assignment) => !assignment.end_date) ?? null,
   };
@@ -66,9 +108,12 @@ export class LocalEmployeeRepository implements EmployeeRepository {
 
   async create(input: EmployeeInput) {
     const timestamp = now();
+    const beneficiaries = input.member_id
+      ? saveMemberBeneficiaries(input.member_id, input.beneficiaries, timestamp)
+      : normalizeBeneficiaries(input.beneficiaries, [], timestamp);
     const employee: Employee = {
       ...input,
-      beneficiaries: input.beneficiaries.map((beneficiary) => ({ ...beneficiary, deactivated_at: beneficiary.is_active ? null : timestamp })),
+      beneficiaries,
       active_assignment: input.active_assignment?.end_date ? null : input.active_assignment,
       assignment_history: input.active_assignment ? [input.active_assignment] : [],
       id: crypto.randomUUID(),
@@ -87,6 +132,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     if (index === -1) throw new Error("Employee not found.");
     const timestamp = now();
     const existing = normalizeEmployee(employees[index]);
+    const memberId = Object.prototype.hasOwnProperty.call(input, "member_id") ? input.member_id ?? null : existing.member_id;
     let assignmentHistory = existing.assignment_history;
     let activeAssignment = existing.active_assignment;
     if (Object.prototype.hasOwnProperty.call(input, "active_assignment")) {
@@ -113,13 +159,11 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       ...input,
       active_assignment: activeAssignment,
       assignment_history: assignmentHistory.sort((a, b) => b.start_date.localeCompare(a.start_date)),
-      beneficiaries: (input.beneficiaries ?? employees[index].beneficiaries).map((beneficiary) => {
-        const existingBeneficiary = employees[index].beneficiaries.find((item) => item.id === beneficiary.id);
-        return {
-          ...beneficiary,
-          deactivated_at: beneficiary.is_active ? null : existingBeneficiary?.deactivated_at ?? timestamp
-        };
-      }),
+      beneficiaries: input.beneficiaries
+        ? memberId
+          ? saveMemberBeneficiaries(memberId, input.beneficiaries, timestamp)
+          : normalizeBeneficiaries(input.beneficiaries, employees[index].beneficiaries, timestamp)
+        : existing.beneficiaries,
       updated_at: timestamp,
       sync_status: employees[index].sync_status === "pending_create" ? "pending_create" : "pending_update"
     };

@@ -8,7 +8,7 @@ function employee(
   lastName: string,
   employmentStatusId = "33000000-0000-4000-8000-000000000001",
 ): Employee {
-  const sequence = String(index).padStart(4, "0");
+  const sequence = String(index).padStart(6, "0");
   const departmentIndex = ((index - 1) % 5) + 1;
   const positionIndex = ((index - 1) % 10) + 1;
   const branchIndex = index % 2 === 0 ? 2 : 1;
@@ -35,13 +35,13 @@ function employee(
 
   return {
     id: `80000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-    employee_number: `EMP-${sequence}`,
+    employee_number: sequence,
     member_id: index <= 6 ? `70000000-0000-4000-8000-${String(index).padStart(12, "0")}` : null,
     religion_affiliation_id: `35000000-0000-4000-8000-00000000000${(index % 8) + 1}`,
     sss_number: null,
     pagibig_number: null,
     philhealth_number: null,
-    tax_identification_number: index <= 6 ? `000-000-${sequence}-000` : null,
+    tax_identification_number: index <= 6 ? `000-000-${String(index).padStart(3, "0")}-000` : null,
     first_name: firstName,
     middle_name: null,
     last_name: lastName,

@@ -9,7 +9,7 @@ import { employeeInputSchema } from "../../../services/validation/employeeSchema
 import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { Member } from "../../../types/member";
 import { AssignmentEditor } from "./AssignmentEditor";
-import { BeneficiaryEditor } from "./BeneficiaryEditor";
+import { BeneficiaryEditor } from "../../../components/forms/BeneficiaryEditor";
 import {
   employmentStatuses,
   employmentTypes,
@@ -23,6 +23,7 @@ type MembershipMode = "none" | "existing" | "create";
 
 type Props = {
   employee: Employee | null;
+  suggestedNumber: string;
   members: Member[];
   formerEmployees: Employee[];
   saving: boolean;
@@ -64,9 +65,9 @@ function newAssignment() {
   };
 }
 
-function emptyInput(): EmployeeInput {
+function emptyInput(suggestedNumber = ""): EmployeeInput {
   return {
-    employee_number: "",
+    employee_number: suggestedNumber,
     member_id: null,
     religion_affiliation_id: null,
     sss_number: null,
@@ -102,20 +103,19 @@ function emptyInput(): EmployeeInput {
   };
 }
 
-function toInput(employee: Employee | null): EmployeeInput {
-  if (!employee) return emptyInput();
+function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput {
+  if (!employee) return emptyInput(suggestedNumber);
   const omitted = new Set(["id", "created_at", "updated_at", "deleted_at", "sync_status", "assignment_history"]);
   return Object.fromEntries(
     Object.entries(employee).filter(([key]) => !omitted.has(key)),
   ) as unknown as EmployeeInput;
 }
 
-export function EmployeeForm({ employee, members, formerEmployees, saving, saveError, onCancel, onSubmit }: Props) {
+export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, onCancel, onSubmit }: Props) {
   const { departments, positions } = useOrganization();
-  const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee));
+  const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
   const [membershipMode, setMembershipMode] = useState<MembershipMode>(employee?.member_id ? "existing" : "none");
-  const [newMembershipNumber, setNewMembershipNumber] = useState("");
   const [rehireSourceId, setRehireSourceId] = useState("");
   const [transferring, setTransferring] = useState(false);
   const linkedMember = useMemo(
@@ -130,13 +130,12 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
   );
 
   useEffect(() => {
-    setDraft(toInput(employee));
+    setDraft(toInput(employee, suggestedNumber));
     setMembershipMode(employee?.member_id ? "existing" : "none");
-    setNewMembershipNumber("");
     setRehireSourceId("");
     setTransferring(false);
     setError("");
-  }, [employee]);
+  }, [employee, suggestedNumber]);
 
   function setValue<K extends keyof EmployeeInput>(field: K, value: EmployeeInput[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -161,7 +160,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     setRehireSourceId(sourceId);
     const source = formerEmployees.find((item) => item.id === sourceId);
     if (!source) {
-      setDraft(emptyInput());
+      setDraft(emptyInput(suggestedNumber));
       setMembershipMode("none");
       return;
     }
@@ -169,7 +168,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     const copied = toInput(source);
     const refreshed: EmployeeInput = {
       ...copied,
-      employee_number: "",
+      employee_number: suggestedNumber,
       employment_status_id: employmentStatuses[0].id,
       date_hired: new Date().toISOString().slice(0, 10),
       date_regularized: null,
@@ -194,10 +193,6 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     event.preventDefault();
     if (membershipMode === "existing" && !draft.member_id) {
       setError("Select the existing member ID to link.");
-      return;
-    }
-    if (membershipMode === "create" && !newMembershipNumber.trim()) {
-      setError("Enter the new membership number.");
       return;
     }
     if (transferring && !draft.active_assignment?.transfer_reason?.trim()) {
@@ -234,7 +229,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     const membership = membershipMode === "existing"
       ? { mode: "existing" as const, memberId: draft.member_id! }
       : membershipMode === "create"
-        ? { mode: "create" as const, membershipNumber: newMembershipNumber.trim() }
+        ? { mode: "create" as const, membershipNumber: draft.employee_number }
         : { mode: "none" as const };
     onSubmit({ input: result.data as EmployeeInput, membership });
   }
@@ -306,11 +301,11 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
             ) : null}
             {membershipMode === "create" ? (
               <div className="sm:col-span-2">
-                <Field label="New membership number"><input className={inputClass} value={newMembershipNumber} onChange={(event) => setNewMembershipNumber(event.target.value)} placeholder="MEM-0001" /></Field>
+                <p className="sm:col-span-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">The membership record will use person number <span className="font-mono font-semibold">{draft.employee_number}</span>.</p>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-moss"><UserPlus className="h-3.5 w-3.5" /> A new Associate membership will copy shared identity, address, and government numbers only.</p>
               </div>
             ) : null}
-            <Field label="Employee number"><input className={inputClass} value={draft.employee_number} onChange={(event) => setValue("employee_number", event.target.value)} placeholder="EMP-0001" /></Field>
+            <Field label="Person number"><input className={`${inputClass} bg-paper font-mono`} value={draft.employee_number} readOnly aria-readonly="true" /></Field>
             <Field label="Religion / social affiliation"><select className={inputClass} value={draft.religion_affiliation_id ?? ""} onChange={(event) => setValue("religion_affiliation_id", event.target.value || null)}><option value="">Not set</option>{religionAffiliations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
             <Field label="First name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} /></Field>
             <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} /></Field>

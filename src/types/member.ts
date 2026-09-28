@@ -1,4 +1,7 @@
 import type { BaseRecord, PersonName } from "./common";
+import type { Beneficiary, BeneficiaryInput } from "./beneficiary";
+
+export type BodApprovalStatus = "pending" | "approved";
 
 export type Member = BaseRecord &
   PersonName & {
@@ -23,6 +26,8 @@ export type Member = BaseRecord &
     philhealth_number: string | null;
     tax_identification_number: string | null;
     acceptance_resolution_number: string | null;
+    acceptance_date: string | null;
+    bod_approval_status: BodApprovalStatus;
     highest_educational_attainment: string | null;
     occupation_income_source: string | null;
     annual_income: number | null;
@@ -34,9 +39,10 @@ export type Member = BaseRecord &
     emergency_contact: string | null;
     notes: string | null;
     profile_photo_ref: string | null;
+    beneficiaries: Beneficiary[];
   };
 
 export type MemberInput = Omit<
   Member,
-  "id" | "created_at" | "updated_at" | "deleted_at" | "sync_status"
->;
+  "id" | "created_at" | "updated_at" | "deleted_at" | "sync_status" | "beneficiaries"
+> & { beneficiaries: BeneficiaryInput[] };

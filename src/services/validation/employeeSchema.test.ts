@@ -4,7 +4,7 @@ import { EMPLOYMENT_STATUS } from "../lookups/statuses";
 import { HEAD_OFFICE_ID } from "../lookups/organization";
 
 const baseEmployee = {
-  employee_number: "EMP-000001",
+  employee_number: "000001",
   member_id: null,
   religion_affiliation_id: null,
   sss_number: null,

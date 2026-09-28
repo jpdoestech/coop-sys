@@ -23,14 +23,16 @@ const employee = {
   philhealth_number: "12-345678901-2",
   tax_identification_number: "123-456-789-000",
   date_hired: "2026-09-28",
-} as EmployeeInput;
+  beneficiaries: [],
+} as unknown as EmployeeInput;
 
 describe("newMemberFromEmployee", () => {
   it("copies shared identity but starts a new Associate membership lifecycle", () => {
-    const member = newMemberFromEmployee(employee, "MEM-1000");
+    const member = newMemberFromEmployee(employee, "001000");
 
-    expect(member.membership_number).toBe("MEM-1000");
+    expect(member.membership_number).toBe("001000");
     expect(member.membership_type_id).toBe(ASSOCIATE_MEMBER_TYPE_ID);
+    expect(member.bod_approval_status).toBe("pending");
     expect(member.tax_identification_number).toBe(employee.tax_identification_number);
     expect(member).not.toHaveProperty("date_hired");
   });

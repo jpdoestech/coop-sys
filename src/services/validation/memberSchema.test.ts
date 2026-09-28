@@ -3,7 +3,7 @@ import { memberInputSchema } from "./memberSchema";
 import { MEMBER_STATUS } from "../lookups/statuses";
 
 const validMember = {
-  membership_number: "MEM-0001",
+  membership_number: "000001",
   first_name: "Amara",
   middle_name: null,
   last_name: "Santos",
@@ -28,6 +28,8 @@ const validMember = {
   philhealth_number: null,
   tax_identification_number: null,
   acceptance_resolution_number: null,
+  acceptance_date: null,
+  bod_approval_status: "pending",
   highest_educational_attainment: null,
   occupation_income_source: null,
   annual_income: 300000,
@@ -38,7 +40,8 @@ const validMember = {
   termination_reason: null,
   emergency_contact: null,
   notes: null,
-  profile_photo_ref: null
+  profile_photo_ref: null,
+  beneficiaries: [],
 };
 
 describe("memberInputSchema", () => {

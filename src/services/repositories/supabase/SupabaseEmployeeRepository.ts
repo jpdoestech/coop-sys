@@ -8,6 +8,7 @@ import type { ListOptions } from "../Repository";
 type EmployeeRow = Omit<Employee, "beneficiaries" | "active_assignment" | "assignment_history"> & {
   beneficiaries?: Beneficiary[];
   employment_assignments?: EmploymentAssignment[];
+  member?: { beneficiaries?: Beneficiary[] } | null;
 };
 
 function client() {
@@ -20,7 +21,7 @@ function normalize(row: EmployeeRow): Employee {
     .sort((a, b) => b.start_date.localeCompare(a.start_date));
   return {
     ...row,
-    beneficiaries: row.beneficiaries ?? [],
+    beneficiaries: row.member?.beneficiaries ?? row.beneficiaries ?? [],
     active_assignment: assignmentHistory.find((assignment) => !assignment.end_date) ?? null,
     assignment_history: assignmentHistory,
   };
@@ -36,15 +37,20 @@ function employeeFields(input: EmployeeInput | Partial<EmployeeInput>) {
 async function saveRelations(employeeId: string, input: Partial<EmployeeInput>) {
   const db = client();
   if (input.beneficiaries) {
+    const memberId = input.member_id ?? null;
     const rows = input.beneficiaries.map((beneficiary: BeneficiaryInput) => ({
       ...beneficiary,
-      employee_id: employeeId,
-      member_id: null,
+      employee_id: memberId ? null : employeeId,
+      member_id: memberId,
       deactivated_at: beneficiary.is_active ? null : new Date().toISOString(),
       sync_status: "synced"
     }));
     if (rows.length) {
       const { error } = await db.from("beneficiaries").upsert(rows);
+      if (error) throw error;
+    }
+    if (memberId) {
+      const { error } = await db.from("beneficiaries").delete().eq("employee_id", employeeId);
       if (error) throw error;
     }
   }
@@ -76,7 +82,7 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
   async list(options: ListOptions = {}) {
     let query = client()
       .from("employees")
-      .select("*, beneficiaries(*), employment_assignments(*)")
+      .select("*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))")
       .order("updated_at", { ascending: false });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
     if (options.search) {
@@ -90,19 +96,19 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
   }
 
   async getById(id: string) {
-    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*)").eq("id", id).maybeSingle();
+    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))").eq("id", id).maybeSingle();
     if (error) throw error;
     return data ? normalize(data as EmployeeRow) : null;
   }
 
   async findByEmployeeNumber(employeeNumber: string) {
-    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*)").eq("employee_number", employeeNumber).maybeSingle();
+    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))").eq("employee_number", employeeNumber).maybeSingle();
     if (error) throw error;
     return data ? normalize(data as EmployeeRow) : null;
   }
 
   async listByMemberId(memberId: string) {
-    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*)").eq("member_id", memberId);
+    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))").eq("member_id", memberId);
     if (error) throw error;
     return (data as EmployeeRow[]).map(normalize);
   }

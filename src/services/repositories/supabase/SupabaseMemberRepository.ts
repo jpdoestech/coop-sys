@@ -2,6 +2,30 @@ import { supabase } from "../../../database/supabase/client";
 import type { Member, MemberInput } from "../../../types/member";
 import type { ListOptions } from "../Repository";
 import type { MemberRepository } from "../MemberRepository";
+import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
+
+type MemberRow = Omit<Member, "beneficiaries"> & { beneficiaries?: Beneficiary[] };
+
+function normalize(row: MemberRow): Member {
+  return { ...row, beneficiaries: row.beneficiaries ?? [] };
+}
+
+function memberFields(input: MemberInput | Partial<MemberInput>) {
+  return Object.fromEntries(Object.entries(input).filter(([field]) => field !== "beneficiaries"));
+}
+
+async function saveBeneficiaries(memberId: string, beneficiaries?: BeneficiaryInput[]) {
+  if (!beneficiaries) return;
+  const client = requireSupabase();
+  const rows = beneficiaries.map((beneficiary) => ({
+    ...beneficiary, member_id: memberId, employee_id: null,
+    deactivated_at: beneficiary.is_active ? null : new Date().toISOString(), sync_status: "synced",
+  }));
+  if (rows.length) {
+    const { error } = await client.from("beneficiaries").upsert(rows);
+    if (error) throw error;
+  }
+}
 
 function requireSupabase() {
   if (!supabase) {
@@ -14,7 +38,7 @@ function requireSupabase() {
 export class SupabaseMemberRepository implements MemberRepository {
   async list(options: ListOptions = {}) {
     const client = requireSupabase();
-    let query = client.from("members").select("*").order("updated_at", { ascending: false });
+    let query = client.from("members").select("*, beneficiaries(*)").order("updated_at", { ascending: false });
 
     if (!options.includeDeleted) {
       query = query.is("deleted_at", null);
@@ -33,48 +57,48 @@ export class SupabaseMemberRepository implements MemberRepository {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data as Member[];
+    return (data as MemberRow[]).map(normalize);
   }
 
   async getById(id: string) {
     const client = requireSupabase();
-    const { data, error } = await client.from("members").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await client.from("members").select("*, beneficiaries(*)").eq("id", id).maybeSingle();
     if (error) throw error;
-    return data as Member | null;
+    return data ? normalize(data as MemberRow) : null;
   }
 
   async findByMembershipNumber(membershipNumber: string) {
     const client = requireSupabase();
     const { data, error } = await client
       .from("members")
-      .select("*")
+      .select("*, beneficiaries(*)")
       .eq("membership_number", membershipNumber)
       .maybeSingle();
     if (error) throw error;
-    return data as Member | null;
+    return data ? normalize(data as MemberRow) : null;
   }
 
   async create(input: MemberInput) {
     const client = requireSupabase();
     const { data, error } = await client
       .from("members")
-      .insert({ ...input, sync_status: "synced" })
+      .insert({ ...memberFields(input), sync_status: "synced" })
       .select("*")
       .single();
     if (error) throw error;
-    return data as Member;
+    await saveBeneficiaries(data.id as string, input.beneficiaries);
+    return (await this.getById(data.id as string))!;
   }
 
   async update(id: string, input: Partial<MemberInput>) {
     const client = requireSupabase();
-    const { data, error } = await client
+    const { error } = await client
       .from("members")
-      .update({ ...input, updated_at: new Date().toISOString(), sync_status: "synced" })
-      .eq("id", id)
-      .select("*")
-      .single();
+      .update({ ...memberFields(input), updated_at: new Date().toISOString(), sync_status: "synced" })
+      .eq("id", id);
     if (error) throw error;
-    return data as Member;
+    await saveBeneficiaries(id, input.beneficiaries);
+    return (await this.getById(id))!;
   }
 
   async archive(id: string) {
@@ -99,6 +123,6 @@ export class SupabaseMemberRepository implements MemberRepository {
       .select("*")
       .single();
     if (error) throw error;
-    return data as Member;
+    return normalize(data as MemberRow);
   }
 }

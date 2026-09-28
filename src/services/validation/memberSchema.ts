@@ -2,12 +2,13 @@ import { z } from "zod";
 import { terminalMemberStatuses } from "../lookups/statuses";
 import { governmentId } from "./governmentIdSchema";
 import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
+import { beneficiariesSchema } from "./beneficiarySchema";
 
 const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
 const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
 
 export const memberInputSchema = z.object({
-  membership_number: z.string().trim().min(1, "Membership number is required.").max(CHARACTER_LIMITS.identifier),
+  membership_number: z.string().regex(/^\d{6}$/, "Membership number must contain exactly six digits."),
   first_name: z.string().trim().min(1, "First name is required.").max(CHARACTER_LIMITS.name),
   middle_name: nullableText,
   last_name: z.string().trim().min(1, "Last name is required.").max(CHARACTER_LIMITS.name),
@@ -38,6 +39,8 @@ export const memberInputSchema = z.object({
   philhealth_number: governmentId([12], "PhilHealth number", 14, [/^\d{2}-\d{9}-\d$/]),
   tax_identification_number: governmentId([9, 12], "TIN", 15, [/^\d{3}-\d{3}-\d{3}$/, /^\d{3}-\d{3}-\d{3}-\d{3}$/]),
   acceptance_resolution_number: nullableText,
+  acceptance_date: nullableText,
+  bod_approval_status: z.enum(["pending", "approved"]),
   highest_educational_attainment: nullableText,
   occupation_income_source: nullableText,
   annual_income: z.number().nonnegative().nullable().optional(),
@@ -48,8 +51,15 @@ export const memberInputSchema = z.object({
   termination_reason: nullableText,
   emergency_contact: nullableText,
   notes: z.string().trim().max(CHARACTER_LIMITS.notes, "Notes are too long.").nullable().optional(),
-  profile_photo_ref: nullableText
+  profile_photo_ref: nullableText,
+  beneficiaries: beneficiariesSchema,
 }).refine(
+  (value) => value.bod_approval_status === "pending" || Boolean(value.acceptance_date && /^\d{6}$/.test(value.acceptance_resolution_number ?? "")),
+  {
+    message: "Approved memberships require an approval date and six-digit BOD resolution number.",
+    path: ["acceptance_resolution_number"],
+  },
+).refine(
   (value) =>
     !value.membership_status_id ||
     !terminalMemberStatuses.has(value.membership_status_id) ||

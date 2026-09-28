@@ -6,6 +6,7 @@ export const ASSOCIATE_MEMBER_TYPE_ID = "30000000-0000-4000-8000-000000000002";
 
 export function employeeProfileFromMember(member: Member): Partial<EmployeeInput> {
   return {
+    employee_number: member.membership_number,
     member_id: member.id,
     first_name: member.first_name,
     middle_name: member.middle_name,
@@ -26,6 +27,15 @@ export function employeeProfileFromMember(member: Member): Partial<EmployeeInput
     pagibig_number: member.pagibig_number,
     philhealth_number: member.philhealth_number,
     tax_identification_number: member.tax_identification_number,
+    beneficiaries: member.beneficiaries.map((beneficiary) => ({
+      id: beneficiary.id,
+      full_name: beneficiary.full_name,
+      relationship: beneficiary.relationship,
+      date_of_birth: beneficiary.date_of_birth,
+      contact_number: beneficiary.contact_number,
+      is_active: beneficiary.is_active,
+      deactivation_reason: beneficiary.deactivation_reason,
+    })),
   };
 }
 
@@ -35,6 +45,7 @@ export function governmentIdsFromEmployee(employee: EmployeeInput): Partial<Memb
     pagibig_number: employee.pagibig_number,
     philhealth_number: employee.philhealth_number,
     tax_identification_number: employee.tax_identification_number,
+    beneficiaries: employee.beneficiaries,
   };
 }
 
@@ -59,7 +70,7 @@ export function newMemberFromEmployee(
     province: employee.province,
     postal_code: employee.postal_code,
     membership_date: new Date().toISOString().slice(0, 10),
-    membership_status_id: MEMBER_STATUS.active,
+    membership_status_id: MEMBER_STATUS.inactive,
     membership_type_id: ASSOCIATE_MEMBER_TYPE_ID,
     member_category: "Manpower",
     religion_affiliation_id: employee.religion_affiliation_id,
@@ -68,6 +79,8 @@ export function newMemberFromEmployee(
     philhealth_number: employee.philhealth_number,
     tax_identification_number: employee.tax_identification_number,
     acceptance_resolution_number: null,
+    acceptance_date: null,
+    bod_approval_status: "pending",
     highest_educational_attainment: null,
     occupation_income_source: "Employed / Salary",
     annual_income: null,
@@ -79,6 +92,7 @@ export function newMemberFromEmployee(
     emergency_contact: null,
     notes: null,
     profile_photo_ref: null,
+    beneficiaries: employee.beneficiaries,
   };
 }
 

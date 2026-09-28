@@ -33,11 +33,15 @@ textarea {
     @apply focus-ring min-h-10 rounded-md border border-line bg-white px-3 text-sm text-ink shadow-sm transition placeholder:text-ink/40 hover:border-ink/20;
   }
 
+  .compact-control {
+    @apply focus-ring h-9 rounded-md border border-line bg-white px-3 text-xs text-ink shadow-sm transition placeholder:text-ink/40 hover:border-ink/20;
+  }
+
   .icon-button {
     @apply focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-ink/55 transition hover:border-line hover:bg-paper hover:text-ink;
   }
 
   .primary-button {
-    @apply focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f6145] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus-ring inline-flex h-9 items-center justify-center gap-2 rounded-md bg-moss px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1f6145] disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
