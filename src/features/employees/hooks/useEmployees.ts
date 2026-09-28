@@ -5,7 +5,7 @@ import type { Employee, EmployeeInput } from "../../../types/employee";
 import { governmentIdsFromEmployee, newMemberFromEmployee } from "../../../services/identity/personProfileSync";
 import { terminalEmploymentStatuses } from "../../../services/lookups/statuses";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
-import { useAccess } from "../../../services/access/AccessContext";
+import { useAccess } from "../../../services/access/useAccess";
 import { assertPermission, branchIsInScope, employeeIsInScope } from "../../../services/access/accessControl";
 
 export function useEmployees(search: string) {

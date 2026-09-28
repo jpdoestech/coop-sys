@@ -6,7 +6,7 @@ import { EmployeeForm } from "./components/EmployeeForm";
 import { EmployeeTable } from "./components/EmployeeTable";
 import { useEmployees } from "./hooks/useEmployees";
 import type { EmployeeSubmission } from "./types/employeeWorkflow";
-import { useAccess } from "../../services/access/AccessContext";
+import { useAccess } from "../../services/access/useAccess";
 
 export function EmployeesPage() {
   const [search, setSearch] = useState("");

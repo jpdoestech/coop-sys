@@ -19,6 +19,7 @@ coop-sys/
 |   |-- features/                 Business modules owned end to end
 |   |   |-- members/
 |   |   |-- employees/
+|   |   |-- users/
 |   |   |-- departments/
 |   |   |-- positions/
 |   |   |-- documents/
@@ -28,6 +29,7 @@ coop-sys/
 |   |   `-- settings/
 |   |-- hooks/                    Cross-feature React hooks
 |   |-- services/
+|   |   |-- access/               Role permissions and organization scope rules
 |   |   |-- identity/             Member/employee profile synchronization rules
 |   |   |-- lookups/              Shared configurable reference values
 |   |   |-- repositories/         Persistence interfaces and implementations

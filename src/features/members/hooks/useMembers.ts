@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { createRepositories } from "../../../services/repositories/repositoryFactory";
 import type { Member, MemberInput } from "../../../types/member";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
-import { useAccess } from "../../../services/access/AccessContext";
+import { useAccess } from "../../../services/access/useAccess";
 import { assertPermission, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
 
 export function useMembers(search: string) {

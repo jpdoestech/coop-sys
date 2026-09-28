@@ -18,7 +18,7 @@ import { NavLink } from "react-router-dom";
 import { clsx } from "clsx";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { getAppMode } from "../../utils/env";
-import { useAccess } from "../../services/access/AccessContext";
+import { useAccess } from "../../services/access/useAccess";
 import { roleLabel, type Permission } from "../../services/access/accessControl";
 
 type AppShellProps = {

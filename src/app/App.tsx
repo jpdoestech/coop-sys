@@ -23,13 +23,13 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/members" element={<RequirePermission permission="members.view"><MembersPage /></RequirePermission>} />
           <Route path="/employees" element={<RequirePermission permission="employees.view"><EmployeesPage /></RequirePermission>} />
-          <Route path="/organization/departments" element={<DepartmentsPage />} />
-          <Route path="/organization/positions" element={<PositionsPage />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/sync" element={<SynchronizationPage />} />
-          <Route path="/audit-logs" element={<AuditLogsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/organization/departments" element={<RequirePermission permission="organization.manage"><DepartmentsPage /></RequirePermission>} />
+          <Route path="/organization/positions" element={<RequirePermission permission="organization.manage"><PositionsPage /></RequirePermission>} />
+          <Route path="/documents" element={<RequirePermission permission="documents.view"><DocumentsPage /></RequirePermission>} />
+          <Route path="/reports" element={<RequirePermission permission="reports.view"><ReportsPage /></RequirePermission>} />
+          <Route path="/sync" element={<RequirePermission permission="sync.manage"><SynchronizationPage /></RequirePermission>} />
+          <Route path="/audit-logs" element={<RequirePermission permission="audit.view"><AuditLogsPage /></RequirePermission>} />
+          <Route path="/settings" element={<RequirePermission permission="settings.manage"><SettingsPage /></RequirePermission>} />
           <Route path="/settings/users" element={<RequirePermission permission="users.manage"><UsersPage /></RequirePermission>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

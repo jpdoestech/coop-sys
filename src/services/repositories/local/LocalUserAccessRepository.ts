@@ -1,6 +1,8 @@
 import { developmentUsers } from "../../../database/seeds/userSeed";
 import type { SystemUser, SystemUserInput } from "../../../types/systemUser";
 import type { UserAccessRepository } from "../UserAccessRepository";
+import { branches, HEAD_OFFICE_ID } from "../../lookups/organization";
+import { roleDefinitions } from "../../access/accessControl";
 
 const STORAGE_KEY = "coop_sys_user_access";
 
@@ -15,12 +17,22 @@ function writeUsers(users: SystemUser[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
 }
 
+function validateInput(input: SystemUserInput) {
+  if (!roleDefinitions.some((role) => role.code === input.role)) throw new Error("Select a valid system role.");
+  const branchScoped = input.role === "branch_admin" || input.role === "branch_user";
+  if (branchScoped && input.branch_ids.length === 0) throw new Error("Assign at least one branch to this role.");
+  if (!branchScoped && input.branch_ids.length > 0) throw new Error("Organization-wide roles cannot have branch restrictions.");
+  const validBranchIds = new Set<string>(branches.filter((branch) => branch.id !== HEAD_OFFICE_ID).map((branch) => branch.id));
+  if (input.branch_ids.some((id) => !validBranchIds.has(id))) throw new Error("One or more assigned branches are invalid.");
+}
+
 export class LocalUserAccessRepository implements UserAccessRepository {
   async list() {
     return readUsers().sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
   async create(input: SystemUserInput) {
+    validateInput(input);
     const users = readUsers();
     if (users.some((user) => user.email.toLowerCase() === input.email.toLowerCase())) {
       throw new Error("Email address already belongs to a system user.");
@@ -32,6 +44,7 @@ export class LocalUserAccessRepository implements UserAccessRepository {
   }
 
   async update(id: string, input: SystemUserInput) {
+    validateInput(input);
     const users = readUsers();
     const index = users.findIndex((user) => user.id === id);
     if (index < 0) throw new Error("System user was not found.");

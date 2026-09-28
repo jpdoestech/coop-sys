@@ -5,7 +5,7 @@ import type { Member, MemberInput } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
 import { MemberTable } from "./components/MemberTable";
 import { useMembers } from "./hooks/useMembers";
-import { useAccess } from "../../services/access/AccessContext";
+import { useAccess } from "../../services/access/useAccess";
 import { isBranchScoped } from "../../services/access/accessControl";
 
 export function MembersPage() {
