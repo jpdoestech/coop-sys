@@ -1,0 +1,36 @@
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "../components/layout/AppShell";
+
+const AuditLogsPage = lazy(() => import("../features/audit-logs/AuditLogsPage").then((module) => ({ default: module.AuditLogsPage })));
+const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const DepartmentsPage = lazy(() => import("../features/departments/DepartmentsPage").then((module) => ({ default: module.DepartmentsPage })));
+const DocumentsPage = lazy(() => import("../features/documents/DocumentsPage").then((module) => ({ default: module.DocumentsPage })));
+const EmployeesPage = lazy(() => import("../features/employees/EmployeesPage").then((module) => ({ default: module.EmployeesPage })));
+const MembersPage = lazy(() => import("../features/members/MembersPage").then((module) => ({ default: module.MembersPage })));
+const PositionsPage = lazy(() => import("../features/positions/PositionsPage").then((module) => ({ default: module.PositionsPage })));
+const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then((module) => ({ default: module.ReportsPage })));
+const SettingsPage = lazy(() => import("../features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const SynchronizationPage = lazy(() => import("../features/synchronization/SynchronizationPage").then((module) => ({ default: module.SynchronizationPage })));
+
+export function App() {
+  return (
+    <AppShell>
+      <Suspense fallback={<div className="py-16 text-center text-sm text-ink/55">Loading workspace...</div>}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/members" element={<MembersPage />} />
+          <Route path="/employees" element={<EmployeesPage />} />
+          <Route path="/organization/departments" element={<DepartmentsPage />} />
+          <Route path="/organization/positions" element={<PositionsPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/sync" element={<SynchronizationPage />} />
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </AppShell>
+  );
+}

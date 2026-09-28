@@ -1,1 +1,10 @@
-build-instruction.md
+.sample_files/
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db

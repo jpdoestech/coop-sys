@@ -1,0 +1,82 @@
+import type { Employee } from "../../types/employee";
+
+const timestamp = "2026-09-01T08:00:00.000Z";
+
+function employee(index: number, firstName: string, lastName: string): Employee {
+  const sequence = String(index).padStart(4, "0");
+  const departmentIndex = ((index - 1) % 5) + 1;
+  const positionIndex = ((index - 1) % 10) + 1;
+  const branchIndex = index % 2 === 0 ? 2 : 1;
+  const clientIndex = index % 2 === 0 ? 2 : 1;
+
+  return {
+    id: `80000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    employee_number: `EMP-${sequence}`,
+    member_id: index <= 6 ? `70000000-0000-4000-8000-${String(index).padStart(12, "0")}` : null,
+    religion_affiliation_id: `35000000-0000-4000-8000-00000000000${(index % 8) + 1}`,
+    first_name: firstName,
+    middle_name: null,
+    last_name: lastName,
+    suffix: null,
+    date_of_birth: `199${index}-0${Math.min(index, 9)}-10`,
+    sex: index % 2 === 0 ? "Female" : "Male",
+    civil_status: index % 3 === 0 ? "Married" : "Single",
+    mobile_number: `+63918000${sequence}`,
+    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.test`,
+    address: `${index} Bonifacio Street`,
+    barangay: "Poblacion",
+    city_municipality: "Davao City",
+    province: "Davao del Sur",
+    postal_code: "8000",
+    employment_status_id: "33000000-0000-4000-8000-000000000001",
+    employment_type_id:
+      index % 4 === 0
+        ? "32000000-0000-4000-8000-000000000002"
+        : "32000000-0000-4000-8000-000000000001",
+    date_hired: `202${index % 5}-0${Math.min(index, 9)}-15`,
+    date_regularized: null,
+    date_separated: null,
+    position_id: `20000000-0000-4000-8000-${String(positionIndex).padStart(12, "0")}`,
+    department_id: `10000000-0000-4000-8000-${String(departmentIndex).padStart(12, "0")}`,
+    supervisor_id: null,
+    work_location: branchIndex === 1 ? "Davao Site" : "General Santos Site",
+    notes: null,
+    beneficiaries: index <= 3 ? [
+      {
+        id: `90000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+        full_name: `Dependent ${sequence}`,
+        relationship: "Child",
+        date_of_birth: `201${index}-01-01`,
+        contact_number: null,
+        is_active: true,
+        deactivated_at: null,
+        deactivation_reason: null
+      }
+    ] : [],
+    active_assignment: {
+      id: `91000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      branch_id: `60000000-0000-4000-8000-00000000000${branchIndex}`,
+      client_id: `61000000-0000-4000-8000-00000000000${clientIndex}`,
+      assignment_code: `ASN-${sequence}`,
+      start_date: "2025-01-15",
+      end_date: null,
+      work_location: branchIndex === 1 ? "Davao Site" : "General Santos Site",
+      notes: null
+    },
+    created_at: timestamp,
+    updated_at: timestamp,
+    deleted_at: null,
+    sync_status: "synced"
+  };
+}
+
+export const developmentEmployees: Employee[] = [
+  employee(1, "Amara", "Santos"),
+  employee(2, "Nico", "Reyes"),
+  employee(3, "Leah", "Villanueva"),
+  employee(4, "Paolo", "Mendoza"),
+  employee(5, "Mira", "Flores"),
+  employee(6, "Tomas", "Navarro"),
+  employee(7, "Elena", "Cruz"),
+  employee(8, "Marco", "Aquino")
+];
