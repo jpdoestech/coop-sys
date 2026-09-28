@@ -7,6 +7,7 @@ type MemberTableProps = {
   loading: boolean;
   onEdit: (member: Member) => void;
   onArchive: (member: Member) => void;
+  canManage: boolean;
 };
 
 function displayName(member: Member) {
@@ -15,7 +16,7 @@ function displayName(member: Member) {
     .join(", ");
 }
 
-export function MemberTable({ members, loading, onEdit, onArchive }: MemberTableProps) {
+export function MemberTable({ members, loading, onEdit, onArchive, canManage }: MemberTableProps) {
   if (loading) {
     return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60">Loading member records...</div>;
   }
@@ -40,7 +41,7 @@ export function MemberTable({ members, loading, onEdit, onArchive }: MemberTable
             <th className="px-4 py-3 font-semibold">Status</th>
             <th className="px-4 py-3 font-semibold">Contact</th>
             <th className="px-4 py-3 font-semibold">Joined</th>
-            <th className="w-24 px-4 py-3 text-right font-semibold">Actions</th>
+            {canManage ? <th className="w-24 px-4 py-3 text-right font-semibold">Actions</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-line bg-white">
@@ -53,12 +54,12 @@ export function MemberTable({ members, loading, onEdit, onArchive }: MemberTable
               <td className="px-4 py-3.5 text-ink/75">
                 {optionLabel(memberTypes, member.membership_type_id)}
               </td>
-              <td className="px-4 py-3.5">
+              {canManage ? <td className="px-4 py-3.5">
                 <span className="inline-flex items-center gap-1.5 text-ink/75">
                   <span className={`h-2 w-2 rounded-full ${member.membership_status_id === memberStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />
                   {optionLabel(memberStatuses, member.membership_status_id)}
                 </span>
-              </td>
+              </td> : null}
               <td className="px-4 py-3.5">
                 <p className="text-ink/80">{member.mobile_number || "No mobile"}</p>
                 <p className="mt-0.5 text-xs text-ink/55">{member.email || "No email"}</p>

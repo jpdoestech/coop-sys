@@ -59,6 +59,15 @@ describe("memberInputSchema", () => {
     expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123" }).success).toBe(false);
   });
 
+  it("rejects invalid government ID and contact characters", () => {
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-345678A-0" }).success).toBe(false);
+    expect(memberInputSchema.safeParse({ ...validMember, mobile_number: "+63 917 CALL-ME" }).success).toBe(false);
+  });
+
+  it("rejects contact numbers longer than twenty characters", () => {
+    expect(memberInputSchema.safeParse({ ...validMember, mobile_number: "+63 917 123 4567 89012" }).success).toBe(false);
+  });
+
   it("requires an end date for resigned or terminated membership", () => {
     expect(memberInputSchema.safeParse({ ...validMember, membership_status_id: MEMBER_STATUS.resigned }).success).toBe(false);
     expect(memberInputSchema.safeParse({ ...validMember, membership_status_id: MEMBER_STATUS.resigned, termination_date: "2026-09-28" }).success).toBe(true);

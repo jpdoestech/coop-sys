@@ -1,19 +1,21 @@
 import { z } from "zod";
 import { terminalMemberStatuses } from "../lookups/statuses";
 import { governmentId } from "./governmentIdSchema";
+import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
 
-const nullableText = z.string().trim().nullable().optional();
+const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
+const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
 
 export const memberInputSchema = z.object({
-  membership_number: z.string().trim().min(1, "Membership number is required."),
-  first_name: z.string().trim().min(1, "First name is required."),
+  membership_number: z.string().trim().min(1, "Membership number is required.").max(CHARACTER_LIMITS.identifier),
+  first_name: z.string().trim().min(1, "First name is required.").max(CHARACTER_LIMITS.name),
   middle_name: nullableText,
-  last_name: z.string().trim().min(1, "Last name is required."),
+  last_name: z.string().trim().min(1, "Last name is required.").max(CHARACTER_LIMITS.name),
   suffix: nullableText,
   date_of_birth: nullableText,
   sex: nullableText,
   civil_status: nullableText,
-  mobile_number: nullableText,
+  mobile_number: contactNumber,
   email: z
     .string()
     .trim()
@@ -31,10 +33,10 @@ export const memberInputSchema = z.object({
   membership_type_id: nullableText,
   member_category: nullableText,
   religion_affiliation_id: nullableText,
-  sss_number: governmentId([10], "SSS number"),
-  pagibig_number: governmentId([12], "PAG-IBIG MID number"),
-  philhealth_number: governmentId([12], "PhilHealth number"),
-  tax_identification_number: governmentId([9, 12], "TIN"),
+  sss_number: governmentId([10], "SSS number", 12),
+  pagibig_number: governmentId([12], "PAG-IBIG MID number", 14),
+  philhealth_number: governmentId([12], "PhilHealth number", 14),
+  tax_identification_number: governmentId([9, 12], "TIN", 15),
   acceptance_resolution_number: nullableText,
   highest_educational_attainment: nullableText,
   occupation_income_source: nullableText,
@@ -45,7 +47,7 @@ export const memberInputSchema = z.object({
   termination_date: nullableText,
   termination_reason: nullableText,
   emergency_contact: nullableText,
-  notes: nullableText,
+  notes: z.string().trim().max(CHARACTER_LIMITS.notes, "Notes are too long.").nullable().optional(),
   profile_photo_ref: nullableText
 }).refine(
   (value) =>

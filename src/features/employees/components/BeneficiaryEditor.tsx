@@ -1,6 +1,7 @@
 import { Plus, RotateCcw, UserMinus } from "lucide-react";
 import type { BeneficiaryInput } from "../../../types/beneficiary";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
+import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 
 type BeneficiaryEditorProps = {
   value: BeneficiaryInput[];
@@ -60,7 +61,7 @@ export function BeneficiaryEditor({ value, onChange }: BeneficiaryEditorProps) {
               <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.full_name} onChange={(event) => update(beneficiary.id, { full_name: event.target.value })} placeholder="Full name" aria-label={`Beneficiary ${index + 1} full name`} />
               <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.relationship} onChange={(event) => update(beneficiary.id, { relationship: event.target.value })} placeholder="Relationship" aria-label={`Beneficiary ${index + 1} relationship`} />
               <input type="date" className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.date_of_birth ?? ""} onChange={(event) => update(beneficiary.id, { date_of_birth: event.target.value || null })} aria-label={`Beneficiary ${index + 1} date of birth`} />
-              <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.contact_number ?? ""} onChange={(event) => update(beneficiary.id, { contact_number: event.target.value || null })} placeholder="Contact number" aria-label={`Beneficiary ${index + 1} contact number`} />
+              <input className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} disabled={!beneficiary.is_active} value={beneficiary.contact_number ?? ""} onChange={(event) => update(beneficiary.id, { contact_number: sanitizePhoneNumber(event.target.value) || null })} placeholder="Contact number" aria-label={`Beneficiary ${index + 1} contact number`} />
               {!beneficiary.is_active ? (
                 <input className={`${inputClass} sm:col-span-2`} value={beneficiary.deactivation_reason ?? ""} onChange={(event) => update(beneficiary.id, { deactivation_reason: event.target.value || null })} placeholder="Reason for deactivation (required)" aria-label={`Beneficiary ${index + 1} deactivation reason`} />
               ) : null}

@@ -123,13 +123,13 @@ insert into public.beneficiaries (
   ('63000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000002', 'Fictional Dependent 02', 'Spouse', '1994-04-18', true),
   ('63000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-000000000003', 'Fictional Dependent 03', 'Child', '2019-07-22', true);
 
-insert into public.branches (id, code, name, address) values
-  ('60000000-0000-4000-8000-000000000001', 'DVO', 'Davao Branch', 'Davao City'),
-  ('60000000-0000-4000-8000-000000000002', 'GES', 'General Santos Branch', 'General Santos City');
+insert into public.branches (id, code, name, address, unit_type, parent_branch_id) values
+  ('60000000-0000-4000-8000-000000000001', 'DVO', 'Davao Branch', 'Davao City', 'branch', '60000000-0000-4000-8000-000000000000'),
+  ('60000000-0000-4000-8000-000000000002', 'GES', 'General Santos Branch', 'General Santos City', 'branch', '60000000-0000-4000-8000-000000000000');
 
-insert into public.clients (id, code, name, address) values
-  ('61000000-0000-4000-8000-000000000001', 'CLIENT-A', 'Fictional Manufacturing Client', 'Davao City'),
-  ('61000000-0000-4000-8000-000000000002', 'CLIENT-B', 'Fictional Logistics Client', 'General Santos City');
+insert into public.clients (id, code, name, address, branch_id) values
+  ('61000000-0000-4000-8000-000000000001', 'CLIENT-A', 'Fictional Manufacturing Client', 'Davao City', '60000000-0000-4000-8000-000000000001'),
+  ('61000000-0000-4000-8000-000000000002', 'CLIENT-B', 'Fictional Logistics Client', 'General Santos City', '60000000-0000-4000-8000-000000000002');
 
 insert into public.employment_assignments (
   id, employee_id, branch_id, client_id, assignment_code, start_date, work_location
@@ -137,17 +137,21 @@ insert into public.employment_assignments (
 select
   ('62000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid,
   ('50000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid,
-  case when series % 2 = 0
+  case when series % 5 = 0
+    then '60000000-0000-4000-8000-000000000000'::uuid
+    when series % 2 = 0
     then '60000000-0000-4000-8000-000000000002'::uuid
     else '60000000-0000-4000-8000-000000000001'::uuid
   end,
-  case when series % 2 = 0
+  case when series % 5 = 0
+    then null
+    when series % 2 = 0
     then '61000000-0000-4000-8000-000000000002'::uuid
     else '61000000-0000-4000-8000-000000000001'::uuid
   end,
   'ASN-' || lpad(series::text, 4, '0'),
   date '2025-01-01' + (series * 7),
-  case when series % 2 = 0 then 'General Santos Site' else 'Davao Site' end
+  case when series % 5 = 0 then 'Head Office' when series % 2 = 0 then 'General Santos Site' else 'Davao Site' end
 from generate_series(1, 20) as series;
 
 insert into public.system_settings (key, value, description) values

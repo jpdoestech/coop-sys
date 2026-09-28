@@ -5,7 +5,7 @@ import type { EmploymentAssignment } from "../../../types/assignment";
 import type { EmployeeRepository } from "../EmployeeRepository";
 import type { ListOptions } from "../Repository";
 
-type EmployeeRow = Omit<Employee, "beneficiaries" | "active_assignment"> & {
+type EmployeeRow = Omit<Employee, "beneficiaries" | "active_assignment" | "assignment_history"> & {
   beneficiaries?: Beneficiary[];
   employment_assignments?: EmploymentAssignment[];
 };
@@ -16,16 +16,18 @@ function client() {
 }
 
 function normalize(row: EmployeeRow): Employee {
+  const assignmentHistory = (row.employment_assignments ?? [])
+    .sort((a, b) => b.start_date.localeCompare(a.start_date));
   return {
     ...row,
     beneficiaries: row.beneficiaries ?? [],
-    active_assignment:
-      row.employment_assignments?.find((assignment) => !assignment.end_date) ?? null
+    active_assignment: assignmentHistory.find((assignment) => !assignment.end_date) ?? null,
+    assignment_history: assignmentHistory,
   };
 }
 
 function employeeFields(input: EmployeeInput | Partial<EmployeeInput>) {
-  const relationFields = new Set(["beneficiaries", "active_assignment"]);
+  const relationFields = new Set(["beneficiaries", "active_assignment", "assignment_history"]);
   return Object.fromEntries(
     Object.entries(input).filter(([field]) => !relationFields.has(field))
   );
@@ -47,6 +49,20 @@ async function saveRelations(employeeId: string, input: Partial<EmployeeInput>) 
     }
   }
   if (input.active_assignment) {
+    const { data: currentAssignments, error: currentError } = await db
+      .from("employment_assignments")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .is("end_date", null)
+      .neq("id", input.active_assignment.id);
+    if (currentError) throw currentError;
+    if (currentAssignments?.length) {
+      const { error: closeError } = await db
+        .from("employment_assignments")
+        .update({ end_date: input.active_assignment.start_date, updated_at: new Date().toISOString() })
+        .in("id", currentAssignments.map((assignment) => assignment.id));
+      if (closeError) throw closeError;
+    }
     const { error } = await db.from("employment_assignments").upsert({
       ...input.active_assignment,
       employee_id: employeeId,

@@ -33,11 +33,12 @@ export type Employee = BaseRecord &
     notes: string | null;
     beneficiaries: Beneficiary[];
     active_assignment: EmploymentAssignment | null;
+    assignment_history: EmploymentAssignment[];
   };
 
 export type EmployeeInput = Omit<
   Employee,
-  "id" | "created_at" | "updated_at" | "deleted_at" | "sync_status" | "beneficiaries" | "active_assignment"
+  "id" | "created_at" | "updated_at" | "deleted_at" | "sync_status" | "beneficiaries" | "active_assignment" | "assignment_history"
 > & {
   beneficiaries: BeneficiaryInput[];
   active_assignment: EmploymentAssignmentInput | null;

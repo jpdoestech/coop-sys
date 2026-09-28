@@ -20,4 +20,6 @@ The sample workbook at `.sample_files/share_cap.xlsx` is a read-only domain refe
 - `employees.member_id` links both roles for the same person.
 - For a linked employee, personal and contact details are read from the member profile; employment-only information remains on the employee record.
 - An employee can have many branch/client assignments over time, but only one active assignment.
+- Placement follows `Head Office > Branch > Client > Member/Employee`. Head Office may employ linked members directly without a branch or client.
+- Transfers preserve prior assignments and can move employees between Head Office, direct branch placement, and branch-client placement.
 - Payment, share certificate, balance, and paid-share rows remain outside this information-management system.

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./app/App";
+import { AccessProvider } from "./services/access/AccessContext";
 import "./styles.css";
 
 const queryClient = new QueryClient();
@@ -11,7 +12,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <AccessProvider>
+          <App />
+        </AccessProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>

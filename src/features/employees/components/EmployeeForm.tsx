@@ -8,16 +8,17 @@ import { religionAffiliations } from "../../../services/lookups/religionAffiliat
 import { employeeInputSchema } from "../../../services/validation/employeeSchema";
 import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { Member } from "../../../types/member";
+import { AssignmentEditor } from "./AssignmentEditor";
 import { BeneficiaryEditor } from "./BeneficiaryEditor";
 import {
-  branches,
-  clients,
   departments,
   employmentStatuses,
   employmentTypes,
+  HEAD_OFFICE_ID,
   positions,
 } from "../data/employeeOptions";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
+import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 
 type MembershipMode = "none" | "existing" | "create";
 
@@ -53,12 +54,13 @@ function Section({ title, description, children }: { title: string; description:
 function newAssignment() {
   return {
     id: crypto.randomUUID(),
-    branch_id: null,
+    branch_id: HEAD_OFFICE_ID,
     client_id: null,
     assignment_code: null,
     start_date: new Date().toISOString().slice(0, 10),
     end_date: null,
-    work_location: null,
+    work_location: "Head Office",
+    transfer_reason: null,
     notes: null,
   };
 }
@@ -103,7 +105,7 @@ function emptyInput(): EmployeeInput {
 
 function toInput(employee: Employee | null): EmployeeInput {
   if (!employee) return emptyInput();
-  const omitted = new Set(["id", "created_at", "updated_at", "deleted_at", "sync_status"]);
+  const omitted = new Set(["id", "created_at", "updated_at", "deleted_at", "sync_status", "assignment_history"]);
   return Object.fromEntries(
     Object.entries(employee).filter(([key]) => !omitted.has(key)),
   ) as unknown as EmployeeInput;
@@ -115,6 +117,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
   const [membershipMode, setMembershipMode] = useState<MembershipMode>(employee?.member_id ? "existing" : "none");
   const [newMembershipNumber, setNewMembershipNumber] = useState("");
   const [rehireSourceId, setRehireSourceId] = useState("");
+  const [transferring, setTransferring] = useState(false);
   const linkedMember = useMemo(
     () => members.find((member) => member.id === draft.member_id) ?? null,
     [members, draft.member_id],
@@ -131,6 +134,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     setMembershipMode(employee?.member_id ? "existing" : "none");
     setNewMembershipNumber("");
     setRehireSourceId("");
+    setTransferring(false);
     setError("");
   }, [employee]);
 
@@ -183,6 +187,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     const sourceMember = members.find((member) => member.id === source.member_id);
     setDraft(sourceMember ? { ...refreshed, ...employeeProfileFromMember(sourceMember) } : refreshed);
     setMembershipMode(source.member_id ? "existing" : "none");
+    setTransferring(false);
   }
 
   function submit(event: FormEvent) {
@@ -195,7 +200,33 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
       setError("Enter the new membership number.");
       return;
     }
-    const result = employeeInputSchema.safeParse(draft);
+    if (transferring && !draft.active_assignment?.transfer_reason?.trim()) {
+      setError("Enter a reason for the employee transfer.");
+      return;
+    }
+    if (
+      transferring &&
+      employee?.active_assignment &&
+      draft.active_assignment &&
+      draft.active_assignment.start_date < employee.active_assignment.start_date
+    ) {
+      setError("Transfer date cannot be earlier than the current assignment start date.");
+      return;
+    }
+    const submissionDraft =
+      draft.employment_status_id &&
+      terminalEmploymentStatuses.has(draft.employment_status_id) &&
+      draft.date_separated &&
+      draft.active_assignment
+        ? {
+            ...draft,
+            active_assignment: {
+              ...draft.active_assignment,
+              end_date: draft.date_separated,
+            },
+          }
+        : draft;
+    const result = employeeInputSchema.safeParse(submissionDraft);
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Please review the employee record.");
       return;
@@ -285,7 +316,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
             <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} /></Field>
             <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} /></Field>
             <Field label="Date of birth"><input type="date" disabled={Boolean(linkedMember)} className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} /></Field>
-            <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", event.target.value || null)} /></Field>
+            <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
           </Section>
 
@@ -307,12 +338,25 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
             <Field label="Position"><select className={inputClass} value={draft.position_id ?? ""} onChange={(event) => setValue("position_id", event.target.value || null)}><option value="">Not set</option>{availablePositions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
           </Section>
 
-          <Section title="Manpower assignment" description="Current branch and client deployment; completed assignments remain in history.">
-            <Field label="Branch"><select className={inputClass} value={draft.active_assignment?.branch_id ?? ""} onChange={(event) => setValue("active_assignment", { ...(draft.active_assignment ?? newAssignment()), branch_id: event.target.value || null })}><option value="">Not set</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
-            <Field label="Client"><select className={inputClass} value={draft.active_assignment?.client_id ?? ""} onChange={(event) => setValue("active_assignment", { ...(draft.active_assignment ?? newAssignment()), client_id: event.target.value || null })}><option value="">Not set</option>{clients.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
-            <Field label="Assignment code"><input className={inputClass} value={draft.active_assignment?.assignment_code ?? ""} onChange={(event) => setValue("active_assignment", { ...(draft.active_assignment ?? newAssignment()), assignment_code: event.target.value || null })} /></Field>
-            <Field label="Start date"><input type="date" className={inputClass} value={draft.active_assignment?.start_date ?? ""} onChange={(event) => setValue("active_assignment", { ...(draft.active_assignment ?? newAssignment()), start_date: event.target.value })} /></Field>
-            <div className="sm:col-span-2"><Field label="Work location"><input className={inputClass} value={draft.active_assignment?.work_location ?? ""} onChange={(event) => { const value = event.target.value || null; setValue("work_location", value); setValue("active_assignment", { ...(draft.active_assignment ?? newAssignment()), work_location: value }); }} /></Field></div>
+          <Section title="Organizational placement" description="Head Office employees are direct; branch clients appear only under their assigned branch. Transfers retain prior placements.">
+            <AssignmentEditor
+              value={draft.active_assignment}
+              history={employee?.assignment_history ?? []}
+              existingActive={employee?.active_assignment ?? null}
+              transferring={transferring}
+              onChange={(assignment) => {
+                setValue("active_assignment", assignment);
+                setValue("work_location", assignment?.work_location ?? null);
+              }}
+              onBeginTransfer={() => {
+                setTransferring(true);
+                setValue("active_assignment", newAssignment());
+              }}
+              onCancelTransfer={() => {
+                setTransferring(false);
+                setValue("active_assignment", employee?.active_assignment ?? null);
+              }}
+            />
           </Section>
 
           <Section title="Beneficiaries" description="The displayed dependent count is calculated from active beneficiary records.">

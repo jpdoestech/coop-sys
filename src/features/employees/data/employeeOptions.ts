@@ -1,4 +1,7 @@
 import { EMPLOYMENT_STATUS } from "../../../services/lookups/statuses";
+import { branches, clients, clientsForBranch, HEAD_OFFICE_ID } from "../../../services/lookups/organization";
+
+export { branches, clients, clientsForBranch, HEAD_OFFICE_ID };
 
 export const employmentStatuses = [
   { id: EMPLOYMENT_STATUS.active, label: "Active" },
@@ -38,16 +41,6 @@ export const positions = [
   { id: "20000000-0000-4000-8000-000000000008", departmentId: departments[3].id, label: "Operations Associate" },
   { id: "20000000-0000-4000-8000-000000000009", departmentId: departments[4].id, label: "Systems Administrator" },
   { id: "20000000-0000-4000-8000-000000000010", departmentId: departments[4].id, label: "Technical Support Specialist" }
-] as const;
-
-export const branches = [
-  { id: "60000000-0000-4000-8000-000000000001", label: "Davao Branch" },
-  { id: "60000000-0000-4000-8000-000000000002", label: "General Santos Branch" }
-] as const;
-
-export const clients = [
-  { id: "61000000-0000-4000-8000-000000000001", label: "Fictional Manufacturing Client" },
-  { id: "61000000-0000-4000-8000-000000000002", label: "Fictional Logistics Client" }
 ] as const;
 
 export function labelFor(options: ReadonlyArray<{ id: string; label: string }>, id: string | null) {

@@ -1,26 +1,29 @@
 import { z } from "zod";
 import { terminalEmploymentStatuses } from "../lookups/statuses";
 import { governmentId } from "./governmentIdSchema";
+import { isValidPlacement } from "../lookups/organization";
+import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
 
-const nullableText = z.string().trim().nullable().optional();
+const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
+const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
 
 export const employeeInputSchema = z
   .object({
-    employee_number: z.string().trim().min(1, "Employee number is required."),
+    employee_number: z.string().trim().min(1, "Employee number is required.").max(CHARACTER_LIMITS.identifier),
     member_id: nullableText,
     religion_affiliation_id: nullableText,
-    sss_number: governmentId([10], "SSS number"),
-    pagibig_number: governmentId([12], "PAG-IBIG MID number"),
-    philhealth_number: governmentId([12], "PhilHealth number"),
-    tax_identification_number: governmentId([9, 12], "TIN"),
-    first_name: z.string().trim().min(1, "First name is required."),
+    sss_number: governmentId([10], "SSS number", 12),
+    pagibig_number: governmentId([12], "PAG-IBIG MID number", 14),
+    philhealth_number: governmentId([12], "PhilHealth number", 14),
+    tax_identification_number: governmentId([9, 12], "TIN", 15),
+    first_name: z.string().trim().min(1, "First name is required.").max(CHARACTER_LIMITS.name),
     middle_name: nullableText,
-    last_name: z.string().trim().min(1, "Last name is required."),
+    last_name: z.string().trim().min(1, "Last name is required.").max(CHARACTER_LIMITS.name),
     suffix: nullableText,
     date_of_birth: nullableText,
     sex: nullableText,
     civil_status: nullableText,
-    mobile_number: nullableText,
+    mobile_number: contactNumber,
     email: z
       .string()
       .trim()
@@ -42,16 +45,16 @@ export const employeeInputSchema = z
     department_id: nullableText,
     supervisor_id: nullableText,
     work_location: nullableText,
-    notes: nullableText,
+    notes: z.string().trim().max(CHARACTER_LIMITS.notes, "Notes are too long.").nullable().optional(),
     beneficiaries: z
       .array(
         z
           .object({
             id: z.string().uuid(),
-            full_name: z.string().trim().min(1, "Beneficiary name is required."),
-            relationship: z.string().trim().min(1, "Relationship is required."),
+            full_name: z.string().trim().min(1, "Beneficiary name is required.").max(CHARACTER_LIMITS.name),
+            relationship: z.string().trim().min(1, "Relationship is required.").max(CHARACTER_LIMITS.name),
             date_of_birth: nullableText,
-            contact_number: nullableText,
+            contact_number: contactNumber,
             is_active: z.boolean(),
             deactivation_reason: nullableText
           })
@@ -72,6 +75,7 @@ export const employeeInputSchema = z
         start_date: z.string().min(1, "Assignment start date is required."),
         end_date: nullableText,
         work_location: nullableText,
+        transfer_reason: nullableText,
         notes: nullableText
       })
       .nullable()
@@ -90,6 +94,18 @@ export const employeeInputSchema = z
     {
       message: "Assignment end date cannot be earlier than its start date.",
       path: ["active_assignment", "end_date"]
+    }
+  )
+  .refine(
+    (value) =>
+      !value.active_assignment ||
+      isValidPlacement(
+        value.active_assignment.branch_id ?? null,
+        value.active_assignment.client_id ?? null,
+      ),
+    {
+      message: "The selected client must belong to the selected branch, and Head Office cannot have a client.",
+      path: ["active_assignment", "client_id"]
     }
   )
   .refine(

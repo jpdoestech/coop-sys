@@ -5,6 +5,8 @@ import type { Member, MemberInput } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
 import { MemberTable } from "./components/MemberTable";
 import { useMembers } from "./hooks/useMembers";
+import { useAccess } from "../../services/access/AccessContext";
+import { isBranchScoped } from "../../services/access/accessControl";
 
 export function MembersPage() {
   const [search, setSearch] = useState("");
@@ -12,6 +14,9 @@ export function MembersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const { query, saveMember, archiveMember } = useMembers(deferredSearch);
+  const { profile, can } = useAccess();
+  const canManage = can("members.manage");
+  const canCreate = canManage && !isBranchScoped(profile);
 
   function openCreate() {
     setEditingMember(null);
@@ -38,9 +43,9 @@ export function MembersPage() {
           title="Cooperative members"
           description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
         />
-        <button className="focus-ring mb-6 inline-flex items-center justify-center gap-2 rounded bg-moss px-4 py-2.5 text-sm font-semibold text-white hover:bg-moss/90" onClick={openCreate}>
+        {canCreate ? <button className="focus-ring mb-6 inline-flex items-center justify-center gap-2 rounded bg-moss px-4 py-2.5 text-sm font-semibold text-white hover:bg-moss/90" onClick={openCreate}>
           <Plus className="h-4 w-4" /> New member
-        </button>
+        </button> : null}
       </div>
 
       <section className="overflow-hidden rounded border border-line bg-white shadow-panel">
@@ -60,7 +65,7 @@ export function MembersPage() {
         {query.isError ? (
           <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load member records.</div>
         ) : (
-          <MemberTable members={query.data ?? []} loading={query.isLoading} onEdit={(member) => { setEditingMember(member); setFormOpen(true); }} onArchive={archive} />
+          <MemberTable members={query.data ?? []} loading={query.isLoading} canManage={canManage} onEdit={(member) => { setEditingMember(member); setFormOpen(true); }} onArchive={archive} />
         )}
       </section>
 

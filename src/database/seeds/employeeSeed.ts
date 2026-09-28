@@ -13,6 +13,25 @@ function employee(
   const positionIndex = ((index - 1) % 10) + 1;
   const branchIndex = index % 2 === 0 ? 2 : 1;
   const clientIndex = index % 2 === 0 ? 2 : 1;
+  const isActive = employmentStatusId === "33000000-0000-4000-8000-000000000001";
+  const isHeadOffice = index % 4 === 1;
+  const assignment = {
+    id: `91000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    branch_id: isHeadOffice
+      ? "60000000-0000-4000-8000-000000000000"
+      : `60000000-0000-4000-8000-00000000000${branchIndex}`,
+    client_id: isHeadOffice
+      ? null
+      : `61000000-0000-4000-8000-00000000000${clientIndex}`,
+    assignment_code: `ASN-${sequence}`,
+    start_date: "2025-01-15",
+    end_date: isActive ? null : "2026-08-31",
+    work_location: isHeadOffice
+      ? "Head Office"
+      : branchIndex === 1 ? "Davao Site" : "General Santos Site",
+    transfer_reason: null,
+    notes: null,
+  };
 
   return {
     id: `80000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
@@ -51,7 +70,7 @@ function employee(
     position_id: `20000000-0000-4000-8000-${String(positionIndex).padStart(12, "0")}`,
     department_id: `10000000-0000-4000-8000-${String(departmentIndex).padStart(12, "0")}`,
     supervisor_id: null,
-    work_location: branchIndex === 1 ? "Davao Site" : "General Santos Site",
+    work_location: assignment.work_location,
     notes: null,
     beneficiaries: index <= 3 ? [
       {
@@ -65,16 +84,8 @@ function employee(
         deactivation_reason: null
       }
     ] : [],
-    active_assignment: employmentStatusId === "33000000-0000-4000-8000-000000000001" ? {
-      id: `91000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-      branch_id: `60000000-0000-4000-8000-00000000000${branchIndex}`,
-      client_id: `61000000-0000-4000-8000-00000000000${clientIndex}`,
-      assignment_code: `ASN-${sequence}`,
-      start_date: "2025-01-15",
-      end_date: null,
-      work_location: branchIndex === 1 ? "Davao Site" : "General Santos Site",
-      notes: null
-    } : null,
+    active_assignment: isActive ? assignment : null,
+    assignment_history: [assignment],
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,

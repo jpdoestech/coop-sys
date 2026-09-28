@@ -13,12 +13,23 @@ function writeEmployees(employees: Employee[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
 }
 
+function normalizeEmployee(employee: Employee): Employee {
+  const history = (employee.assignment_history ?? (employee.active_assignment ? [employee.active_assignment] : []))
+    .map((assignment) => ({ ...assignment, transfer_reason: assignment.transfer_reason ?? null }))
+    .sort((a, b) => b.start_date.localeCompare(a.start_date));
+  return {
+    ...employee,
+    assignment_history: history,
+    active_assignment: history.find((assignment) => !assignment.end_date) ?? null,
+  };
+}
+
 function readEmployees(): Employee[] {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) return JSON.parse(raw) as Employee[];
+  if (raw) return (JSON.parse(raw) as Employee[]).map(normalizeEmployee);
   if (import.meta.env.DEV) {
     writeEmployees(developmentEmployees);
-    return developmentEmployees;
+    return developmentEmployees.map(normalizeEmployee);
   }
   return [];
 }
@@ -58,6 +69,8 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     const employee: Employee = {
       ...input,
       beneficiaries: input.beneficiaries.map((beneficiary) => ({ ...beneficiary, deactivated_at: beneficiary.is_active ? null : timestamp })),
+      active_assignment: input.active_assignment?.end_date ? null : input.active_assignment,
+      assignment_history: input.active_assignment ? [input.active_assignment] : [],
       id: crypto.randomUUID(),
       created_at: timestamp,
       updated_at: timestamp,
@@ -73,14 +86,38 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     const index = employees.findIndex((employee) => employee.id === id);
     if (index === -1) throw new Error("Employee not found.");
     const timestamp = now();
+    const existing = normalizeEmployee(employees[index]);
+    let assignmentHistory = existing.assignment_history;
+    let activeAssignment = existing.active_assignment;
+    if (Object.prototype.hasOwnProperty.call(input, "active_assignment")) {
+      const nextAssignment = input.active_assignment ?? null;
+      if (nextAssignment && activeAssignment && nextAssignment.id !== activeAssignment.id) {
+        assignmentHistory = [
+          ...assignmentHistory.map((assignment) =>
+            assignment.id === activeAssignment?.id
+              ? { ...assignment, end_date: nextAssignment.start_date }
+              : assignment,
+          ),
+          nextAssignment,
+        ];
+      } else if (nextAssignment) {
+        const found = assignmentHistory.some((assignment) => assignment.id === nextAssignment.id);
+        assignmentHistory = found
+          ? assignmentHistory.map((assignment) => assignment.id === nextAssignment.id ? nextAssignment : assignment)
+          : [...assignmentHistory, nextAssignment];
+      }
+      activeAssignment = nextAssignment?.end_date ? null : nextAssignment;
+    }
     const employee: Employee = {
-      ...employees[index],
+      ...existing,
       ...input,
+      active_assignment: activeAssignment,
+      assignment_history: assignmentHistory.sort((a, b) => b.start_date.localeCompare(a.start_date)),
       beneficiaries: (input.beneficiaries ?? employees[index].beneficiaries).map((beneficiary) => {
-        const existing = employees[index].beneficiaries.find((item) => item.id === beneficiary.id);
+        const existingBeneficiary = employees[index].beneficiaries.find((item) => item.id === beneficiary.id);
         return {
           ...beneficiary,
-          deactivated_at: beneficiary.is_active ? null : existing?.deactivated_at ?? timestamp
+          deactivated_at: beneficiary.is_active ? null : existingBeneficiary?.deactivated_at ?? timestamp
         };
       }),
       updated_at: timestamp,

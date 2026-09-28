@@ -8,6 +8,7 @@ import { memberInputSchema } from "../../../services/validation/memberSchema";
 import { religionAffiliations } from "../../../services/lookups/religionAffiliations";
 import type { Member, MemberInput } from "../../../types/member";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
+import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 
 type Draft = Omit<MemberInput, "annual_income" | "number_of_dependents"> & {
   annual_income: string;
@@ -210,7 +211,7 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
           </Section>
 
           <Section title="Contact" description="Current contact and residential information.">
-            <Field label="Mobile number"><input className={inputClass} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", event.target.value || null)} /></Field>
+            <Field label="Mobile number"><input className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
             <Field label="Email" error={errors.email}><input type="email" className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
             <AddressFields value={addressValue} onChange={(address) => setDraft((current) => ({ ...current, ...address }))} />
             <div className="sm:col-span-2"><Field label="Emergency contact"><input className={inputClass} value={draft.emergency_contact ?? ""} onChange={(event) => setValue("emergency_contact", event.target.value || null)} /></Field></div>

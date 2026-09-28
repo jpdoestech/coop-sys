@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Users,
   UserSquare2,
+  UserCog,
   Wifi,
   X
 } from "lucide-react";
@@ -17,28 +18,33 @@ import { NavLink } from "react-router-dom";
 import { clsx } from "clsx";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { getAppMode } from "../../utils/env";
+import { useAccess } from "../../services/access/AccessContext";
+import { roleLabel, type Permission } from "../../services/access/accessControl";
 
 type AppShellProps = {
   children: ReactNode;
 };
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: Gauge },
-  { to: "/members", label: "Members", icon: Users },
-  { to: "/employees", label: "Employees", icon: UserSquare2 },
-  { to: "/organization/departments", label: "Departments", icon: Building2 },
-  { to: "/organization/positions", label: "Positions", icon: Archive },
-  { to: "/documents", label: "Documents", icon: FileText },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/sync", label: "Synchronization", icon: Wifi },
-  { to: "/audit-logs", label: "Audit Logs", icon: ShieldCheck },
-  { to: "/settings", label: "Settings", icon: Settings }
+const navItems: Array<{ to: string; label: string; icon: typeof Gauge; permission: Permission }> = [
+  { to: "/", label: "Dashboard", icon: Gauge, permission: "dashboard.view" },
+  { to: "/members", label: "Members", icon: Users, permission: "members.view" },
+  { to: "/employees", label: "Employees", icon: UserSquare2, permission: "employees.view" },
+  { to: "/organization/departments", label: "Departments", icon: Building2, permission: "organization.manage" },
+  { to: "/organization/positions", label: "Positions", icon: Archive, permission: "organization.manage" },
+  { to: "/documents", label: "Documents", icon: FileText, permission: "documents.view" },
+  { to: "/reports", label: "Reports", icon: BarChart3, permission: "reports.view" },
+  { to: "/sync", label: "Synchronization", icon: Wifi, permission: "sync.manage" },
+  { to: "/audit-logs", label: "Audit Logs", icon: ShieldCheck, permission: "audit.view" },
+  { to: "/settings/users", label: "User Access", icon: UserCog, permission: "users.manage" },
+  { to: "/settings", label: "Settings", icon: Settings, permission: "settings.manage" }
 ];
 
 export function AppShell({ children }: AppShellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const online = useOnlineStatus();
   const appMode = getAppMode();
+  const { profile, can } = useAccess();
+  const visibleNavItems = navItems.filter((item) => can(item.permission));
 
   const sidebar = (
     <aside className="flex h-full w-72 shrink-0 flex-col border-r border-line bg-[#fbfaf6]">
@@ -51,7 +57,7 @@ export function AppShell({ children }: AppShellProps) {
         </h1>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -71,6 +77,8 @@ export function AppShell({ children }: AppShellProps) {
         ))}
       </nav>
       <div className="border-t border-line px-5 py-4 text-xs text-ink/70">
+        <p className="font-semibold text-ink">{profile.displayName}</p>
+        <p className="mt-0.5">{roleLabel(profile.role)}</p>
         <p>Mode: {appMode}</p>
         <p className="mt-1">Last sync: Not yet synchronized</p>
       </div>

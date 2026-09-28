@@ -5,23 +5,33 @@ import type { Employee, EmployeeInput } from "../../../types/employee";
 import { governmentIdsFromEmployee, newMemberFromEmployee } from "../../../services/identity/personProfileSync";
 import { terminalEmploymentStatuses } from "../../../services/lookups/statuses";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
+import { useAccess } from "../../../services/access/AccessContext";
+import { assertPermission, branchIsInScope, employeeIsInScope } from "../../../services/access/accessControl";
 
 export function useEmployees(search: string) {
   const repositories = useMemo(() => createRepositories(), []);
   const queryClient = useQueryClient();
+  const { profile } = useAccess();
   const query = useQuery({
     queryKey: ["employees", search],
-    queryFn: () => repositories.employees.list({ search, limit: 100 })
+    queryFn: async () => (await repositories.employees.list({ search, limit: 100 })).filter((employee) => employeeIsInScope(employee, profile))
   });
   const members = useQuery({
     queryKey: ["member-options"],
-    queryFn: () => repositories.members.list({ limit: 500 })
+    queryFn: async () => {
+      const [memberRecords, employeeRecords] = await Promise.all([
+        repositories.members.list({ limit: 500 }),
+        repositories.employees.list({ limit: 500 }),
+      ]);
+      const visibleMemberIds = new Set(employeeRecords.filter((employee) => employeeIsInScope(employee, profile)).map((employee) => employee.member_id));
+      return profile.branchIds.length ? memberRecords.filter((member) => visibleMemberIds.has(member.id)) : memberRecords;
+    }
   });
   const formerEmployees = useQuery({
     queryKey: ["former-employees"],
     queryFn: async () => {
       const employees = await repositories.employees.list({ limit: 500 });
-      return employees.filter((employee) =>
+      return employees.filter((employee) => employeeIsInScope(employee, profile) &&
         Boolean(
           employee.employment_status_id &&
           terminalEmploymentStatuses.has(employee.employment_status_id),
@@ -31,7 +41,12 @@ export function useEmployees(search: string) {
   });
   const saveEmployee = useMutation({
     mutationFn: async ({ employee, submission }: { employee: Employee | null; submission: EmployeeSubmission }) => {
+      assertPermission(profile, "employees.manage");
+      if (employee && !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your assigned branches.");
       let input: EmployeeInput = submission.input;
+      if (!branchIsInScope(input.active_assignment?.branch_id, profile)) {
+        throw new Error("Select one of your assigned branches for this employee.");
+      }
       if (submission.membership.mode === "create") {
         const duplicate = await repositories.members.findByMembershipNumber(
           submission.membership.membershipNumber,
@@ -62,7 +77,12 @@ export function useEmployees(search: string) {
     }
   });
   const archiveEmployee = useMutation({
-    mutationFn: (id: string) => repositories.employees.archive(id),
+    mutationFn: async (id: string) => {
+      assertPermission(profile, "employees.manage");
+      const employee = await repositories.employees.getById(id);
+      if (!employee || !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your assigned branches.");
+      return repositories.employees.archive(id);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] })
   });
   return { query, members, formerEmployees, saveEmployee, archiveEmployee };
