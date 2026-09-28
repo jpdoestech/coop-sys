@@ -28,6 +28,8 @@ coop-sys/
 |   |   `-- settings/
 |   |-- hooks/                    Cross-feature React hooks
 |   |-- services/
+|   |   |-- identity/             Member/employee profile synchronization rules
+|   |   |-- lookups/              Shared configurable reference values
 |   |   |-- repositories/         Persistence interfaces and implementations
 |   |   |-- sync/                 Synchronization rules and conflict handling
 |   |   `-- validation/           Domain input schemas

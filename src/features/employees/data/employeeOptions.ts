@@ -1,9 +1,13 @@
+import { EMPLOYMENT_STATUS } from "../../../services/lookups/statuses";
+
 export const employmentStatuses = [
-  { id: "33000000-0000-4000-8000-000000000001", label: "Active" },
-  { id: "33000000-0000-4000-8000-000000000002", label: "On Leave" },
-  { id: "33000000-0000-4000-8000-000000000003", label: "Separated" },
-  { id: "33000000-0000-4000-8000-000000000004", label: "Inactive" },
-  { id: "33000000-0000-4000-8000-000000000005", label: "Retired" }
+  { id: EMPLOYMENT_STATUS.active, label: "Active" },
+  { id: EMPLOYMENT_STATUS.onLeave, label: "On Leave" },
+  { id: EMPLOYMENT_STATUS.separated, label: "Separated" },
+  { id: EMPLOYMENT_STATUS.inactive, label: "Inactive" },
+  { id: EMPLOYMENT_STATUS.retired, label: "Retired" },
+  { id: EMPLOYMENT_STATUS.resigned, label: "Resigned" },
+  { id: EMPLOYMENT_STATUS.terminated, label: "Terminated" }
 ] as const;
 
 export const employmentTypes = [

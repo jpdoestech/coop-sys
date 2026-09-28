@@ -17,7 +17,7 @@ function AddressHarness() {
 }
 
 describe("AddressFields", () => {
-  it("accepts custom geographic values without requiring a lookup selection", () => {
+  it("allows typed search but rejects locations outside the official hierarchy", () => {
     render(<AddressHarness />);
 
     const region = screen.getByLabelText("Region");
@@ -26,19 +26,15 @@ describe("AddressFields", () => {
     const barangay = screen.getByLabelText("Barangay");
 
     expect(region).toHaveAttribute("list");
-    expect(province).toBeEnabled();
-    expect(city).toBeEnabled();
-    expect(barangay).toBeEnabled();
+    expect(province).toBeDisabled();
+    expect(city).toBeDisabled();
+    expect(barangay).toBeDisabled();
 
     fireEvent.change(region, { target: { value: "Custom Region" } });
-    fireEvent.change(province, { target: { value: "Custom Province" } });
-    fireEvent.change(city, { target: { value: "Custom Municipality" } });
-    fireEvent.change(barangay, { target: { value: "Custom Barangay" } });
+    fireEvent.blur(region);
 
-    expect(region).toHaveValue("Custom Region");
-    expect(province).toHaveValue("Custom Province");
-    expect(city).toHaveValue("Custom Municipality");
-    expect(barangay).toHaveValue("Custom Barangay");
+    expect(region).toBeInvalid();
+    expect(screen.getByText("Choose a region from the official list.")).toBeInTheDocument();
   });
 });
 

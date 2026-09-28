@@ -49,6 +49,10 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     return readEmployees().find((employee) => employee.employee_number === employeeNumber) ?? null;
   }
 
+  async listByMemberId(memberId: string) {
+    return readEmployees().filter((employee) => employee.member_id === memberId);
+  }
+
   async create(input: EmployeeInput) {
     const timestamp = now();
     const employee: Employee = {

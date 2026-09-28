@@ -1,7 +1,10 @@
+import { MEMBER_STATUS } from "../../../services/lookups/statuses";
+
 export const memberStatuses = [
-  { id: "31000000-0000-4000-8000-000000000001", label: "Active" },
-  { id: "31000000-0000-4000-8000-000000000002", label: "Inactive" },
-  { id: "31000000-0000-4000-8000-000000000003", label: "Terminated" }
+  { id: MEMBER_STATUS.active, label: "Active" },
+  { id: MEMBER_STATUS.inactive, label: "Inactive" },
+  { id: MEMBER_STATUS.resigned, label: "Resigned" },
+  { id: MEMBER_STATUS.terminated, label: "Terminated" }
 ] as const;
 
 export const memberTypes = [

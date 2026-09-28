@@ -18,6 +18,9 @@ export type Member = BaseRecord &
     membership_type_id: string | null;
     member_category: string | null;
     religion_affiliation_id: string | null;
+    sss_number: string | null;
+    pagibig_number: string | null;
+    philhealth_number: string | null;
     tax_identification_number: string | null;
     acceptance_resolution_number: string | null;
     highest_educational_attainment: string | null;

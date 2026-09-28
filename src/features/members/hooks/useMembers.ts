@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { createRepositories } from "../../../services/repositories/repositoryFactory";
 import type { Member, MemberInput } from "../../../types/member";
+import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
 
 export function useMembers(search: string) {
   const repositories = useMemo(() => createRepositories(), []);
@@ -14,9 +15,23 @@ export function useMembers(search: string) {
   });
 
   const saveMember = useMutation({
-    mutationFn: ({ member, input }: { member: Member | null; input: MemberInput }) =>
-      member ? repositories.members.update(member.id, input) : repositories.members.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["members"] })
+    mutationFn: async ({ member, input }: { member: Member | null; input: MemberInput }) => {
+      const saved = member
+        ? await repositories.members.update(member.id, input)
+        : await repositories.members.create(input);
+      const linkedEmployees = await repositories.employees.listByMemberId(saved.id);
+      await Promise.all(
+        linkedEmployees.map((linkedEmployee) =>
+          repositories.employees.update(linkedEmployee.id, employeeProfileFromMember(saved)),
+        ),
+      );
+      return saved;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["member-options"] });
+    }
   });
 
   const archiveMember = useMutation({

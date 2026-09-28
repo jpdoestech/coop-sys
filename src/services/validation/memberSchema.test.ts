@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { memberInputSchema } from "./memberSchema";
+import { MEMBER_STATUS } from "../lookups/statuses";
 
 const validMember = {
   membership_number: "MEM-0001",
@@ -22,6 +23,9 @@ const validMember = {
   membership_type_id: null,
   member_category: "Manpower",
   religion_affiliation_id: null,
+  sss_number: null,
+  pagibig_number: null,
+  philhealth_number: null,
   tax_identification_number: null,
   acceptance_resolution_number: null,
   highest_educational_attainment: null,
@@ -48,5 +52,15 @@ describe("memberInputSchema", () => {
 
   it("requires a whole non-negative dependent count", () => {
     expect(memberInputSchema.safeParse({ ...validMember, number_of_dependents: 1.5 }).success).toBe(false);
+  });
+
+  it("validates Philippine government number lengths", () => {
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-3456789-0" }).success).toBe(true);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123" }).success).toBe(false);
+  });
+
+  it("requires an end date for resigned or terminated membership", () => {
+    expect(memberInputSchema.safeParse({ ...validMember, membership_status_id: MEMBER_STATUS.resigned }).success).toBe(false);
+    expect(memberInputSchema.safeParse({ ...validMember, membership_status_id: MEMBER_STATUS.resigned, termination_date: "2026-09-28" }).success).toBe(true);
   });
 });

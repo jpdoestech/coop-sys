@@ -31,7 +31,8 @@ insert into public.member_types (id, code, name) values
 insert into public.member_statuses (id, code, name) values
   ('31000000-0000-4000-8000-000000000001', 'ACTIVE', 'Active'),
   ('31000000-0000-4000-8000-000000000002', 'INACTIVE', 'Inactive'),
-  ('31000000-0000-4000-8000-000000000003', 'TERMINATED', 'Terminated');
+  ('31000000-0000-4000-8000-000000000003', 'TERMINATED', 'Terminated'),
+  ('31000000-0000-4000-8000-000000000004', 'RESIGNED', 'Resigned');
 
 insert into public.employment_types (id, code, name) values
   ('32000000-0000-4000-8000-000000000001', 'REGULAR', 'Regular'),
@@ -46,7 +47,9 @@ insert into public.employment_statuses (id, code, name) values
   ('33000000-0000-4000-8000-000000000002', 'ON_LEAVE', 'On Leave'),
   ('33000000-0000-4000-8000-000000000003', 'SEPARATED', 'Separated'),
   ('33000000-0000-4000-8000-000000000004', 'INACTIVE', 'Inactive'),
-  ('33000000-0000-4000-8000-000000000005', 'RETIRED', 'Retired');
+  ('33000000-0000-4000-8000-000000000005', 'RETIRED', 'Retired'),
+  ('33000000-0000-4000-8000-000000000006', 'RESIGNED', 'Resigned'),
+  ('33000000-0000-4000-8000-000000000007', 'TERMINATED', 'Terminated');
 
 insert into public.document_types (id, code, name, is_required) values
   ('34000000-0000-4000-8000-000000000001', 'BIO_DATA', 'Bio-data', true),

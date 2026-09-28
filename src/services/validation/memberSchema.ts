@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { terminalMemberStatuses } from "../lookups/statuses";
+import { governmentId } from "./governmentIdSchema";
 
 const nullableText = z.string().trim().nullable().optional();
 
@@ -29,7 +31,10 @@ export const memberInputSchema = z.object({
   membership_type_id: nullableText,
   member_category: nullableText,
   religion_affiliation_id: nullableText,
-  tax_identification_number: nullableText,
+  sss_number: governmentId([10], "SSS number"),
+  pagibig_number: governmentId([12], "PAG-IBIG MID number"),
+  philhealth_number: governmentId([12], "PhilHealth number"),
+  tax_identification_number: governmentId([9, 12], "TIN"),
   acceptance_resolution_number: nullableText,
   highest_educational_attainment: nullableText,
   occupation_income_source: nullableText,
@@ -42,6 +47,15 @@ export const memberInputSchema = z.object({
   emergency_contact: nullableText,
   notes: nullableText,
   profile_photo_ref: nullableText
-});
+}).refine(
+  (value) =>
+    !value.membership_status_id ||
+    !terminalMemberStatuses.has(value.membership_status_id) ||
+    Boolean(value.termination_date),
+  {
+    message: "A resignation or termination date is required.",
+    path: ["termination_date"],
+  },
+);
 
 export type MemberInputSchema = z.infer<typeof memberInputSchema>;

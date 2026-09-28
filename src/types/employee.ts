@@ -7,6 +7,10 @@ export type Employee = BaseRecord &
     employee_number: string;
     member_id: string | null;
     religion_affiliation_id: string | null;
+    sss_number: string | null;
+    pagibig_number: string | null;
+    philhealth_number: string | null;
+    tax_identification_number: string | null;
     date_of_birth: string | null;
     sex: string | null;
     civil_status: string | null;

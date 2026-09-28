@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Save, X } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
+import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/forms/GovernmentIdFields";
 import { educationalAttainments } from "../../../services/lookups/educationalAttainments";
+import { terminalMemberStatuses } from "../../../services/lookups/statuses";
 import { memberInputSchema } from "../../../services/validation/memberSchema";
 import { religionAffiliations } from "../../../services/lookups/religionAffiliations";
 import type { Member, MemberInput } from "../../../types/member";
@@ -41,9 +43,12 @@ function emptyDraft(): Draft {
     postal_code: null,
     membership_date: null,
     membership_status_id: memberStatuses[0].id,
-    membership_type_id: memberTypes[0].id,
+    membership_type_id: memberTypes[1].id,
     member_category: null,
     religion_affiliation_id: null,
+    sss_number: null,
+    pagibig_number: null,
+    philhealth_number: null,
     tax_identification_number: null,
     acceptance_resolution_number: null,
     highest_educational_attainment: null,
@@ -105,6 +110,15 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
     province: draft.province,
     postal_code: draft.postal_code,
   };
+  const governmentIdValue: GovernmentIdValue = {
+    sss_number: draft.sss_number,
+    pagibig_number: draft.pagibig_number,
+    philhealth_number: draft.philhealth_number,
+    tax_identification_number: draft.tax_identification_number,
+  };
+  const membershipEnded = Boolean(
+    draft.membership_status_id && terminalMemberStatuses.has(draft.membership_status_id),
+  );
 
   useEffect(() => {
     setDraft(toDraft(member));
@@ -158,9 +172,6 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
             <Field label="Membership number" error={errors.membership_number}>
               <input className={inputClass} value={draft.membership_number} onChange={(event) => setValue("membership_number", event.target.value)} placeholder="MEM-0001" />
             </Field>
-            <Field label="TIN">
-              <input className={inputClass} value={draft.tax_identification_number ?? ""} onChange={(event) => setValue("tax_identification_number", event.target.value || null)} placeholder="000-000-000-000" />
-            </Field>
             <Field label="First name" error={errors.first_name}>
               <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} />
             </Field>
@@ -194,6 +205,10 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
             </Field>
           </Section>
 
+          <Section title="Government numbers" description="Government-issued identifiers synchronize with a linked employee record; the system never invents these values.">
+            <GovernmentIdFields value={governmentIdValue} errors={errors} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
+          </Section>
+
           <Section title="Contact" description="Current contact and residential information.">
             <Field label="Mobile number"><input className={inputClass} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", event.target.value || null)} /></Field>
             <Field label="Email" error={errors.email}><input type="email" className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
@@ -205,7 +220,13 @@ export function MemberForm({ member, saving, onCancel, onSubmit }: MemberFormPro
             <Field label="Membership date"><input type="date" className={inputClass} value={draft.membership_date ?? ""} onChange={(event) => setValue("membership_date", event.target.value || null)} /></Field>
             <Field label="Acceptance resolution number"><input className={inputClass} value={draft.acceptance_resolution_number ?? ""} onChange={(event) => setValue("acceptance_resolution_number", event.target.value || null)} /></Field>
             <Field label="Membership type"><select className={inputClass} value={draft.membership_type_id ?? ""} onChange={(event) => setValue("membership_type_id", event.target.value || null)}>{memberTypes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
-            <Field label="Membership status"><select className={inputClass} value={draft.membership_status_id ?? ""} onChange={(event) => setValue("membership_status_id", event.target.value || null)}>{memberStatuses.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
+            <Field label="Membership status"><select className={inputClass} value={draft.membership_status_id ?? ""} onChange={(event) => { const status = event.target.value || null; setValue("membership_status_id", status); if (!status || !terminalMemberStatuses.has(status)) { setValue("termination_date", null); setValue("termination_reason", null); } }}>{memberStatuses.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
+            {membershipEnded ? (
+              <>
+                <Field label="Resignation / termination date" error={errors.termination_date}><input type="date" className={inputClass} value={draft.termination_date ?? ""} onChange={(event) => setValue("termination_date", event.target.value || null)} /></Field>
+                <Field label="Reason"><input className={inputClass} value={draft.termination_reason ?? ""} onChange={(event) => setValue("termination_reason", event.target.value || null)} /></Field>
+              </>
+            ) : null}
             <Field label="Member category"><input className={inputClass} value={draft.member_category ?? ""} onChange={(event) => setValue("member_category", event.target.value || null)} placeholder="Community, Manpower" /></Field>
             <Field label="Religion / social affiliation"><select className={inputClass} value={draft.religion_affiliation_id ?? ""} onChange={(event) => setValue("religion_affiliation_id", event.target.value || null)}><option value="">Not set</option>{religionAffiliations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
           </Section>

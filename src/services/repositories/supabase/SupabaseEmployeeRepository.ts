@@ -85,6 +85,12 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
     return data ? normalize(data as EmployeeRow) : null;
   }
 
+  async listByMemberId(memberId: string) {
+    const { data, error } = await client().from("employees").select("*, beneficiaries(*), employment_assignments(*)").eq("member_id", memberId);
+    if (error) throw error;
+    return (data as EmployeeRow[]).map(normalize);
+  }
+
   async create(input: EmployeeInput) {
     const { data, error } = await client().from("employees").insert({ ...employeeFields(input), sync_status: "synced" }).select("*").single();
     if (error) throw error;

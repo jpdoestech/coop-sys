@@ -50,6 +50,7 @@ export function AddressFields({ value, disabled = false, onChange }: AddressFiel
   const [provinceCode, setProvinceCode] = useState(initialProvince?.code ?? "");
   const [cityCode, setCityCode] = useState(initialCity?.code ?? "");
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const listId = useId().replace(/:/g, "");
   const provinceOptions = useMemo(() => provincesForRegion(regionCode), [regionCode]);
   const cityOptions = useMemo(() => citiesForProvince(provinceCode), [provinceCode]);
@@ -86,6 +87,16 @@ export function AddressFields({ value, disabled = false, onChange }: AddressFiel
 
   function patch(next: Partial<AddressValue>) {
     onChange({ ...value, ...next });
+  }
+
+  function validateInput(
+    input: HTMLInputElement,
+    field: string,
+    valid: boolean,
+    message: string,
+  ) {
+    input.setCustomValidity(valid ? "" : message);
+    setErrors((current) => ({ ...current, [field]: valid ? "" : message }));
   }
 
   function changeRegion(nextName: string) {
@@ -141,28 +152,88 @@ export function AddressFields({ value, disabled = false, onChange }: AddressFiel
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Region
-        <input className={inputClass} disabled={disabled} value={regionName} list={`${listId}-regions`} placeholder="Select or type a region" onChange={(event) => changeRegion(event.target.value)} />
+        <input
+          className={inputClass}
+          disabled={disabled}
+          value={regionName}
+          list={`${listId}-regions`}
+          placeholder="Type to search regions"
+          aria-invalid={Boolean(errors.region)}
+          onChange={(event) => {
+            changeRegion(event.target.value);
+            const valid = !event.target.value || regions.some((item) => normalizedLocationName(item.name) === normalizedLocationName(event.target.value));
+            event.currentTarget.setCustomValidity(valid ? "" : "Choose a region from the official list.");
+            setErrors((current) => ({ ...current, region: "" }));
+          }}
+          onBlur={(event) => validateInput(event.currentTarget, "region", event.currentTarget.validity.valid, "Choose a region from the official list.")}
+        />
+        {errors.region ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.region}</span> : null}
         <datalist id={`${listId}-regions`}>
           {regions.map((item) => <option key={item.code} value={item.name} />)}
         </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Province
-        <input className={inputClass} disabled={disabled} value={value.province ?? ""} list={`${listId}-provinces`} placeholder="Select or type a province" onChange={(event) => changeProvince(event.target.value)} />
+        <input
+          className={inputClass}
+          disabled={disabled || !regionCode}
+          value={value.province ?? ""}
+          list={`${listId}-provinces`}
+          placeholder="Type to search provinces"
+          aria-invalid={Boolean(errors.province)}
+          onChange={(event) => {
+            changeProvince(event.target.value);
+            const valid = !event.target.value || provinceOptions.some((item) => normalizedLocationName(item.name) === normalizedLocationName(event.target.value));
+            event.currentTarget.setCustomValidity(valid ? "" : "Choose a province within the selected region.");
+            setErrors((current) => ({ ...current, province: "" }));
+          }}
+          onBlur={(event) => validateInput(event.currentTarget, "province", event.currentTarget.validity.valid, "Choose a province within the selected region.")}
+        />
+        {errors.province ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.province}</span> : null}
         <datalist id={`${listId}-provinces`}>
           {(regionCode ? provinceOptions : provinces).map((item) => <option key={item.code} value={item.name} />)}
         </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         City / municipality
-        <input className={inputClass} disabled={disabled} value={value.city_municipality ?? ""} list={`${listId}-cities`} placeholder="Select or type a city / municipality" onChange={(event) => changeCity(event.target.value)} />
+        <input
+          className={inputClass}
+          disabled={disabled || !provinceCode}
+          value={value.city_municipality ?? ""}
+          list={`${listId}-cities`}
+          placeholder="Type to search cities"
+          aria-invalid={Boolean(errors.city)}
+          onChange={(event) => {
+            changeCity(event.target.value);
+            const valid = !event.target.value || cityOptions.some((item) => normalizedLocationName(item.name) === normalizedLocationName(event.target.value));
+            event.currentTarget.setCustomValidity(valid ? "" : "Choose a city or municipality within the selected province.");
+            setErrors((current) => ({ ...current, city: "" }));
+          }}
+          onBlur={(event) => validateInput(event.currentTarget, "city", event.currentTarget.validity.valid, "Choose a city or municipality within the selected province.")}
+        />
+        {errors.city ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.city}</span> : null}
         <datalist id={`${listId}-cities`}>
           {(provinceCode ? cityOptions : cities).map((item) => <option key={item.code} value={item.name} />)}
         </datalist>
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         Barangay
-        <input className={inputClass} disabled={disabled} value={value.barangay ?? ""} list={`${listId}-barangays`} placeholder="Select or type a barangay" onChange={(event) => patch({ barangay: event.target.value || null })} />
+        <input
+          className={inputClass}
+          disabled={disabled || !cityCode}
+          value={value.barangay ?? ""}
+          list={`${listId}-barangays`}
+          placeholder="Type to search barangays"
+          aria-invalid={Boolean(errors.barangay)}
+          onChange={(event) => {
+            patch({ barangay: event.target.value || null });
+            const valid = !event.target.value || barangays.some((item) => normalizedLocationName(item.name) === normalizedLocationName(event.target.value));
+            event.currentTarget.setCustomValidity(valid ? "" : "Choose a barangay within the selected city or municipality.");
+            setErrors((current) => ({ ...current, barangay: "" }));
+          }}
+          onBlur={(event) => validateInput(event.currentTarget, "barangay", event.currentTarget.validity.valid, "Choose a barangay within the selected city or municipality.")}
+        />
+        {errors.barangay ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.barangay}</span> : null}
         <datalist id={`${listId}-barangays`}>
           {barangays.map((item) => <option key={item.code} value={item.name} />)}
         </datalist>

@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { employeeInputSchema } from "./employeeSchema";
+import { EMPLOYMENT_STATUS } from "../lookups/statuses";
 
 const baseEmployee = {
   employee_number: "EMP-000001",
   member_id: null,
   religion_affiliation_id: null,
+  sss_number: null,
+  pagibig_number: null,
+  philhealth_number: null,
+  tax_identification_number: null,
   first_name: "Ada",
   middle_name: null,
   last_name: "Santos",
@@ -72,5 +77,10 @@ describe("employeeInputSchema", () => {
       deactivation_reason: null
     }];
     expect(employeeInputSchema.safeParse({ ...baseEmployee, beneficiaries }).success).toBe(false);
+  });
+
+  it("requires a separation date for a resigned or terminated employee", () => {
+    expect(employeeInputSchema.safeParse({ ...baseEmployee, employment_status_id: EMPLOYMENT_STATUS.terminated }).success).toBe(false);
+    expect(employeeInputSchema.safeParse({ ...baseEmployee, employment_status_id: EMPLOYMENT_STATUS.terminated, date_separated: "2026-09-28" }).success).toBe(true);
   });
 });

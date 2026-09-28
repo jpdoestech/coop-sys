@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { terminalEmploymentStatuses } from "../lookups/statuses";
+import { governmentId } from "./governmentIdSchema";
 
 const nullableText = z.string().trim().nullable().optional();
 
@@ -7,6 +9,10 @@ export const employeeInputSchema = z
     employee_number: z.string().trim().min(1, "Employee number is required."),
     member_id: nullableText,
     religion_affiliation_id: nullableText,
+    sss_number: governmentId([10], "SSS number"),
+    pagibig_number: governmentId([12], "PAG-IBIG MID number"),
+    philhealth_number: governmentId([12], "PhilHealth number"),
+    tax_identification_number: governmentId([9, 12], "TIN"),
     first_name: z.string().trim().min(1, "First name is required."),
     middle_name: nullableText,
     last_name: z.string().trim().min(1, "Last name is required."),
@@ -91,6 +97,16 @@ export const employeeInputSchema = z
     {
       message: "Date hired cannot be later than today.",
       path: ["date_hired"]
+    }
+  )
+  .refine(
+    (value) =>
+      !value.employment_status_id ||
+      !terminalEmploymentStatuses.has(value.employment_status_id) ||
+      Boolean(value.date_separated),
+    {
+      message: "A resignation, termination, or separation date is required.",
+      path: ["date_separated"]
     }
   );
 
