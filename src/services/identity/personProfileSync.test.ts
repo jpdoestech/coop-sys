@@ -18,7 +18,7 @@ const employee = {
   province: "Davao del Sur",
   postal_code: "8000",
   religion_affiliation_id: null,
-  sss_number: "12-3456789-0",
+  sss_number: "12-345678-9",
   pagibig_number: "1234-5678-9012",
   philhealth_number: "12-345678901-2",
   tax_identification_number: "123-456-789-000",

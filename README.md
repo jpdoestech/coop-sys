@@ -4,7 +4,7 @@ Small, maintainable records system for cooperative members and employees. The im
 
 ## Current Phase
 
-Phase 1 foundation is complete. Member management is functional and employee management is in progress:
+The foundation, member register, employee register, hierarchy, and authentication baseline are functional:
 
 - React, TypeScript, Vite, Tailwind CSS
 - Responsive app shell and route structure
@@ -21,6 +21,10 @@ Phase 1 foundation is complete. Member management is functional and employee man
 - Cascading Philippine address reference selector
 - Beneficiary history with a three-active-record limit and required deactivation reasons
 - Configurable religion and social-affiliation seed values
+- Supabase session authentication and password recovery
+- PBKDF2-secured offline authentication with forced temporary-password replacement
+- Role-aware navigation and branch-scoped member/employee access
+- Super Admin user invitations, roles, status, and branch assignments
 
 ## Local Development
 
@@ -54,3 +58,5 @@ npm run test
 - [Database Schema](./docs/database.md)
 - [Synchronization Strategy](./docs/synchronization.md)
 - [Deployment Strategy](./docs/deployment.md)
+- [Authentication](./docs/authentication.md)
+- [Access Control](./docs/access-control.md)

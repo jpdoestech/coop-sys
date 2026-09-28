@@ -1,5 +1,4 @@
 import {
-  Archive,
   BarChart3,
   Building2,
   FileText,
@@ -10,6 +9,7 @@ import {
   Users,
   UserSquare2,
   UserCog,
+  LogOut,
   Wifi,
   X
 } from "lucide-react";
@@ -20,6 +20,7 @@ import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { getAppMode } from "../../utils/env";
 import { useAccess } from "../../services/access/useAccess";
 import { roleLabel, type Permission } from "../../services/access/accessControl";
+import { useAuth } from "../../services/auth/useAuth";
 
 type AppShellProps = {
   children: ReactNode;
@@ -29,8 +30,7 @@ const navItems: Array<{ to: string; label: string; icon: typeof Gauge; permissio
   { to: "/", label: "Dashboard", icon: Gauge, permission: "dashboard.view" },
   { to: "/members", label: "Members", icon: Users, permission: "members.view" },
   { to: "/employees", label: "Employees", icon: UserSquare2, permission: "employees.view" },
-  { to: "/organization/departments", label: "Departments", icon: Building2, permission: "organization.manage" },
-  { to: "/organization/positions", label: "Positions", icon: Archive, permission: "organization.manage" },
+  { to: "/organization", label: "Organization", icon: Building2, permission: "organization.manage" },
   { to: "/documents", label: "Documents", icon: FileText, permission: "documents.view" },
   { to: "/reports", label: "Reports", icon: BarChart3, permission: "reports.view" },
   { to: "/sync", label: "Synchronization", icon: Wifi, permission: "sync.manage" },
@@ -44,6 +44,7 @@ export function AppShell({ children }: AppShellProps) {
   const online = useOnlineStatus();
   const appMode = getAppMode();
   const { profile, can } = useAccess();
+  const { session, signOut } = useAuth();
   const visibleNavItems = navItems.filter((item) => can(item.permission));
 
   const sidebar = (
@@ -77,9 +78,8 @@ export function AppShell({ children }: AppShellProps) {
         ))}
       </nav>
       <div className="border-t border-line px-5 py-4 text-xs text-ink/70">
-        <p className="font-semibold text-ink">{profile.displayName}</p>
-        <p className="mt-0.5">{roleLabel(profile.role)}</p>
-        <p>Mode: {appMode}</p>
+        <div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink">{profile.displayName}</p><p className="mt-0.5">{roleLabel(profile.role)}</p><p className="mt-0.5">{session?.mode === "online" ? "Online account" : "Offline account"}</p></div><button onClick={() => void signOut()} className="focus-ring rounded p-2 text-ink/60 hover:bg-[#ece6dc] hover:text-red-700" title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button></div>
+        <p className="mt-2">Mode: {appMode}</p>
         <p className="mt-1">Last sync: Not yet synchronized</p>
       </div>
     </aside>

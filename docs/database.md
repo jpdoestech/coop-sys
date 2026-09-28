@@ -45,7 +45,7 @@ sync_queue 1---* sync_conflicts
 - SQLite: `src/database/sqlite/migrations/0001_initial_schema.sql`
 - Seed data: `src/database/seeds/dev_seed.sql`
 
-Apply migrations in numeric order. Migration `0002` adds member registration details and the manpower branch/client assignment history. Migration `0003` adds beneficiaries and religion/social affiliations. Migration `0004` adds government identifiers, resignation/termination statuses, and support for multiple employment engagements under one member ID. Migration `0005` establishes the Head Office > Branch > Client hierarchy and transfer metadata. Migration `0006` adds the seven operating roles, optional employee linkage on users, and many-to-many branch assignments through `user_branch_access`.
+Apply migrations in numeric order. Migration `0002` adds member registration details and the manpower branch/client assignment history. Migration `0003` adds beneficiaries and religion/social affiliations. Migration `0004` adds government identifiers, resignation/termination statuses, and support for multiple employment engagements under one member ID. Migration `0005` establishes the Head Office > Branch > Client hierarchy and transfer metadata. Migration `0006` adds the seven operating roles, optional employee linkage on users, and many-to-many branch assignments through `user_branch_access`. Migration `0007` provisions application profiles from Supabase Auth, while `0008` enables organization-administration RLS policies.
 
 ## Current Difference Log
 

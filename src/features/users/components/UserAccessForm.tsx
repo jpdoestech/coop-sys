@@ -11,6 +11,7 @@ type Props = {
   error?: string;
   onCancel: () => void;
   onSubmit: (input: SystemUserInput) => void;
+  offline: boolean;
 };
 
 const emptyUser: SystemUserInput = {
@@ -19,9 +20,10 @@ const emptyUser: SystemUserInput = {
   role: "branch_user",
   branch_ids: [],
   is_active: true,
+  temporary_password: "",
 };
 
-export function UserAccessForm({ user, saving, error, onCancel, onSubmit }: Props) {
+export function UserAccessForm({ user, saving, error, onCancel, onSubmit, offline }: Props) {
   const [value, setValue] = useState<SystemUserInput>(emptyUser);
   const [validationError, setValidationError] = useState("");
   useEffect(() => {
@@ -31,6 +33,7 @@ export function UserAccessForm({ user, saving, error, onCancel, onSubmit }: Prop
       role: user.role,
       branch_ids: user.branch_ids,
       is_active: user.is_active,
+      temporary_password: "",
     } : emptyUser);
     setValidationError("");
   }, [user]);
@@ -54,8 +57,9 @@ export function UserAccessForm({ user, saving, error, onCancel, onSubmit }: Prop
         </div>
         <div className="grid gap-5 p-6 sm:grid-cols-2">
           <label className="text-sm font-medium">Display name<input required maxLength={CHARACTER_LIMITS.name} value={value.display_name} onChange={(event) => setValue({ ...value, display_name: event.target.value })} className="focus-ring mt-1.5 w-full rounded border border-line px-3 py-2.5" /></label>
-          <label className="text-sm font-medium">Email address<input required type="email" maxLength={254} value={value.email} onChange={(event) => setValue({ ...value, email: event.target.value })} className="focus-ring mt-1.5 w-full rounded border border-line px-3 py-2.5" /></label>
+          <label className="text-sm font-medium">Email address<input required readOnly={!offline && Boolean(user)} type="email" maxLength={254} value={value.email} onChange={(event) => setValue({ ...value, email: event.target.value })} className="focus-ring mt-1.5 w-full rounded border border-line px-3 py-2.5 read-only:bg-paper read-only:text-ink/60" /></label>
           <label className="text-sm font-medium sm:col-span-2">System role<select value={value.role} onChange={(event) => { const role = event.target.value as SystemUserInput["role"]; setValue({ ...value, role, branch_ids: role === "branch_admin" || role === "branch_user" ? value.branch_ids : [] }); }} className="focus-ring mt-1.5 w-full rounded border border-line bg-white px-3 py-2.5">{roleDefinitions.map((role) => <option key={role.code} value={role.code}>{role.label}</option>)}</select></label>
+          {offline ? <label className="text-sm font-medium sm:col-span-2">{user ? "Reset with temporary password" : "Temporary password"}<input required={!user} type="password" autoComplete="new-password" minLength={12} maxLength={128} value={value.temporary_password ?? ""} onChange={(event) => setValue({ ...value, temporary_password: event.target.value })} className="focus-ring mt-1.5 w-full rounded border border-line px-3 py-2.5" /><span className="mt-1 block text-xs font-normal text-ink/55">{user ? "Leave blank to keep the current password." : "The user must replace this password at first sign-in."}</span></label> : !user ? <p className="text-sm text-ink/60 sm:col-span-2">An invitation will be sent to this email address.</p> : null}
           {branchScoped ? <fieldset className="sm:col-span-2"><legend className="text-sm font-medium">Assigned branches</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{branches.filter((branch) => branch.id !== HEAD_OFFICE_ID).map((branch) => <label key={branch.id} className="flex items-center gap-3 rounded border border-line px-3 py-2.5 text-sm"><input type="checkbox" checked={value.branch_ids.includes(branch.id)} onChange={(event) => setValue({ ...value, branch_ids: event.target.checked ? [...value.branch_ids, branch.id] : value.branch_ids.filter((id) => id !== branch.id) })} />{branch.label}</label>)}</div></fieldset> : null}
           <label className="flex items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={value.is_active} onChange={(event) => setValue({ ...value, is_active: event.target.checked })} />Active system access</label>
           {validationError || error ? <p className="text-sm text-red-700 sm:col-span-2">{validationError || error}</p> : null}

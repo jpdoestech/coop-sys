@@ -22,4 +22,4 @@ Branch scope follows the employee's current active placement. A member is visibl
 - `user_branch_access` supports one or more branch assignments for each branch-level user.
 - Only Super Admin can maintain system-user role and branch assignments.
 
-The local development profile defaults to the seeded Super Admin. Set `coop_sys_current_user_id` in browser local storage to a seeded user ID and reload to exercise another role during development. Production authentication must derive the profile from the authenticated Supabase user and must never trust a browser-selected role.
+The active access profile always comes from the authenticated session. Online mode resolves roles and branch assignments from Supabase. Offline mode resolves them from the authenticated device-local account; changing browser storage alone does not create an authenticated session.

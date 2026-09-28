@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import { sanitizeGovernmentId, sanitizePhoneNumber } from "./inputSanitizers";
 
 describe("input sanitizers", () => {
-  it("keeps only government ID digits and hyphens within the field limit", () => {
-    expect(sanitizeGovernmentId("12A-3456789-0-extra", 12)).toBe("12-3456789-0");
+  it("formats SSS digits and inserts hyphens automatically", () => {
+    expect(sanitizeGovernmentId("12A3456789-extra", "sss")).toBe("12-345678-9");
+  });
+
+  it("formats each government identifier using its required grouping", () => {
+    expect(sanitizeGovernmentId("123456789012", "pagibig")).toBe("1234-5678-9012");
+    expect(sanitizeGovernmentId("123456789012", "philhealth")).toBe("12-345678901-2");
+    expect(sanitizeGovernmentId("123456789012999", "tin")).toBe("123-456-789-012");
   });
 
   it("keeps phone punctuation, removes letters, and allows one plus sign", () => {

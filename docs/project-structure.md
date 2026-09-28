@@ -20,6 +20,7 @@ coop-sys/
 |   |   |-- members/
 |   |   |-- employees/
 |   |   |-- users/
+|   |   |-- organization/
 |   |   |-- departments/
 |   |   |-- positions/
 |   |   |-- documents/
@@ -30,6 +31,7 @@ coop-sys/
 |   |-- hooks/                    Cross-feature React hooks
 |   |-- services/
 |   |   |-- access/               Role permissions and organization scope rules
+|   |   |-- auth/                 Online and offline authentication services
 |   |   |-- identity/             Member/employee profile synchronization rules
 |   |   |-- lookups/              Shared configurable reference values
 |   |   |-- repositories/         Persistence interfaces and implementations

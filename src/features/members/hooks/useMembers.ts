@@ -22,6 +22,10 @@ export function useMembers(search: string) {
       return members.filter((member) => visibleIds.has(member.id));
     }
   });
+  const placementEmployees = useQuery({
+    queryKey: ["member-placement-employees"],
+    queryFn: async () => (await repositories.employees.list({ limit: 1000 })).filter((employee) => employeeIsInScope(employee, profile)),
+  });
 
   const saveMember = useMutation({
     mutationFn: async ({ member, input }: { member: Member | null; input: MemberInput }) => {
@@ -61,5 +65,5 @@ export function useMembers(search: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["members"] })
   });
 
-  return { query, saveMember, archiveMember };
+  return { query, placementEmployees, saveMember, archiveMember };
 }

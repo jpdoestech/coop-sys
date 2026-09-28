@@ -4,7 +4,7 @@ function digitCount(value: string) {
   return value.replace(/\D/g, "").length;
 }
 
-export function governmentId(lengths: number[], label: string, maxCharacters: number) {
+export function governmentId(lengths: number[], label: string, maxCharacters: number, formats: RegExp[]) {
   return z
     .string()
     .trim()
@@ -12,8 +12,8 @@ export function governmentId(lengths: number[], label: string, maxCharacters: nu
     .optional()
     .refine((value) => !value || value.length <= maxCharacters, `${label} is too long.`)
     .refine(
-      (value) => !value || /^[0-9-]+$/.test(value),
-      `${label} may contain digits and hyphens only.`,
+      (value) => !value || formats.some((format) => format.test(value)),
+      `${label} format is invalid.`,
     )
     .refine(
       (value) => !value || lengths.includes(digitCount(value)),

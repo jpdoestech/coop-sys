@@ -1,11 +1,7 @@
 import { ArrowRightLeft, Building2, MapPin, X } from "lucide-react";
 import type { EmploymentAssignmentInput } from "../../../types/assignment";
-import {
-  branches,
-  clientsForBranch,
-  HEAD_OFFICE_ID,
-  labelFor,
-} from "../data/employeeOptions";
+import { HEAD_OFFICE_ID, labelFor } from "../data/employeeOptions";
+import { useOrganization } from "../../../services/organization/useOrganization";
 
 type Props = {
   value: EmploymentAssignmentInput | null;
@@ -20,15 +16,16 @@ type Props = {
 const inputClass =
   "focus-ring mt-1.5 w-full rounded border border-line bg-white px-3 py-2.5 text-sm text-ink disabled:bg-line/20 disabled:text-ink/55";
 
-function placementName(assignment: EmploymentAssignmentInput) {
+function placementName(assignment: EmploymentAssignmentInput, branches: Array<{ id: string; label: string }>, clients: Array<{ id: string; label: string; branchId: string; isActive: boolean }>) {
   const branch = labelFor(branches, assignment.branch_id);
-  const clientOptions = clientsForBranch(assignment.branch_id);
+  const clientOptions = clients.filter((item) => item.branchId === assignment.branch_id && item.isActive);
   const client = clientOptions.find((item) => item.id === assignment.client_id)?.label;
   return client ? `${branch} / ${client}` : branch;
 }
 
 export function AssignmentEditor({ value, history, existingActive, transferring, onChange, onBeginTransfer, onCancelTransfer }: Props) {
-  const availableClients = clientsForBranch(value?.branch_id ?? null);
+  const { branches, clients } = useOrganization();
+  const availableClients = clients.filter((item) => item.branchId === value?.branch_id && item.isActive);
   const showEditor = !existingActive || transferring;
 
   return (
@@ -36,7 +33,7 @@ export function AssignmentEditor({ value, history, existingActive, transferring,
       {existingActive && !transferring ? (
         <div className="flex flex-col gap-3 border-l-4 border-moss bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Building2 className="h-4 w-4 text-moss" />{placementName(existingActive)}</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Building2 className="h-4 w-4 text-moss" />{placementName(existingActive, branches, clients)}</p>
             <p className="mt-1 text-xs text-ink/55">Since {existingActive.start_date}{existingActive.work_location ? ` / ${existingActive.work_location}` : ""}</p>
           </div>
           <button type="button" className="focus-ring inline-flex items-center justify-center gap-2 rounded border border-moss px-3 py-2 text-sm font-semibold text-moss hover:bg-moss/5" onClick={onBeginTransfer}>
@@ -55,7 +52,7 @@ export function AssignmentEditor({ value, history, existingActive, transferring,
               onChange({ ...value, branch_id: branchId, client_id: null, work_location: branch?.label ?? null });
             }}>
               <option value="">Not assigned</option>
-              {branches.map((item) => <option key={item.id} value={item.id}>{item.type === "head_office" ? item.label : `Branch: ${item.label}`}</option>)}
+              {branches.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.type === "head_office" ? item.label : `Branch: ${item.label}`}</option>)}
             </select>
           </label>
           <label className="block text-xs font-semibold text-ink/75">
@@ -97,7 +94,7 @@ export function AssignmentEditor({ value, history, existingActive, transferring,
           <div className="mt-2 divide-y divide-line border-y border-line">
             {history.map((assignment) => (
               <div key={assignment.id} className="grid gap-1 py-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center sm:gap-6">
-                <div><p className="font-semibold text-ink">{placementName(assignment)}</p><p className="mt-0.5 text-xs text-ink/55">{assignment.assignment_code ?? "No assignment code"}{assignment.transfer_reason ? ` / ${assignment.transfer_reason}` : ""}</p></div>
+                <div><p className="font-semibold text-ink">{placementName(assignment, branches, clients)}</p><p className="mt-0.5 text-xs text-ink/55">{assignment.assignment_code ?? "No assignment code"}{assignment.transfer_reason ? ` / ${assignment.transfer_reason}` : ""}</p></div>
                 <p className="font-mono text-xs text-ink/55">{assignment.start_date} to {assignment.end_date ?? "Present"}</p>
               </div>
             ))}

@@ -32,9 +32,9 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage }: 
   }
 
   return (
-    <div className="overflow-x-auto border-t border-line">
+    <div className="max-h-[60vh] overflow-auto border-t border-line">
       <table className="w-full min-w-[850px] border-collapse text-left text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10">
           <tr className="bg-ink text-xs uppercase text-white">
             <th className="px-5 py-3 font-semibold">Member</th>
             <th className="px-4 py-3 font-semibold">Type</th>

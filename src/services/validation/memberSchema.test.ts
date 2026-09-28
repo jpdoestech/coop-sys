@@ -55,12 +55,13 @@ describe("memberInputSchema", () => {
   });
 
   it("validates Philippine government number lengths", () => {
-    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-3456789-0" }).success).toBe(true);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-345678-9" }).success).toBe(true);
     expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123" }).success).toBe(false);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123456789" }).success).toBe(false);
   });
 
   it("rejects invalid government ID and contact characters", () => {
-    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-345678A-0" }).success).toBe(false);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-34567A-9" }).success).toBe(false);
     expect(memberInputSchema.safeParse({ ...validMember, mobile_number: "+63 917 CALL-ME" }).success).toBe(false);
   });
 

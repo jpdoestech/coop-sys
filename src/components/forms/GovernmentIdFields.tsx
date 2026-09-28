@@ -23,22 +23,22 @@ export function GovernmentIdFields({ value, errors = {}, onChange }: Props) {
     <>
       <label className="block text-xs font-semibold text-ink/75">
         SSS number
-        <input className={inputClass} inputMode="numeric" maxLength={12} pattern="[0-9-]*" value={value.sss_number ?? ""} onChange={(event) => patch({ sss_number: sanitizeGovernmentId(event.target.value, 12) || null })} placeholder="00-0000000-0" />
+        <input className={inputClass} inputMode="numeric" maxLength={11} value={value.sss_number ?? ""} onChange={(event) => patch({ sss_number: sanitizeGovernmentId(event.target.value, "sss") || null })} placeholder="00-000000-0" />
         {errors.sss_number ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.sss_number}</span> : null}
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         PAG-IBIG MID number
-        <input className={inputClass} inputMode="numeric" maxLength={14} pattern="[0-9-]*" value={value.pagibig_number ?? ""} onChange={(event) => patch({ pagibig_number: sanitizeGovernmentId(event.target.value, 14) || null })} placeholder="0000-0000-0000" />
+        <input className={inputClass} inputMode="numeric" maxLength={14} value={value.pagibig_number ?? ""} onChange={(event) => patch({ pagibig_number: sanitizeGovernmentId(event.target.value, "pagibig") || null })} placeholder="0000-0000-0000" />
         {errors.pagibig_number ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.pagibig_number}</span> : null}
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         PhilHealth number
-        <input className={inputClass} inputMode="numeric" maxLength={14} pattern="[0-9-]*" value={value.philhealth_number ?? ""} onChange={(event) => patch({ philhealth_number: sanitizeGovernmentId(event.target.value, 14) || null })} placeholder="00-000000000-0" />
+        <input className={inputClass} inputMode="numeric" maxLength={14} value={value.philhealth_number ?? ""} onChange={(event) => patch({ philhealth_number: sanitizeGovernmentId(event.target.value, "philhealth") || null })} placeholder="00-000000000-0" />
         {errors.philhealth_number ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.philhealth_number}</span> : null}
       </label>
       <label className="block text-xs font-semibold text-ink/75">
         TIN
-        <input className={inputClass} inputMode="numeric" maxLength={15} pattern="[0-9-]*" value={value.tax_identification_number ?? ""} onChange={(event) => patch({ tax_identification_number: sanitizeGovernmentId(event.target.value, 15) || null })} placeholder="000-000-000-000" />
+        <input className={inputClass} inputMode="numeric" maxLength={15} value={value.tax_identification_number ?? ""} onChange={(event) => patch({ tax_identification_number: sanitizeGovernmentId(event.target.value, "tin") || null })} placeholder="000-000-000-000" />
         {errors.tax_identification_number ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.tax_identification_number}</span> : null}
       </label>
     </>

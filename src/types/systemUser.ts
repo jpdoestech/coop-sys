@@ -11,5 +11,7 @@ export type SystemUser = {
   updated_at: string;
 };
 
-export type SystemUserInput = Omit<SystemUser, "id" | "created_at" | "updated_at">;
+export type SystemUserInput = Omit<SystemUser, "id" | "created_at" | "updated_at"> & {
+  temporary_password?: string;
+};
 

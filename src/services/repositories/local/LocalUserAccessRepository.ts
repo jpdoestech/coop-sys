@@ -3,6 +3,7 @@ import type { SystemUser, SystemUserInput } from "../../../types/systemUser";
 import type { UserAccessRepository } from "../UserAccessRepository";
 import { branches, HEAD_OFFICE_ID } from "../../lookups/organization";
 import { roleDefinitions } from "../../access/accessControl";
+import { setLocalCredential } from "../../auth/local/localCredentialStore";
 
 const STORAGE_KEY = "coop_sys_user_access";
 
@@ -33,26 +34,34 @@ export class LocalUserAccessRepository implements UserAccessRepository {
 
   async create(input: SystemUserInput) {
     validateInput(input);
+    if (!input.temporary_password || input.temporary_password.length < 12) throw new Error("A temporary password of at least 12 characters is required.");
     const users = readUsers();
     if (users.some((user) => user.email.toLowerCase() === input.email.toLowerCase())) {
       throw new Error("Email address already belongs to a system user.");
     }
     const timestamp = new Date().toISOString();
-    const user: SystemUser = { ...input, id: crypto.randomUUID(), created_at: timestamp, updated_at: timestamp };
+    const { temporary_password, ...profileInput } = input;
+    const user: SystemUser = { ...profileInput, id: crypto.randomUUID(), created_at: timestamp, updated_at: timestamp };
     writeUsers([...users, user]);
+    await setLocalCredential(user.id, temporary_password, true);
     return user;
   }
 
   async update(id: string, input: SystemUserInput) {
     validateInput(input);
+    if (input.temporary_password && input.temporary_password.length < 12) throw new Error("A temporary password must contain at least 12 characters.");
     const users = readUsers();
     const index = users.findIndex((user) => user.id === id);
     if (index < 0) throw new Error("System user was not found.");
     if (users.some((user) => user.id !== id && user.email.toLowerCase() === input.email.toLowerCase())) {
       throw new Error("Email address already belongs to a system user.");
     }
-    users[index] = { ...users[index], ...input, updated_at: new Date().toISOString() };
+    const { temporary_password, ...profileInput } = input;
+    users[index] = { ...users[index], ...profileInput, updated_at: new Date().toISOString() };
     writeUsers(users);
+    if (temporary_password) {
+      await setLocalCredential(id, temporary_password, true);
+    }
     return users[index];
   }
 }

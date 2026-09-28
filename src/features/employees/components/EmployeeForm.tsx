@@ -11,14 +11,13 @@ import type { Member } from "../../../types/member";
 import { AssignmentEditor } from "./AssignmentEditor";
 import { BeneficiaryEditor } from "./BeneficiaryEditor";
 import {
-  departments,
   employmentStatuses,
   employmentTypes,
   HEAD_OFFICE_ID,
-  positions,
 } from "../data/employeeOptions";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
 import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { useOrganization } from "../../../services/organization/useOrganization";
 
 type MembershipMode = "none" | "existing" | "create";
 
@@ -112,6 +111,7 @@ function toInput(employee: Employee | null): EmployeeInput {
 }
 
 export function EmployeeForm({ employee, members, formerEmployees, saving, saveError, onCancel, onSubmit }: Props) {
+  const { departments, positions } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee));
   const [error, setError] = useState("");
   const [membershipMode, setMembershipMode] = useState<MembershipMode>(employee?.member_id ? "existing" : "none");
@@ -123,7 +123,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
     [members, draft.member_id],
   );
   const availablePositions = positions.filter(
-    (position) => !draft.department_id || position.departmentId === draft.department_id,
+    (position) => position.isActive && (!draft.department_id || position.departmentId === draft.department_id),
   );
   const employmentEnded = Boolean(
     draft.employment_status_id && terminalEmploymentStatuses.has(draft.employment_status_id),
@@ -334,7 +334,7 @@ export function EmployeeForm({ employee, members, formerEmployees, saving, saveE
             <Field label="Date hired"><input type="date" className={inputClass} value={draft.date_hired ?? ""} onChange={(event) => setValue("date_hired", event.target.value || null)} /></Field>
             <Field label="Date regularized"><input type="date" className={inputClass} value={draft.date_regularized ?? ""} onChange={(event) => setValue("date_regularized", event.target.value || null)} /></Field>
             {employmentEnded ? <Field label="Resignation / termination date"><input type="date" className={inputClass} value={draft.date_separated ?? ""} onChange={(event) => setValue("date_separated", event.target.value || null)} /></Field> : null}
-            <Field label="Department"><select className={inputClass} value={draft.department_id ?? ""} onChange={(event) => { setValue("department_id", event.target.value || null); setValue("position_id", null); }}><option value="">Not set</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
+            <Field label="Department"><select className={inputClass} value={draft.department_id ?? ""} onChange={(event) => { setValue("department_id", event.target.value || null); setValue("position_id", null); }}><option value="">Not set</option>{departments.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
             <Field label="Position"><select className={inputClass} value={draft.position_id ?? ""} onChange={(event) => setValue("position_id", event.target.value || null)}><option value="">Not set</option>{availablePositions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
           </Section>
 
