@@ -28,6 +28,18 @@ The foundation, member register, employee register, hierarchy, and authenticatio
 
 ## Local Development
 
+### Windows quick start
+
+Run `setup.bat` once to install dependencies, create the local environment file,
+run checks, and build the application. After setup, run `start.bat` whenever you
+want to open the local system at `http://127.0.0.1:5173/`.
+
+The start script detects an already-running instance, so it is safe to run it
+again. Command-line users can pass `--no-pause` to `setup.bat` and
+`--no-browser` to `start.bat` for unattended validation.
+
+### Manual setup
+
 ```bash
 npm install
 npm run dev
