@@ -5,6 +5,7 @@ import type {
   PaymentSettings,
 } from "../../../types/payment";
 import { allocatePayment, effectiveSettings } from "../../payments/paymentMath";
+import { createUuid } from "../../../utils/createUuid";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -330,7 +331,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
       };
       runningPayments.push({
         ...payment,
-        id: crypto.randomUUID(),
+        id: createUuid(),
         created_at: "",
         updated_at: "",
         deleted_at: null,

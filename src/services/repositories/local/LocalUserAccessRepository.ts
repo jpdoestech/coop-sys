@@ -7,6 +7,7 @@ import type {
 import { branches, HEAD_OFFICE_ID } from "../../lookups/organization";
 import { roleDefinitions } from "../../access/accessControl";
 import { setLocalCredential } from "../../auth/local/localCredentialStore";
+import { createUuid } from "../../../utils/createUuid";
 
 const STORAGE_KEY = "coop_sys_user_access";
 
@@ -83,7 +84,7 @@ export class LocalUserAccessRepository implements UserAccessRepository {
     const { temporary_password, ...profileInput } = input;
     const user: SystemUser = {
       ...profileInput,
-      id: crypto.randomUUID(),
+      id: createUuid(),
       created_at: timestamp,
       updated_at: timestamp,
     };

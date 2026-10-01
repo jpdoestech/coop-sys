@@ -5,6 +5,7 @@ import type { ListOptions } from "../Repository";
 import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { normalizePersonNumber } from "../../identity/personNumber";
+import { createUuid } from "../../../utils/createUuid";
 
 const STORAGE_KEY = "coop_sys_employees";
 
@@ -117,7 +118,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       beneficiaries,
       active_assignment: input.active_assignment?.end_date ? null : input.active_assignment,
       assignment_history: input.active_assignment ? [input.active_assignment] : [],
-      id: crypto.randomUUID(),
+      id: createUuid(),
       created_at: timestamp,
       updated_at: timestamp,
       deleted_at: null,

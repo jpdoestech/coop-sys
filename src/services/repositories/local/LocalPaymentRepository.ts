@@ -7,6 +7,7 @@ import { allocatePayment, effectiveSettings } from "../../payments/paymentMath";
 import { buildPaymentSummary } from "../../payments/paymentSummary";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
 import { LocalOrganizationDirectoryRepository } from "./LocalOrganizationDirectoryRepository";
+import { createUuid } from "../../../utils/createUuid";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -64,7 +65,7 @@ function writeLedger(ledger: PaymentLedger) {
 
 function recordMeta(timestamp: string) {
   return {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     created_at: timestamp,
     updated_at: timestamp,
     deleted_at: null,
@@ -287,7 +288,7 @@ export class LocalPaymentRepository implements PaymentRepository {
         : setting,
     );
     const settings: PaymentSettings = {
-      id: crypto.randomUUID(),
+      id: createUuid(),
       ...input,
       effective_to: null,
       is_active: true,

@@ -19,6 +19,7 @@ import type { EmployeeSubmission } from "../types/employeeWorkflow";
 import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import { MemberSearchField } from "./MemberSearchField";
+import { createUuid } from "../../../utils/createUuid";
 
 type MembershipMode = "none" | "existing" | "create";
 
@@ -55,7 +56,7 @@ function Section({ title, description, children }: { title: string; description:
 
 function newAssignment() {
   return {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     branch_id: HEAD_OFFICE_ID,
     client_id: null,
     assignment_code: null,
@@ -181,7 +182,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
       work_location: null,
       beneficiaries: copied.beneficiaries.map((beneficiary) => ({
         ...beneficiary,
-        id: crypto.randomUUID(),
+        id: createUuid(),
       })),
       active_assignment: newAssignment(),
     };

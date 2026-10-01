@@ -2,6 +2,7 @@ import type { Member, MemberInput } from "../../../types/member";
 import type { ListOptions } from "../Repository";
 import type { MemberRepository } from "../MemberRepository";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
+import { createUuid } from "../../../utils/createUuid";
 
 function now() {
   return new Date().toISOString();
@@ -45,7 +46,7 @@ export class LocalMemberRepository implements MemberRepository {
     const member: Member = {
       ...input,
       beneficiaries: input.beneficiaries.map((beneficiary) => ({ ...beneficiary, deactivated_at: beneficiary.is_active ? null : timestamp })),
-      id: crypto.randomUUID(),
+      id: createUuid(),
       created_at: timestamp,
       updated_at: timestamp,
       deleted_at: null,

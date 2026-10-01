@@ -2,6 +2,7 @@ import { Plus, RotateCcw, UserMinus } from "lucide-react";
 import type { BeneficiaryInput } from "../../types/beneficiary";
 import { activeBeneficiaryCount } from "../../types/beneficiary";
 import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../utils/inputSanitizers";
+import { createUuid } from "../../utils/createUuid";
 
 type BeneficiaryEditorProps = {
   value: BeneficiaryInput[];
@@ -20,7 +21,7 @@ export function BeneficiaryEditor({ value, onChange }: BeneficiaryEditorProps) {
   function add() {
     if (activeCount >= 3) return;
     onChange([...value, {
-      id: crypto.randomUUID(), full_name: "", relationship: "", date_of_birth: null,
+      id: createUuid(), full_name: "", relationship: "", date_of_birth: null,
       contact_number: null, is_active: true, deactivation_reason: null,
     }]);
   }

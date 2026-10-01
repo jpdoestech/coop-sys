@@ -4,6 +4,7 @@ import type { OrganizationBranch, OrganizationClient, OrganizationDepartment, Or
 import { HEAD_OFFICE_ID } from "../../../services/lookups/organization";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import { CHARACTER_LIMITS } from "../../../utils/inputSanitizers";
+import { createUuid } from "../../../utils/createUuid";
 
 export type OrganizationKind = "branch" | "client" | "department" | "position";
 type RecordValue = OrganizationBranch | OrganizationClient | OrganizationDepartment | OrganizationPosition;
@@ -24,7 +25,7 @@ export function OrganizationRecordForm({ kind, record, onCancel, onSaved }: Prop
   async function submit(event: FormEvent) {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      const id = record?.id ?? crypto.randomUUID();
+      const id = record?.id ?? createUuid();
       if (kind === "branch") {
         const existingBranch = record && "type" in record ? record : null;
         await directory.saveBranch({ id, code: code.trim().toUpperCase(), label: name.trim(), address: detail.trim(), type: existingBranch?.type ?? "branch", parentId: existingBranch?.type === "head_office" ? null : HEAD_OFFICE_ID, isActive: active });
