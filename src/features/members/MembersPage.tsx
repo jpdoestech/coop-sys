@@ -14,6 +14,8 @@ import { FilterMenu } from "../../components/ui/FilterMenu";
 import { MemberApprovalDialog } from "./components/MemberApprovalDialog";
 import { PersonImportDialog } from "../../components/forms/PersonImportDialog";
 import { EMPLOYMENT_STATUS } from "../../services/lookups/statuses";
+import { useAliasManagement } from "../payments/hooks/useAliasManagement";
+import { AliasEditor } from "../../components/forms/AliasEditor";
 
 export function MembersPage() {
   const [search, setSearch] = useState("");
@@ -37,8 +39,10 @@ export function MembersPage() {
   const [pageSize, setPageSize] = useState(10);
   const activeFilterCount = [statusFilter, branchFilter, clientFilter].filter(Boolean).length;
   const { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
+  const aliasManagement = useAliasManagement("members.manage");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
   const pageMembers = query.data?.items ?? [];
+  const editingEmployee = (placementEmployees.data ?? []).find((employee) => employee.member_id === editingMember?.id) ?? null;
 
   function openCreate() {
     setEditingMember(null);
@@ -108,7 +112,7 @@ export function MembersPage() {
       </section>
 
       {formOpen ? (
-        <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} onCancel={() => setFormOpen(false)} onSubmit={save} />
+        <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} aliasEditor={canManage ? <AliasEditor employeeId={editingEmployee?.id ?? null} clientId={editingEmployee?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={clients.filter((client) => !isBranchScoped(profile) || profile.branchIds.includes(client.branchId))} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} />
       ) : null}
       {importOpen ? <PersonImportDialog kind="member" linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows) => importMembers.mutate(rows, { onSuccess: () => setImportOpen(false) })} /> : null}
       {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}

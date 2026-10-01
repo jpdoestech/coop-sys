@@ -21,6 +21,7 @@ type MemberFormProps = {
   member: Member | null;
   suggestedNumber: string;
   saving: boolean;
+  aliasEditor?: ReactNode;
   onCancel: () => void;
   onSubmit: (input: MemberInput) => void;
 };
@@ -107,7 +108,7 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-export function MemberForm({ member, suggestedNumber, saving, onCancel, onSubmit }: MemberFormProps) {
+export function MemberForm({ member, suggestedNumber, saving, aliasEditor, onCancel, onSubmit }: MemberFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const addressValue: AddressValue = {
@@ -210,6 +211,8 @@ export function MemberForm({ member, suggestedNumber, saving, onCancel, onSubmit
               </select>
             </Field>
           </Section>
+
+          {aliasEditor ? <Section title="Payroll aliases" description="Manage the client-specific names used to match payroll imports.">{aliasEditor}</Section> : null}
 
           <Section title="Government numbers" description="Government-issued identifiers synchronize with a linked employee record; the system never invents these values.">
             <GovernmentIdFields value={governmentIdValue} errors={errors} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />

@@ -18,6 +18,7 @@ import {
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
 import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 import { useOrganization } from "../../../services/organization/useOrganization";
+import { MemberSearchField } from "./MemberSearchField";
 
 type MembershipMode = "none" | "existing" | "create";
 
@@ -28,6 +29,7 @@ type Props = {
   formerEmployees: Employee[];
   saving: boolean;
   saveError?: string;
+  aliasEditor?: ReactNode;
   onCancel: () => void;
   onSubmit: (submission: EmployeeSubmission) => void;
 };
@@ -111,7 +113,7 @@ function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput
   ) as unknown as EmployeeInput;
 }
 
-export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, onCancel, onSubmit }: Props) {
+export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, onCancel, onSubmit }: Props) {
   const { departments, positions } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
@@ -291,10 +293,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             {membershipMode === "existing" ? (
               <div className="sm:col-span-2">
                 <Field label="Existing cooperative member">
-                  <select className={inputClass} value={draft.member_id ?? ""} onChange={(event) => selectMember(event.target.value)}>
-                    <option value="">Select member ID</option>
-                    {members.map((member) => <option key={member.id} value={member.id}>{member.membership_number} - {member.last_name}, {member.first_name}</option>)}
-                  </select>
+                  <MemberSearchField members={members} value={draft.member_id ?? ""} onChange={selectMember} />
                 </Field>
                 {linkedMember ? <p className="mt-2 flex items-center gap-1.5 text-xs text-moss"><Link2 className="h-3.5 w-3.5" /> Identity and contact details are sourced from {linkedMember.membership_number}.</p> : null}
               </div>
@@ -314,6 +313,8 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
           </Section>
+
+          {aliasEditor ? <Section title="Payroll aliases" description="Alternate payroll names are client-specific and can also be maintained during imports.">{aliasEditor}</Section> : null}
 
           <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
             <GovernmentIdFields value={governmentIdValue} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />

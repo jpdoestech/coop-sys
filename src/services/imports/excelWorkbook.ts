@@ -39,3 +39,14 @@ export function paymentRowsFromSpreadsheet(rows: SpreadsheetRow[]): PaymentImpor
     return { rowNumber: index + 2, id: row.ID ?? "", name: row.NAME, amountCentavos, remarks: row.REMARKS ?? "" };
   });
 }
+
+export type AliasImportRow = { rowNumber: number; id: string; name: string; alias: string };
+
+export function aliasRowsFromSpreadsheet(rows: SpreadsheetRow[]): AliasImportRow[] {
+  if (!("ALIAS" in rows[0])) throw new Error("Missing required header: ALIAS.");
+  return rows.map((row, index) => {
+    if (!row.ID && !row.NAME) throw new Error(`Row ${index + 2}: ID or NAME is required.`);
+    if (!row.ALIAS) throw new Error(`Row ${index + 2}: ALIAS is required.`);
+    return { rowNumber: index + 2, id: row.ID ?? "", name: row.NAME ?? "", alias: row.ALIAS };
+  });
+}

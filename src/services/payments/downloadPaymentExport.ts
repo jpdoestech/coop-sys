@@ -34,6 +34,7 @@ export async function createPaymentExcelBuffer(data: PaymentExportData) {
     const sheet = workbook.addWorksheet(source.name, { views: [{ state: "frozen", xSplit: source.freezeColumns, ySplit: 1 }] });
     sheet.addRow(source.headers);
     source.rows.forEach((row) => sheet.addRow(row));
+    source.comments?.forEach((comment) => { sheet.getCell(comment.rowIndex + 2, comment.columnIndex + 1).note = comment.text; });
     sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: source.headers.length } };
     sheet.getRow(1).font = { name: "Calibri", size: 11, bold: true };
     sheet.getColumn(1).numFmt = "@";
@@ -42,11 +43,13 @@ export async function createPaymentExcelBuffer(data: PaymentExportData) {
     sheet.getColumn(3).width = source.name === "PAYMENT_MONTHLY" ? 8.66 : source.name === "PAYMENT_PERIOD" ? 9.55 : 11.33;
 
     const statusIndex = source.headers.indexOf("STATUS") + 1;
+    const refundIndex = source.headers.indexOf("REFUND") + 1;
     for (let column = source.name === "PAYMENT_YEARLY" ? 3 : 4; column < statusIndex; column += 1) {
       sheet.getColumn(column).numFmt = accountingFormat;
       sheet.getColumn(column).alignment = { horizontal: "center" };
     }
     sheet.getColumn(statusIndex).alignment = { horizontal: "center" };
+    if (refundIndex) { sheet.getColumn(refundIndex).numFmt = accountingFormat; sheet.getColumn(refundIndex).width = 12; }
     sheet.getColumn(statusIndex).width = 12;
     sheet.getColumn(statusIndex + 1).width = 13.78;
     sheet.getColumn(statusIndex + 2).width = 11.33;

@@ -18,6 +18,33 @@ export type MemberAlias = BaseRecord & {
   normalized_alias: string;
 };
 
+export type PaymentCorrection = BaseRecord & {
+  payment_id: string;
+  from_amount_centavos: number;
+  to_amount_centavos: number;
+  from_remarks: string | null;
+  to_remarks: string | null;
+  comment: string;
+  corrected_by: string;
+};
+
+export type RefundMethod = "manual" | "import";
+
+export type OverDeductionRefund = BaseRecord & {
+  employee_id: string;
+  member_id: string;
+  branch_id: string;
+  client_id: string | null;
+  amount_centavos: number;
+  refund_date: string;
+  cutoff_from: string | null;
+  cutoff_to: string | null;
+  method: RefundMethod;
+  source_file_name: string | null;
+  remarks: string | null;
+  created_by: string;
+};
+
 export type PaymentMethod = "manual" | "payroll_deduction";
 
 export type PaymentBatch = BaseRecord & {
@@ -62,7 +89,10 @@ export type PaymentLedger = {
   batches: PaymentBatch[];
   payments: MemberPayment[];
   settlements: FinalPaySettlement[];
+  corrections: PaymentCorrection[];
+  refunds: OverDeductionRefund[];
   paymentTotal: number;
+  refundTotal: number;
 };
 
 export type PaymentImportRow = {

@@ -91,16 +91,21 @@ export function useMembers(options: ListOptions) {
         throw new Error("Only pending membership applications can be approved.");
       }
       const resolutionNumber = nextBodResolutionNumber(allMembers);
-      await Promise.all(selected.map((member) => repositories.members.update(member.id, {
-        bod_approval_status: "approved",
-        acceptance_date: approvalDate,
-        acceptance_resolution_number: resolutionNumber,
-        membership_status_id: MEMBER_STATUS.active,
-      })));
+      await Promise.all(selected.map(async (member) => {
+        const saved = await repositories.members.update(member.id, {
+          bod_approval_status: "approved",
+          acceptance_date: approvalDate,
+          acceptance_resolution_number: resolutionNumber,
+          membership_status_id: MEMBER_STATUS.active,
+        });
+        const linkedEmployees = await repositories.employees.listByMemberId(saved.id);
+        await Promise.all(linkedEmployees.map((employee) => repositories.employees.update(employee.id, employeeProfileFromMember(saved))));
+      }));
       return resolutionNumber;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["member-options"] });
     },
   });
@@ -124,7 +129,7 @@ export function useMembers(options: ListOptions) {
         const input: MemberInput = { membership_number: number, first_name: row.firstName, middle_name: row.middleName || null, last_name: row.lastName, suffix: row.suffix || null, date_of_birth: row.birthDate || null, sex: null, civil_status: null, mobile_number: row.mobile || null, email: row.email || null, address: row.address || null, barangay: row.barangay || null, city_municipality: row.city || null, province: row.province || null, postal_code: row.postalCode || null, membership_date: row.membershipDate || new Date().toISOString().slice(0, 10), membership_status_id: MEMBER_STATUS.inactive, membership_type_id: memberTypes[1].id, member_category: null, religion_affiliation_id: null, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null, acceptance_resolution_number: null, acceptance_date: null, bod_approval_status: "pending", highest_educational_attainment: null, occupation_income_source: "Employed / Salary", annual_income: null, number_of_dependents: 0, beneficiary_name: null, religion_affiliation: null, termination_date: null, termination_reason: null, emergency_contact: null, notes: "Imported from Excel", profile_photo_ref: null, beneficiaries: [] };
         return { input: memberInputSchema.parse(input) as MemberInput, linkedEmployee };
       });
-      for (const record of inputs) { const saved = await repositories.members.create(record.input); if (record.linkedEmployee) await repositories.employees.update(record.linkedEmployee.id, { member_id: saved.id, employee_number: saved.membership_number }); }
+      for (const record of inputs) { const saved = await repositories.members.create(record.input); if (record.linkedEmployee) await repositories.employees.update(record.linkedEmployee.id, employeeProfileFromMember(saved)); }
       return inputs.length;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["members"] }); queryClient.invalidateQueries({ queryKey: ["next-person-number"] }); },

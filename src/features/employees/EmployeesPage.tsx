@@ -14,6 +14,8 @@ import { FilterMenu } from "../../components/ui/FilterMenu";
 import { PersonImportDialog } from "../../components/forms/PersonImportDialog";
 import { branchIsInScope } from "../../services/access/accessControl";
 import { MEMBER_STATUS } from "../../services/lookups/statuses";
+import { useAliasManagement } from "../payments/hooks/useAliasManagement";
+import { AliasEditor } from "../../components/forms/AliasEditor";
 
 export function EmployeesPage() {
   const [search, setSearch] = useState("");
@@ -36,6 +38,7 @@ export function EmployeesPage() {
   const [pageSize, setPageSize] = useState(10);
   const activeFilterCount = [branchFilter, clientFilter].filter(Boolean).length;
   const { query, members, formerEmployees, personNumber, saveEmployee, archiveEmployee, importEmployees } = useEmployees({ search: deferredSearch, statusId: statusFilter, branchId: branchFilter, clientId: clientFilter, departmentId: departmentFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
+  const aliasManagement = useAliasManagement("employees.manage");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, branchFilter, clientFilter, departmentFilter, sort, pageSize]);
   const pageEmployees = query.data?.items ?? [];
 
@@ -66,7 +69,7 @@ export function EmployeesPage() {
         {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canManage={canManage} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { if (window.confirm(`Archive ${employee.first_name} ${employee.last_name}?`)) archiveEmployee.mutate(employee.id); }} />}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
-      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
+      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} aliasEditor={canManage ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
       {importOpen ? <PersonImportDialog kind="employee" branches={scopedBranches} clients={scopedClients} linkOptions={(members.data ?? []).map((member) => ({ id: member.id, number: member.membership_number, name: `${member.last_name}, ${member.first_name}`, isActive: member.membership_status_id === MEMBER_STATUS.active }))} importing={importEmployees.isPending} importError={importEmployees.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importEmployees.mutate({ rows, branchId: branchId ?? "", clientId: clientId ?? "" }, { onSuccess: () => setImportOpen(false) })} /> : null}
     </>
   );

@@ -36,7 +36,7 @@ describe("buildPaymentExportData", () => {
 
     expect(result.firstYear).toBe(2021);
     expect(result.lastYear).toBe(2022);
-    expect(result.sheets[0].headers).toEqual(["ID", "NAME", 2021, 2022, "STATUS", "REMARKS", "DATE"]);
+    expect(result.sheets[0].headers).toEqual(["ID", "NAME", 2021, 2022, "REFUND", "STATUS", "REMARKS", "DATE"]);
     expect(result.sheets[0].rows[0].slice(0, 4)).toEqual(["000001", "DELA CRUZ, JUAN A.", 150, 100]);
     expect(result.sheets[1].rows[0].slice(0, 5)).toEqual(["000001", "DELA CRUZ, JUAN A.", 2021, 150, null]);
     expect(result.sheets[2].headers.slice(3, 5)).toEqual(["Jan_1-15", "Jan_16-31"]);
@@ -73,5 +73,16 @@ describe("buildPaymentExportData", () => {
     }, ["PAYMENT_PERIOD"]);
     expect(result.sheets[0].headers.slice(3, 6)).toEqual(["Jan_1-15", "Jan_16-31", "Jan_20-25"]);
     expect(result.sheets[0].rows[0].slice(3, 6)).toEqual([75, 75, 30]);
+  });
+
+  it("exports refunds and adds detailed comments to matching amount cells", () => {
+    const refundLedger = {
+      ...ledger,
+      refunds: [{ id: "refund-1", employee_id: employee.id, branch_id: "branch-1", client_id: "client-1", refund_date: "2021-01-20", cutoff_from: "2021-01-01", cutoff_to: "2021-01-15", amount_centavos: 2500, remarks: "Payroll over-deduction" }],
+    } as PaymentLedger;
+    const result = buildPaymentExportData([employee], refundLedger, { scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusIds: [], allowedBranchIds: ["branch-1", "branch-2"] }, ["PAYMENT_MONTHLY"]);
+    expect(result.sheets[0].headers).toContain("REFUND");
+    expect(result.sheets[0].rows[0][15]).toBe(25);
+    expect(result.sheets[0].comments?.some((comment) => comment.text.includes("Payroll over-deduction"))).toBe(true);
   });
 });

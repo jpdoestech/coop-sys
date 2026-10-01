@@ -20,6 +20,7 @@ export type PaymentExportSheet = {
   headers: Array<string | number>;
   rows: Array<Array<string | number | null>>;
   freezeColumns: number;
+  comments?: Array<{ rowIndex: number; columnIndex: number; text: string }>;
 };
 
 export type PaymentExportData = {
@@ -66,6 +67,13 @@ function pesos(centavos: number) {
   return centavos / 100;
 }
 
+function refundComment(refunds: PaymentLedger["refunds"]) {
+  return refunds.map((refund, index) => {
+    const cutoff = refund.cutoff_from && refund.cutoff_to ? `${refund.cutoff_from} to ${refund.cutoff_to}` : "Date only";
+    return `${index + 1}. Cut-off: ${cutoff}; Refunded: ${refund.refund_date}; Amount: ${pesos(refund.amount_centavos).toFixed(2)}; Remarks: ${refund.remarks?.trim() || "None"}`;
+  }).join("\n");
+}
+
 function settlementFields(employeeId: string, ledger: PaymentLedger) {
   const settlement = ledger.settlements
     .filter((item) => item.employee_id === employeeId)
@@ -103,6 +111,13 @@ export function buildPaymentExportData(
     if (selectedClients.size && (!batch.client_id || !selectedClients.has(batch.client_id))) return false;
     return true;
   });
+  const refunds = (ledger.refunds ?? []).filter((refund) => {
+    if (!employeesById.has(refund.employee_id) || !eligibleEmployeeIds.has(refund.employee_id)) return false;
+    if (!allowedBranches.has(refund.branch_id)) return false;
+    if (filters.scope === "branch" && refund.branch_id !== filters.branchId) return false;
+    if (selectedClients.size && (!refund.client_id || !selectedClients.has(refund.client_id))) return false;
+    return true;
+  });
 
   if (!payments.length) throw new Error("No payment records match the selected export filters.");
 
@@ -117,39 +132,54 @@ export function buildPaymentExportData(
   const sheets: PaymentExportSheet[] = [];
 
   if (requested.has("PAYMENT_YEARLY")) {
-    const headers: Array<string | number> = ["ID", "NAME", ...years, "STATUS", "REMARKS", "DATE"];
-    const rows = exportedEmployees.map((employee) => {
+    const headers: Array<string | number> = ["ID", "NAME", ...years, "REFUND", "STATUS", "REMARKS", "DATE"];
+    const comments: NonNullable<PaymentExportSheet["comments"]> = [];
+    const rows = exportedEmployees.map((employee, rowIndex) => {
       const employeePayments = payments.filter((payment) => payment.employee_id === employee.id);
+      const employeeRefunds = refunds.filter((refund) => refund.employee_id === employee.id);
       const settlement = settlementFields(employee.id, ledger);
+      years.forEach((year, index) => { const matching = employeeRefunds.filter((refund) => yearOf(refund.refund_date) === year); if (matching.length) comments.push({ rowIndex, columnIndex: index + 2, text: refundComment(matching) }); });
+      if (employeeRefunds.length) comments.push({ rowIndex, columnIndex: years.length + 2, text: refundComment(employeeRefunds) });
       return [
         employee.employee_number,
         fullName(employee),
         ...years.map((year) => pesos(employeePayments.filter((payment) => yearOf(payment.payment_date) === year).reduce((sum, payment) => sum + payment.amount_centavos, 0)) || null),
+        pesos(employeeRefunds.reduce((sum, refund) => sum + refund.amount_centavos, 0)) || null,
         labelFor(employmentStatuses, employee.employment_status_id).toUpperCase(),
         settlement.remarks,
         settlement.date,
       ];
     });
-    sheets.push({ name: "PAYMENT_YEARLY", headers, rows, freezeColumns: 2 });
+    sheets.push({ name: "PAYMENT_YEARLY", headers, rows, freezeColumns: 2, comments });
   }
 
   if (requested.has("PAYMENT_MONTHLY")) {
-    const headers = ["ID", "NAME", "YEAR", ...months, "STATUS", "REMARKS", "DATE"];
+    const headers = ["ID", "NAME", "YEAR", ...months, "REFUND", "STATUS", "REMARKS", "DATE"];
+    const comments: NonNullable<PaymentExportSheet["comments"]> = [];
+    let rowIndex = 0;
     const rows = exportedEmployees.flatMap((employee) => {
       const employeePayments = payments.filter((payment) => payment.employee_id === employee.id);
       const employeeYears = [...new Set(employeePayments.map((payment) => yearOf(payment.payment_date)))].sort();
       const settlement = settlementFields(employee.id, ledger);
-      return employeeYears.map((year) => [
+      return employeeYears.map((year) => {
+        const yearRefunds = refunds.filter((refund) => refund.employee_id === employee.id && yearOf(refund.refund_date) === year);
+        months.forEach((_, month) => { const matching = yearRefunds.filter((refund) => monthOf(refund.refund_date) === month); if (matching.length) comments.push({ rowIndex, columnIndex: month + 3, text: refundComment(matching) }); });
+        if (yearRefunds.length) comments.push({ rowIndex, columnIndex: 15, text: refundComment(yearRefunds) });
+        const row = [
         employee.employee_number,
         fullName(employee),
         year,
         ...months.map((_, month) => pesos(employeePayments.filter((payment) => yearOf(payment.payment_date) === year && monthOf(payment.payment_date) === month).reduce((sum, payment) => sum + payment.amount_centavos, 0)) || null),
+        pesos(yearRefunds.reduce((sum, refund) => sum + refund.amount_centavos, 0)) || null,
         labelFor(employmentStatuses, employee.employment_status_id).toUpperCase(),
         settlement.remarks,
         settlement.date,
-      ]);
+        ];
+        rowIndex += 1;
+        return row;
+      });
     });
-    sheets.push({ name: "PAYMENT_MONTHLY", headers, rows, freezeColumns: 2 });
+    sheets.push({ name: "PAYMENT_MONTHLY", headers, rows, freezeColumns: 2, comments });
   }
 
   if (requested.has("PAYMENT_PERIOD")) {
@@ -160,12 +190,18 @@ export function buildPaymentExportData(
     });
     const periods = [...cutoffDefinitions.values()].sort((a, b) => a.fromMonth - b.fromMonth || a.fromDay - b.fromDay || a.toMonth - b.toMonth || a.toDay - b.toDay);
     const periodHeaders = periods.map((period) => period.label);
-    const headers = ["ID", "NAME", "YEAR", ...periodHeaders, "STATUS", "REMARKS", "DATE"];
+    const headers = ["ID", "NAME", "YEAR", ...periodHeaders, "REFUND", "STATUS", "REMARKS", "DATE"];
+    const comments: NonNullable<PaymentExportSheet["comments"]> = [];
+    let rowIndex = 0;
     const rows = exportedEmployees.flatMap((employee) => {
       const employeePayments = payments.filter((payment) => payment.employee_id === employee.id);
       const employeeYears = [...new Set(employeePayments.map((payment) => paymentCutoff(payment, batchesById.get(payment.batch_id)).year))].sort();
       const settlement = settlementFields(employee.id, ledger);
-      return employeeYears.map((year) => [
+      return employeeYears.map((year) => {
+        const yearRefunds = refunds.filter((refund) => refund.employee_id === employee.id && yearOf(refund.refund_date) === year);
+        periods.forEach((period, index) => { const matching = yearRefunds.filter((refund) => refund.cutoff_from === period.from && refund.cutoff_to === period.to); if (matching.length) comments.push({ rowIndex, columnIndex: index + 3, text: refundComment(matching) }); });
+        if (yearRefunds.length) comments.push({ rowIndex, columnIndex: periods.length + 3, text: refundComment(yearRefunds) });
+        const row = [
         employee.employee_number,
         fullName(employee),
         year,
@@ -175,12 +211,16 @@ export function buildPaymentExportData(
             return cutoff.year === year && cutoff.key === period.key;
           }).reduce((sum, payment) => sum + payment.amount_centavos, 0)) || null;
         }),
+        pesos(yearRefunds.reduce((sum, refund) => sum + refund.amount_centavos, 0)) || null,
         labelFor(employmentStatuses, employee.employment_status_id).toUpperCase(),
         settlement.remarks,
         settlement.date,
-      ]);
+        ];
+        rowIndex += 1;
+        return row;
+      });
     });
-    sheets.push({ name: "PAYMENT_PERIOD", headers, rows, freezeColumns: 2 });
+    sheets.push({ name: "PAYMENT_PERIOD", headers, rows, freezeColumns: 2, comments });
   }
 
   return { sheets, paymentCount: payments.length, employeeCount: exportedEmployees.length, firstYear, lastYear };

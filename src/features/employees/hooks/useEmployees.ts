@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRepositories } from "../../../services/repositories/repositoryFactory";
 import type { Employee, EmployeeInput } from "../../../types/employee";
-import { governmentIdsFromEmployee, newMemberFromEmployee } from "../../../services/identity/personProfileSync";
+import { employeeProfileFromMember, governmentIdsFromEmployee, newMemberFromEmployee } from "../../../services/identity/personProfileSync";
 import { terminalEmploymentStatuses } from "../../../services/lookups/statuses";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
 import { useAccess } from "../../../services/access/useAccess";
@@ -73,6 +73,8 @@ export function useEmployees(options: ListOptions) {
       } else if (submission.membership.mode === "existing") {
         const member = await repositories.members.getById(submission.membership.memberId);
         if (!member) throw new Error("Member record not found.");
+        const existingLinks = await repositories.employees.listByMemberId(member.id);
+        if (existingLinks.some((linked) => linked.id !== employee?.id)) throw new Error("This member ID is already linked to another employee record.");
         input = { ...input, member_id: member.id, employee_number: member.membership_number };
         await repositories.members.update(
           submission.membership.memberId,
@@ -121,7 +123,7 @@ export function useEmployees(options: ListOptions) {
         if ((employeeRecords.some((item) => item.employee_number === number) && !linkedMember) || imported.has(number)) throw new Error(`Row ${row.rowNumber}: ID ${number} already exists.`); used.add(number); imported.add(number);
         const hired = row.dateHired || new Date().toISOString().slice(0, 10);
         const input: EmployeeInput = { employee_number: number, member_id: linkedMember?.id ?? null, religion_affiliation_id: null, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null, first_name: row.firstName, middle_name: row.middleName || null, last_name: row.lastName, suffix: row.suffix || null, date_of_birth: row.birthDate || null, sex: null, civil_status: null, mobile_number: row.mobile || null, email: row.email || null, address: row.address || null, barangay: row.barangay || null, city_municipality: row.city || null, province: row.province || null, postal_code: row.postalCode || null, employment_status_id: EMPLOYMENT_STATUS.active, employment_type_id: employmentTypes[1].id, date_hired: hired, date_regularized: null, date_separated: null, position_id: null, department_id: null, supervisor_id: null, work_location: null, notes: "Imported from Excel", beneficiaries: linkedMember?.beneficiaries ?? [], active_assignment: { id: crypto.randomUUID(), branch_id: branchId, client_id: clientId || null, assignment_code: null, start_date: hired, end_date: null, work_location: null, transfer_reason: "Initial Excel import", notes: null } };
-        return employeeInputSchema.parse(input) as EmployeeInput;
+        return employeeInputSchema.parse(linkedMember ? { ...input, ...employeeProfileFromMember(linkedMember) } : input) as EmployeeInput;
       });
       for (const input of inputs) await repositories.employees.create(input);
       return inputs.length;
