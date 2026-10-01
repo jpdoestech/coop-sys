@@ -11,7 +11,7 @@ export type PaymentExportFilters = {
   branchId: string;
   clientIds: string[];
   employeeId: string;
-  employmentStatusId: string;
+  employmentStatusIds: string[];
   allowedBranchIds: string[];
 };
 
@@ -82,13 +82,15 @@ export function buildPaymentExportData(
   filters: PaymentExportFilters,
   includedSheets: PaymentExportSheetName[],
 ): PaymentExportData {
+  if (filters.scope === "employee" && filters.clientIds.length !== 1) throw new Error("Select one specific client before exporting an employee.");
   const allowedBranches = new Set(filters.allowedBranchIds);
   const selectedClients = new Set(filters.clientIds);
+  const selectedStatuses = new Set(filters.employmentStatusIds);
   const employeesById = new Map(employees.map((employee) => [employee.id, employee]));
   const batchesById = new Map(ledger.batches.map((batch) => [batch.id, batch]));
   const eligibleEmployeeIds = new Set(
     employees
-      .filter((employee) => !filters.employmentStatusId || employee.employment_status_id === filters.employmentStatusId)
+      .filter((employee) => filters.scope === "employee" || !selectedStatuses.size || Boolean(employee.employment_status_id && selectedStatuses.has(employee.employment_status_id)))
       .filter((employee) => filters.scope !== "employee" || employee.id === filters.employeeId)
       .map((employee) => employee.id),
   );

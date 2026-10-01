@@ -8,6 +8,9 @@ const employee = {
   id: "employee-1", employee_number: "000001", first_name: "Juan", middle_name: "Andres", last_name: "Dela Cruz", suffix: null,
   employment_status_id: EMPLOYMENT_STATUS.active,
 } as Employee;
+const terminatedEmployee = {
+  ...employee, id: "employee-2", employee_number: "000002", first_name: "Maria", middle_name: null, last_name: "Santos", employment_status_id: EMPLOYMENT_STATUS.terminated,
+} as Employee;
 
 const ledger = {
   settings: [], aliases: [], settlements: [], paymentTotal: 3,
@@ -28,7 +31,7 @@ const ledger = {
 describe("buildPaymentExportData", () => {
   it("uses actual years and aggregates the strict yearly, monthly, and period layouts", () => {
     const result = buildPaymentExportData([employee], ledger, {
-      scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusId: "", allowedBranchIds: ["branch-1", "branch-2"],
+      scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusIds: [], allowedBranchIds: ["branch-1", "branch-2"],
     }, ["PAYMENT_YEARLY", "PAYMENT_MONTHLY", "PAYMENT_PERIOD"]);
 
     expect(result.firstYear).toBe(2021);
@@ -42,10 +45,21 @@ describe("buildPaymentExportData", () => {
 
   it("enforces allowed branches and selected clients before aggregating", () => {
     const result = buildPaymentExportData([employee], ledger, {
-      scope: "branch", branchId: "branch-1", clientIds: ["client-2"], employeeId: "", employmentStatusId: EMPLOYMENT_STATUS.active, allowedBranchIds: ["branch-1"],
+      scope: "branch", branchId: "branch-1", clientIds: ["client-2"], employeeId: "", employmentStatusIds: [EMPLOYMENT_STATUS.active], allowedBranchIds: ["branch-1"],
     }, ["PAYMENT_YEARLY"]);
     expect(result.paymentCount).toBe(2);
     expect(result.sheets[0].rows[0][2]).toBe(100);
+  });
+
+  it("includes any of the selected employee statuses", () => {
+    const statusLedger = {
+      ...ledger,
+      payments: [...ledger.payments, { ...ledger.payments[0], id: "payment-6", employee_id: terminatedEmployee.id, amount_centavos: 2000 }],
+    };
+    const result = buildPaymentExportData([employee, terminatedEmployee], statusLedger, {
+      scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusIds: [EMPLOYMENT_STATUS.active, EMPLOYMENT_STATUS.terminated], allowedBranchIds: ["branch-1", "branch-2"],
+    }, ["PAYMENT_YEARLY"]);
+    expect(result.employeeCount).toBe(2);
   });
 
   it("adds another named range only when actual records contain a third distinct cut-off", () => {
@@ -55,7 +69,7 @@ describe("buildPaymentExportData", () => {
       payments: [...ledger.payments, { ...ledger.payments[0], id: "payment-5", batch_id: "batch-5", amount_centavos: 3000 }],
     };
     const result = buildPaymentExportData([employee], extraLedger, {
-      scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusId: "", allowedBranchIds: ["branch-1", "branch-2"],
+      scope: "all", branchId: "", clientIds: [], employeeId: "", employmentStatusIds: [], allowedBranchIds: ["branch-1", "branch-2"],
     }, ["PAYMENT_PERIOD"]);
     expect(result.sheets[0].headers.slice(3, 6)).toEqual(["Jan_1-15", "Jan_16-31", "Jan_20-25"]);
     expect(result.sheets[0].rows[0].slice(3, 6)).toEqual([75, 75, 30]);
