@@ -5,6 +5,7 @@ dist/
 release/
 tools/windows-server/web-assets.zip
 coverage/
+outputs/
 .env
 .env.local
 .env.*.local
