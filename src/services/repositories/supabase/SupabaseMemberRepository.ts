@@ -36,6 +36,26 @@ function requireSupabase() {
 }
 
 export class SupabaseMemberRepository implements MemberRepository {
+  async listPage(options: ListOptions = {}) {
+    const client = requireSupabase();
+    const placement = Boolean(options.branchId || options.clientId);
+    const selection = placement ? "*, beneficiaries(*), employees!inner(employment_assignments!inner(branch_id,client_id,end_date))" : "*, beneficiaries(*)";
+    let query = client.from("members").select(selection, { count: "exact" });
+    if (!options.includeDeleted) query = query.is("deleted_at", null);
+    if (options.search) { const term = `%${options.search}%`; query = query.or(`membership_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`); }
+    if (options.statusId) query = query.eq("membership_status_id", options.statusId);
+    if (options.typeId) query = query.eq("membership_type_id", options.typeId);
+    if (options.approvalStatus) query = query.eq("bod_approval_status", options.approvalStatus);
+    if (options.branchId) query = query.eq("employees.employment_assignments.branch_id", options.branchId).is("employees.employment_assignments.end_date", null);
+    if (options.clientId) query = query.eq("employees.employment_assignments.client_id", options.clientId).is("employees.employment_assignments.end_date", null);
+    const [column, ascending] = options.sort === "name-desc" ? ["last_name", false] : options.sort === "number-asc" ? ["membership_number", true] : options.sort === "joined-desc" ? ["membership_date", false] : ["last_name", true];
+    query = query.order(column, { ascending });
+    if (options.limit) query = query.range(options.offset ?? 0, (options.offset ?? 0) + options.limit - 1);
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { items: (data as unknown as MemberRow[]).map(normalize), total: count ?? 0 };
+  }
+
   async list(options: ListOptions = {}) {
     const client = requireSupabase();
     let query = client.from("members").select("*, beneficiaries(*)").order("updated_at", { ascending: false });

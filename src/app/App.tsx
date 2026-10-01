@@ -15,6 +15,7 @@ const SettingsPage = lazy(() => import("../features/settings/SettingsPage").then
 const SynchronizationPage = lazy(() => import("../features/synchronization/SynchronizationPage").then((module) => ({ default: module.SynchronizationPage })));
 const UsersPage = lazy(() => import("../features/users/UsersPage").then((module) => ({ default: module.UsersPage })));
 const OrganizationPage = lazy(() => import("../features/organization/OrganizationPage").then((module) => ({ default: module.OrganizationPage })));
+const PaymentsPage = lazy(() => import("../features/payments/PaymentsPage").then((module) => ({ default: module.PaymentsPage })));
 
 export function App() {
   return (
@@ -24,6 +25,7 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/members" element={<RequirePermission permission="members.view"><MembersPage /></RequirePermission>} />
           <Route path="/employees" element={<RequirePermission permission="employees.view"><EmployeesPage /></RequirePermission>} />
+          <Route path="/payments" element={<RequirePermission permission="payments.view"><PaymentsPage /></RequirePermission>} />
           <Route path="/organization/departments" element={<RequirePermission permission="organization.manage"><DepartmentsPage /></RequirePermission>} />
           <Route path="/organization/positions" element={<RequirePermission permission="organization.manage"><PositionsPage /></RequirePermission>} />
           <Route path="/organization" element={<RequirePermission permission="organization.manage"><OrganizationPage /></RequirePermission>} />

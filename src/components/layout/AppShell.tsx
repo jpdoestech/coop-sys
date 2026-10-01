@@ -11,7 +11,8 @@ import {
   UserCog,
   LogOut,
   Wifi,
-  Landmark
+  Landmark,
+  WalletCards
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
@@ -30,6 +31,7 @@ const navItems: Array<{ to: string; label: string; icon: typeof Gauge; permissio
   { to: "/", label: "Dashboard", icon: Gauge, permission: "dashboard.view" },
   { to: "/members", label: "Members", icon: Users, permission: "members.view" },
   { to: "/employees", label: "Employees", icon: UserSquare2, permission: "employees.view" },
+  { to: "/payments", label: "Payments", icon: WalletCards, permission: "payments.view" },
   { to: "/organization", label: "Organization", icon: Building2, permission: "organization.manage" },
   { to: "/documents", label: "Documents", icon: FileText, permission: "documents.view" },
   { to: "/reports", label: "Reports", icon: BarChart3, permission: "reports.view" },

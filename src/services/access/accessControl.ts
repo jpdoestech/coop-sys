@@ -15,6 +15,9 @@ export type Permission =
   | "members.manage"
   | "employees.view"
   | "employees.manage"
+  | "payments.view"
+  | "payments.manage"
+  | "payments.settings.manage"
   | "organization.manage"
   | "documents.view"
   | "documents.manage"
@@ -46,12 +49,12 @@ export const roleDefinitions: ReadonlyArray<{
 ];
 
 const permissions: Record<RoleCode, ReadonlySet<Permission>> = {
-  super_admin: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "organization.manage", "documents.view", "documents.manage", "reports.view", "sync.manage", "audit.view", "settings.manage", "users.manage"]),
-  general_manager: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "organization.manage", "documents.view", "reports.view", "audit.view"]),
+  super_admin: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "payments.view", "payments.manage", "payments.settings.manage", "organization.manage", "documents.view", "documents.manage", "reports.view", "sync.manage", "audit.view", "settings.manage", "users.manage"]),
+  general_manager: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "payments.view", "payments.manage", "organization.manage", "documents.view", "reports.view", "audit.view"]),
   hr_manager: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "organization.manage", "documents.view", "documents.manage", "reports.view", "audit.view"]),
-  accounting_manager: new Set(["dashboard.view", "members.view", "employees.view", "documents.view", "reports.view"]),
-  head_office_staff: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "documents.view", "documents.manage", "reports.view"]),
-  branch_admin: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "documents.view", "documents.manage", "reports.view"]),
+  accounting_manager: new Set(["dashboard.view", "members.view", "employees.view", "payments.view", "payments.manage", "documents.view", "reports.view"]),
+  head_office_staff: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "payments.view", "payments.manage", "documents.view", "documents.manage", "reports.view"]),
+  branch_admin: new Set(["dashboard.view", "members.view", "members.manage", "employees.view", "employees.manage", "payments.view", "payments.manage", "documents.view", "documents.manage", "reports.view"]),
   branch_user: new Set(["dashboard.view", "members.view", "employees.view", "documents.view"]),
 };
 

@@ -8,21 +8,21 @@ import { assertPermission, employeeIsInScope, isBranchScoped } from "../../../se
 import { nextPersonNumber } from "../../../services/identity/personNumber";
 import { nextBodResolutionNumber } from "../../../services/members/membershipApproval";
 import { MEMBER_STATUS } from "../../../services/lookups/statuses";
+import type { PersonImportRow } from "../../../services/imports/personImport";
+import { memberInputSchema } from "../../../services/validation/memberSchema";
+import { memberTypes } from "../data/memberOptions";
+import type { ListOptions } from "../../../services/repositories/Repository";
 
-export function useMembers(search: string) {
+export function useMembers(options: ListOptions) {
   const repositories = useMemo(() => createRepositories(), []);
   const queryClient = useQueryClient();
   const { profile } = useAccess();
-  const queryKey = ["members", search];
+  const queryKey = ["members", "page", options];
 
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const members = await repositories.members.list({ search, limit: 100 });
-      if (!isBranchScoped(profile)) return members;
-      const employees = await repositories.employees.list({ limit: 500 });
-      const visibleIds = new Set(employees.filter((employee) => employeeIsInScope(employee, profile)).map((employee) => employee.member_id));
-      return members.filter((member) => visibleIds.has(member.id));
+      return repositories.members.listPage(options);
     }
   });
   const placementEmployees = useQuery({
@@ -105,5 +105,30 @@ export function useMembers(search: string) {
     },
   });
 
-  return { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers };
+  const importMembers = useMutation({
+    mutationFn: async (rows: PersonImportRow[]) => {
+      assertPermission(profile, "members.manage");
+      if (isBranchScoped(profile)) throw new Error("Branch users must import employees so placement scope is recorded.");
+      const [members, employees] = await Promise.all([repositories.members.list({ limit: 10000 }), repositories.employees.list({ limit: 10000 })]);
+      const used = new Set([...members.map((item) => item.membership_number), ...employees.map((item) => item.employee_number)]);
+      const imported = new Set<string>();
+      let sequence = Number(nextPersonNumber(members, employees));
+      const inputs = rows.map((row) => {
+        const linkedEmployee = row.linkedRecordId ? employees.find((item) => item.id === row.linkedRecordId) : null;
+        if (row.linkedRecordId && !linkedEmployee) throw new Error(`Row ${row.rowNumber}: linked employee was not found.`);
+        if (linkedEmployee?.member_id) throw new Error(`Row ${row.rowNumber}: linked employee already has a member record.`);
+        if (linkedEmployee && row.personNumber && row.personNumber !== linkedEmployee.employee_number) throw new Error(`Row ${row.rowNumber}: imported ID does not match the linked employee ID.`);
+        let number = linkedEmployee?.employee_number ?? row.personNumber;
+        if (!number) { while (used.has(String(sequence).padStart(6, "0"))) sequence += 1; number = String(sequence++).padStart(6, "0"); }
+        if (members.some((item) => item.membership_number === number) || imported.has(number)) throw new Error(`Row ${row.rowNumber}: ID ${number} already exists.`); used.add(number); imported.add(number);
+        const input: MemberInput = { membership_number: number, first_name: row.firstName, middle_name: row.middleName || null, last_name: row.lastName, suffix: row.suffix || null, date_of_birth: row.birthDate || null, sex: null, civil_status: null, mobile_number: row.mobile || null, email: row.email || null, address: row.address || null, barangay: row.barangay || null, city_municipality: row.city || null, province: row.province || null, postal_code: row.postalCode || null, membership_date: row.membershipDate || new Date().toISOString().slice(0, 10), membership_status_id: MEMBER_STATUS.inactive, membership_type_id: memberTypes[1].id, member_category: null, religion_affiliation_id: null, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null, acceptance_resolution_number: null, acceptance_date: null, bod_approval_status: "pending", highest_educational_attainment: null, occupation_income_source: "Employed / Salary", annual_income: null, number_of_dependents: 0, beneficiary_name: null, religion_affiliation: null, termination_date: null, termination_reason: null, emergency_contact: null, notes: "Imported from Excel", profile_photo_ref: null, beneficiaries: [] };
+        return { input: memberInputSchema.parse(input) as MemberInput, linkedEmployee };
+      });
+      for (const record of inputs) { const saved = await repositories.members.create(record.input); if (record.linkedEmployee) await repositories.employees.update(record.linkedEmployee.id, { member_id: saved.id, employee_number: saved.membership_number }); }
+      return inputs.length;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["members"] }); queryClient.invalidateQueries({ queryKey: ["next-person-number"] }); },
+  });
+
+  return { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers };
 }

@@ -18,5 +18,12 @@ describe("access control", () => {
     expect(employeeIsInScope(employee, profile)).toBe(true);
     expect(employeeIsInScope({ ...employee, active_assignment: { ...employee.active_assignment!, branch_id: "60000000-0000-4000-8000-000000000002" } }, profile)).toBe(false);
   });
+
+  it("separates payment posting from admin-only payment settings", () => {
+    expect(hasPermission(profile, "payments.view")).toBe(false);
+    expect(hasPermission({ ...profile, role: "branch_admin" }, "payments.manage")).toBe(true);
+    expect(hasPermission({ ...profile, role: "branch_admin" }, "payments.settings.manage")).toBe(false);
+    expect(hasPermission({ ...profile, role: "super_admin" }, "payments.settings.manage")).toBe(true);
+  });
 });
 

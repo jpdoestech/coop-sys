@@ -77,22 +77,23 @@ function readEmployees(): Employee[] {
 }
 
 export class LocalEmployeeRepository implements EmployeeRepository {
-  async list(options: ListOptions = {}) {
+  private filtered(options: ListOptions = {}) {
     let employees = readEmployees();
     if (!options.includeDeleted) employees = employees.filter((employee) => !employee.deleted_at);
-    if (options.search) {
-      const search = options.search.toLowerCase();
-      employees = employees.filter((employee) =>
-        [employee.employee_number, employee.first_name, employee.last_name, employee.work_location]
-          .join(" ")
-          .toLowerCase()
-          .includes(search)
-      );
-    }
-    return employees
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    if (options.search) { const search = options.search.toLowerCase(); employees = employees.filter((employee) => [employee.employee_number, employee.first_name, employee.last_name, employee.work_location].join(" ").toLowerCase().includes(search)); }
+    if (options.statusId) employees = employees.filter((employee) => employee.employment_status_id === options.statusId);
+    if (options.departmentId) employees = employees.filter((employee) => employee.department_id === options.departmentId);
+    if (options.branchId) employees = employees.filter((employee) => employee.active_assignment?.branch_id === options.branchId);
+    if (options.clientId) employees = employees.filter((employee) => employee.active_assignment?.client_id === options.clientId);
+    return employees.sort((a, b) => options.sort === "name-desc" ? b.last_name.localeCompare(a.last_name) : options.sort === "number-asc" ? a.employee_number.localeCompare(b.employee_number) : options.sort === "hired-desc" ? (b.date_hired ?? "").localeCompare(a.date_hired ?? "") : a.last_name.localeCompare(b.last_name));
+  }
+
+  async list(options: ListOptions = {}) {
+    return this.filtered(options)
       .slice(options.offset ?? 0, options.limit ? (options.offset ?? 0) + options.limit : undefined);
   }
+
+  async listPage(options: ListOptions = {}) { const records = this.filtered(options); const offset = options.offset ?? 0; return { items: records.slice(offset, options.limit ? offset + options.limit : undefined), total: records.length }; }
 
   async getById(id: string) {
     return readEmployees().find((employee) => employee.id === id) ?? null;

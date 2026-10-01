@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, CheckCheck, ClipboardCheck, Plus, Search, UsersRound } from "lucide-react";
+import { useDeferredValue, useEffect, useState } from "react";
+import { ArrowUpDown, CheckCheck, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import type { Member, MemberInput } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
@@ -12,15 +12,17 @@ import { useOrganization } from "../../services/organization/useOrganization";
 import { PaginationControls } from "../../components/ui/PaginationControls";
 import { FilterMenu } from "../../components/ui/FilterMenu";
 import { MemberApprovalDialog } from "./components/MemberApprovalDialog";
+import { PersonImportDialog } from "../../components/forms/PersonImportDialog";
+import { EMPLOYMENT_STATUS } from "../../services/lookups/statuses";
 
 export function MembersPage() {
   const [search, setSearch] = useState("");
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const deferredSearch = useDeferredValue(search);
-  const { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers } = useMembers(deferredSearch);
   const { branches, clients } = useOrganization();
   const { profile, can } = useAccess();
   const canManage = can("members.manage");
@@ -28,21 +30,15 @@ export function MembersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [approvalFilter, setApprovalFilter] = useState("");
-  const [branchFilter, setBranchFilter] = useState("");
+  const [branchFilter, setBranchFilter] = useState(() => isBranchScoped(profile) ? profile.branchIds[0] ?? "" : "");
   const [clientFilter, setClientFilter] = useState("");
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const activeFilterCount = [statusFilter, branchFilter, clientFilter].filter(Boolean).length;
-  const filteredMembers = useMemo(() => {
-    const employees = placementEmployees.data ?? [];
-    return [...(query.data ?? [])].filter((member) => {
-      const linked = employees.filter((employee) => employee.member_id === member.id);
-      return (!statusFilter || member.membership_status_id === statusFilter) && (!typeFilter || member.membership_type_id === typeFilter) && (!approvalFilter || member.bod_approval_status === approvalFilter) && (!branchFilter || linked.some((employee) => employee.active_assignment?.branch_id === branchFilter)) && (!clientFilter || linked.some((employee) => employee.active_assignment?.client_id === clientFilter));
-    }).sort((a, b) => sort === "name-desc" ? b.last_name.localeCompare(a.last_name) : sort === "number-asc" ? a.membership_number.localeCompare(b.membership_number) : sort === "joined-desc" ? (b.membership_date ?? "").localeCompare(a.membership_date ?? "") : a.last_name.localeCompare(b.last_name));
-  }, [query.data, placementEmployees.data, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort]);
+  const { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
   useEffect(() => setPage(1), [deferredSearch, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
-  const pageMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
+  const pageMembers = query.data?.items ?? [];
 
   function openCreate() {
     setEditingMember(null);
@@ -73,9 +69,9 @@ export function MembersPage() {
           title="Cooperative members"
           description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
         />
-        {canCreate ? <button className="primary-button mb-3" onClick={openCreate}>
+        {canCreate ? <div className="mb-3 flex gap-2"><button className="secondary-button" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button" onClick={openCreate}>
           <Plus className="h-4 w-4" /> New member
-        </button> : null}
+        </button></div> : null}
       </div>
 
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
@@ -100,7 +96,7 @@ export function MembersPage() {
             </FilterMenu>
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select></div>
           </div>
-          <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{filteredMembers.length} records</p>
+          <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
           {canManage && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}
         </div>
         {query.isError ? (
@@ -108,12 +104,13 @@ export function MembersPage() {
         ) : (
           <MemberTable members={pageMembers} loading={query.isLoading} canManage={canManage} selectedIds={selectedIds} onToggle={toggleSelection} onTogglePage={(ids, selected) => setSelectedIds((current) => { const next = new Set(current); ids.forEach((id) => selected ? next.add(id) : next.delete(id)); return next; })} onEdit={(member) => { setEditingMember(member); setFormOpen(true); }} onArchive={archive} />
         )}
-        <PaginationControls page={page} pageSize={pageSize} total={filteredMembers.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
 
       {formOpen ? (
         <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} onCancel={() => setFormOpen(false)} onSubmit={save} />
       ) : null}
+      {importOpen ? <PersonImportDialog kind="member" linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows) => importMembers.mutate(rows, { onSuccess: () => setImportOpen(false) })} /> : null}
       {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}
     </>
   );

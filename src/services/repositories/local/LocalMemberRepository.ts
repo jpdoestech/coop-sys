@@ -8,27 +8,27 @@ function now() {
 }
 
 export class LocalMemberRepository implements MemberRepository {
-  async list(options: ListOptions = {}) {
+  private filtered(options: ListOptions = {}) {
     let members = readStoredMembers();
-
-    if (!options.includeDeleted) {
-      members = members.filter((member) => !member.deleted_at);
+    if (!options.includeDeleted) members = members.filter((member) => !member.deleted_at);
+    if (options.search) { const search = options.search.toLowerCase(); members = members.filter((member) => [member.membership_number, member.first_name, member.last_name].join(" ").toLowerCase().includes(search)); }
+    if (options.statusId) members = members.filter((member) => member.membership_status_id === options.statusId);
+    if (options.typeId) members = members.filter((member) => member.membership_type_id === options.typeId);
+    if (options.approvalStatus) members = members.filter((member) => member.bod_approval_status === options.approvalStatus);
+    if (options.branchId || options.clientId) {
+      const assignments = (JSON.parse(localStorage.getItem("coop_sys_employees") ?? "[]") as Array<{ member_id?: string | null; active_assignment?: { branch_id?: string | null; client_id?: string | null } | null }>);
+      const visible = new Set(assignments.filter((employee) => employee.member_id && (!options.branchId || employee.active_assignment?.branch_id === options.branchId) && (!options.clientId || employee.active_assignment?.client_id === options.clientId)).map((employee) => employee.member_id));
+      members = members.filter((member) => visible.has(member.id));
     }
+    return members.sort((a, b) => options.sort === "name-desc" ? b.last_name.localeCompare(a.last_name) : options.sort === "number-asc" ? a.membership_number.localeCompare(b.membership_number) : options.sort === "joined-desc" ? (b.membership_date ?? "").localeCompare(a.membership_date ?? "") : a.last_name.localeCompare(b.last_name));
+  }
 
-    if (options.search) {
-      const search = options.search.toLowerCase();
-      members = members.filter((member) =>
-        [member.membership_number, member.first_name, member.last_name]
-          .join(" ")
-          .toLowerCase()
-          .includes(search)
-      );
-    }
-
-    return members
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  async list(options: ListOptions = {}) {
+    return this.filtered(options)
       .slice(options.offset ?? 0, options.limit ? (options.offset ?? 0) + options.limit : undefined);
   }
+
+  async listPage(options: ListOptions = {}) { const records = this.filtered(options); const offset = options.offset ?? 0; return { items: records.slice(offset, options.limit ? offset + options.limit : undefined), total: records.length }; }
 
   async getById(id: string) {
     return readStoredMembers().find((member) => member.id === id) ?? null;
