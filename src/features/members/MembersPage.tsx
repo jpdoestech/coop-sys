@@ -69,7 +69,7 @@ export function MembersPage() {
           title="Cooperative members"
           description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
         />
-        {canCreate ? <div className="mb-3 flex gap-2"><button className="secondary-button" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button" onClick={openCreate}>
+        {canCreate ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto"><button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={openCreate}>
           <Plus className="h-4 w-4" /> New member
         </button></div> : null}
       </div>

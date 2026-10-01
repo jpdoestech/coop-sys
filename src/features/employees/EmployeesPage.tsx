@@ -47,7 +47,7 @@ export function EmployeesPage() {
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader eyebrow="Employees" title="Employee records" description="Manage employment, cooperative membership links, client deployments, and beneficiary records." />
-        {canManage ? <div className="mb-3 flex gap-2"><button className="secondary-button" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> New employee</button></div> : null}
+        {canManage ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto"><button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> New employee</button></div> : null}
       </div>
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
         <div className="flex flex-wrap items-center gap-2 p-2">

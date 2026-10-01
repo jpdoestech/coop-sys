@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { Banknote, Save } from "lucide-react";
+import { Banknote, CalendarDays, Save } from "lucide-react";
 import type { Employee } from "../../../types/employee";
 import type { OrganizationBranch, OrganizationClient } from "../../../types/organization";
-import { employeeFullName } from "../../../services/imports/identityMatching";
 import { pesosToCentavos } from "../../../services/payments/paymentMath";
 import type { PaymentBatchInput, PaymentLineInput } from "../../../services/repositories/PaymentRepository";
+import { EmployeeSearchField } from "./EmployeeSearchField";
 
 type Props = { employees: Employee[]; branches: OrganizationBranch[]; clients: OrganizationClient[]; userId: string; saving: boolean; onPost: (batch: PaymentBatchInput, lines: PaymentLineInput[]) => void };
 
@@ -28,14 +28,17 @@ export function ManualPaymentPanel({ employees, branches, clients, userId, savin
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Payment could not be prepared."); }
   }
 
-  return <form onSubmit={submit} className="grid gap-3 p-4 lg:grid-cols-6">
-    <label className="field-label lg:col-span-2">Branch<select className="control mt-1" required value={branchId} onChange={(e) => { setBranchId(e.target.value); setClientId(""); setEmployeeId(""); }}><option value="">Select branch</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-    <label className="field-label lg:col-span-2">Client<select className="control mt-1" value={clientId} onChange={(e) => { setClientId(e.target.value); setEmployeeId(""); }}><option value="">Direct / all clients</option>{clients.filter((item) => item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-    <label className="field-label lg:col-span-2">Payment date<input className="control mt-1" type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} /></label>
-    <label className="field-label lg:col-span-3">Member / employee<select className="control mt-1" required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}><option value="">Select employee</option>{scoped.map((item) => <option key={item.id} value={item.id}>{item.employee_number} - {employeeFullName(item)}</option>)}</select></label>
-    <label className="field-label">Amount<input className="control mt-1" inputMode="decimal" placeholder="0.00" required value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-    <label className="field-label lg:col-span-2">Remarks<input className="control mt-1" maxLength={200} value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
-    {error ? <p className="text-xs text-red-700 lg:col-span-4">{error}</p> : <p className="flex items-center gap-2 text-xs text-ink/50 lg:col-span-4"><Banknote className="h-4 w-4" /> Payment applies to membership fee first, then capital share.</p>}
-    <button disabled={saving} className="primary-button justify-self-end lg:col-span-2"><Save className="h-4 w-4" /> {saving ? "Posting..." : "Post payment"}</button>
-  </form>;
+  return <div>
+    <div className="flex items-center gap-3 border-b border-line bg-[#f8faf8] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#e4efe9] text-moss"><Banknote className="h-4 w-4" /></span><div><h3 className="text-sm font-semibold">Record a member payment</h3><p className="text-[11px] text-ink/45">Select placement first, then search the employee by ID or name.</p></div></div>
+    <form onSubmit={submit} className="grid gap-x-4 gap-y-3 p-4 sm:grid-cols-2 lg:grid-cols-12">
+      <label className="field-label lg:col-span-3">Branch<select className="control mt-1 w-full" required value={branchId} onChange={(e) => { setBranchId(e.target.value); setClientId(""); setEmployeeId(""); }}><option value="">Select branch</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="field-label lg:col-span-3">Client<select className="control mt-1 w-full" value={clientId} onChange={(e) => { setClientId(e.target.value); setEmployeeId(""); }}><option value="">Direct / all clients</option>{clients.filter((item) => item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <div className="lg:col-span-4"><EmployeeSearchField employees={scoped} value={employeeId} onChange={setEmployeeId} label="Member / employee" required emptyMessage={branchId ? "No linked member/employee matches this placement." : "Select a branch before searching employees."} /></div>
+      <label className="field-label lg:col-span-2">Payment date<div className="relative mt-1"><CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" /><input className="control w-full pl-9" type="date" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} /></div></label>
+      <label className="field-label sm:col-span-1 lg:col-span-3">Amount (PHP)<input className="control mt-1 w-full font-mono" inputMode="decimal" placeholder="0.00" required value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      <label className="field-label sm:col-span-1 lg:col-span-7">Remarks<input className="control mt-1 w-full" maxLength={200} placeholder="Optional payment note" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
+      <div className="flex items-end justify-end lg:col-span-2"><button disabled={saving} className="primary-button w-full"><Save className="h-4 w-4" /> {saving ? "Posting..." : "Post payment"}</button></div>
+      {error ? <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-700 sm:col-span-2 lg:col-span-12">{error}</p> : <p className="flex items-center gap-2 text-[11px] text-ink/45 sm:col-span-2 lg:col-span-12"><Banknote className="h-3.5 w-3.5" /> Payments automatically settle the membership fee before capital share.</p>}
+    </form>
+  </div>;
 }

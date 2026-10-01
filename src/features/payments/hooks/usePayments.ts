@@ -24,5 +24,9 @@ export function usePayments(page: number, pageSize: number, employeeSearch: stri
   const saveAlias = useMutation({ mutationFn: (input: AliasInput) => { assertPermission(profile, "payments.manage"); return paymentRepository.saveAlias(input); }, onSuccess: refresh });
   const postBatch = useMutation({ mutationFn: ({ batch, lines }: { batch: PaymentBatchInput; lines: PaymentLineInput[] }) => { assertPermission(profile, "payments.manage"); return paymentRepository.postBatch(batch, lines); }, onSuccess: refresh });
   const settle = useMutation({ mutationFn: (input: SettlementInput) => { assertPermission(profile, "payments.manage"); return paymentRepository.settleFinalPay(input); }, onSuccess: refresh });
-  return { ledger, employees, saveSettings, saveAlias, postBatch, settle };
+  const loadExportLedger = () => {
+    assertPermission(profile, "payments.view");
+    return paymentRepository.getLedger({ employeeIds: (employees.data ?? []).map((employee) => employee.id) });
+  };
+  return { ledger, employees, saveSettings, saveAlias, postBatch, settle, loadExportLedger };
 }
