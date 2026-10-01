@@ -2,6 +2,8 @@ build-instruction.md
 .sample_files/
 node_modules/
 dist/
+release/
+tools/windows-server/web-assets.zip
 coverage/
 .env
 .env.local

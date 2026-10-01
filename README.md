@@ -55,6 +55,26 @@ VITE_APP_MODE=AUTO
 
 `VITE_APP_MODE` supports `ONLINE`, `OFFLINE`, and `AUTO`.
 
+### Windows LAN executable
+
+Run `build-exe.bat` to validate the project, build the production bundle, and
+create a standalone Windows server at:
+
+```text
+release\windows-lan-server\CooperativeRecordsServer.exe
+```
+
+The host PC does not need Node.js after the EXE has been built. Start the EXE,
+allow Private-network access if Windows Firewall prompts, and share the LAN URL
+shown in its control window. Closing or selecting **Hide** keeps the server in
+the notification area; use **Terminate** to stop it. The default port is `8787`
+and can be changed with `CooperativeRecordsServer.exe --port=9000`.
+
+The EXE shares the application over the LAN. To share the same records between
+devices, configure `.env.local` with Supabase credentials and
+`VITE_APP_MODE=ONLINE` before building. An OFFLINE build stores data separately
+inside each user's browser.
+
 ## Verification
 
 ```bash
@@ -70,5 +90,6 @@ npm run test
 - [Database Schema](./docs/database.md)
 - [Synchronization Strategy](./docs/synchronization.md)
 - [Deployment Strategy](./docs/deployment.md)
+- [Data Access Standard](./docs/data-access.md)
 - [Authentication](./docs/authentication.md)
 - [Access Control](./docs/access-control.md)
