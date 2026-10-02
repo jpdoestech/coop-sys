@@ -108,6 +108,23 @@ export class LocalPaymentRepository implements PaymentRepository {
       new LocalOrganizationDirectoryRepository().getDirectory(),
     ]);
     const ledger = readLedger();
+    const batchById = new Map(ledger.batches.map((batch) => [batch.id, batch]));
+    const period = options.period;
+    const periodPaymentIds = period
+      ? new Set(
+          ledger.payments
+            .filter((payment) => {
+              const batch = batchById.get(payment.batch_id);
+              return period.kind === "cutoff"
+                ? batch?.cutoff_from === period.cutoffFrom && batch?.cutoff_to === period.cutoffTo
+                : batch?.payment_date === period.paymentDate && !batch?.cutoff_from && !batch?.cutoff_to;
+            })
+            .map((payment) => payment.id),
+        )
+      : null;
+    const summaryLedger = periodPaymentIds
+      ? { ...ledger, payments: ledger.payments.filter((payment) => periodPaymentIds.has(payment.id)) }
+      : ledger;
     const term = options.search?.trim().toLowerCase() ?? "";
     const branchIds = options.branchIds ? new Set(options.branchIds) : null;
     const clientIds = options.clientIds ? new Set(options.clientIds) : null;
@@ -129,7 +146,7 @@ export class LocalPaymentRepository implements PaymentRepository {
                     : `${item.employee.last_name}|${item.employee.first_name}`;
     const records = buildPaymentSummary(
       employees,
-      ledger,
+      summaryLedger,
       directory.branches,
       directory.clients,
       options.yearFrom,
@@ -156,6 +173,7 @@ export class LocalPaymentRepository implements PaymentRepository {
         (item) =>
           !clientIds || Boolean(item.client && clientIds.has(item.client.id)),
       )
+      .filter((item) => !period || item.totalPaidCentavos > 0)
       .sort((a, b) => {
         const left = value(a);
         const right = value(b);
@@ -251,6 +269,17 @@ export class LocalPaymentRepository implements PaymentRepository {
       });
     const paymentTotal = filtered.length;
     const offset = options.offset ?? 0;
+    const runningTotals = new Map<string, number>();
+    const employeeTotals = new Map<string, number>();
+    [...filtered]
+      .sort((a, b) => a.payment_date.localeCompare(b.payment_date) || a.created_at.localeCompare(b.created_at))
+      .forEach((payment) => {
+        const total = (employeeTotals.get(payment.employee_id) ?? 0) + payment.amount_centavos;
+        employeeTotals.set(payment.employee_id, total);
+        runningTotals.set(payment.id, total);
+      });
+    const pagedPayments = (options.limit ? filtered.slice(offset, offset + options.limit) : filtered)
+      .map((payment) => ({ ...payment, running_total_centavos: runningTotals.get(payment.id) }));
     const refunds = ledger.refunds
       .filter((item) => !item.deleted_at)
       .filter((item) => !allowed || allowed.has(item.employee_id))
@@ -262,9 +291,7 @@ export class LocalPaymentRepository implements PaymentRepository {
       );
     return {
       ...ledger,
-      payments: options.limit
-        ? filtered.slice(offset, offset + options.limit)
-        : filtered,
+      payments: pagedPayments,
       paymentTotal,
       refunds,
       refundTotal: refunds.length,

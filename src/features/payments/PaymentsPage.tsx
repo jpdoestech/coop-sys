@@ -265,6 +265,9 @@ export function PaymentsPage() {
           <PaymentSummaryPanel
             branches={allowedBranches}
             clients={allowedClients}
+            batches={ledger.batches.filter((batch) =>
+              allowedBranchIds.has(batch.branch_id),
+            )}
             onLoadSummary={payments.loadPaymentSummary}
             onLoadEmployeeLedger={payments.loadEmployeeLedger}
           />

@@ -56,4 +56,14 @@ describe("openPrintReport", () => {
     expect(reserved).toBe(popup);
     expect(popupDocument.body.textContent).toBe("Preparing report...");
   });
+
+  it("applies the selected page orientation", () => {
+    const popupDocument = document.implementation.createHTMLDocument("");
+    const popup = { document: popupDocument, focus: vi.fn(), opener: window, print: vi.fn() } as unknown as Window;
+    vi.spyOn(window, "open").mockReturnValue(popup);
+
+    openPrintReport({ title: "Employee Payment History", orientation: "portrait", columns: [], rows: [] });
+
+    expect(popupDocument.querySelector("style")?.textContent).toContain("@page { size: portrait;");
+  });
 });

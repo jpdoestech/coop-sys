@@ -11,6 +11,7 @@ import { useDeferredValue, useEffect, useState } from "react";
 import { PaginationControls } from "../../../components/ui/PaginationControls";
 import { formatPesos } from "../../../services/payments/paymentMath";
 import type {
+  PaymentPeriodFilter,
   PaymentSummaryItem,
   PaymentSummaryPage,
   PaymentSummaryQueryOptions,
@@ -21,9 +22,12 @@ import type {
   OrganizationClient,
 } from "../../../types/organization";
 import type { PaymentLedger } from "../../../types/payment";
+import type { PaymentBatch } from "../../../types/payment";
 import { parseYearFilter } from "../paymentFilters";
 import { openPrintReport, openPrintWindow } from "../printPaymentReport";
 import { PaymentHistoryDialog } from "./PaymentHistoryDialog";
+import { PaymentPeriodSearchField } from "./PaymentPeriodSearchField";
+import { PrintOrientationToggle, type PrintOrientation } from "./PrintOrientationToggle";
 import {
   PlacementSearchField,
   type PlacementFilter,
@@ -32,6 +36,7 @@ import {
 type Props = {
   branches: OrganizationBranch[];
   clients: OrganizationClient[];
+  batches: PaymentBatch[];
   onLoadSummary: (
     options: PaymentSummaryQueryOptions,
   ) => Promise<PaymentSummaryPage>;
@@ -46,6 +51,7 @@ const emptyPage: PaymentSummaryPage = { items: [], total: 0 };
 export function PaymentSummaryPanel({
   branches,
   clients,
+  batches,
   onLoadSummary,
   onLoadEmployeeLedger,
 }: Props) {
@@ -57,6 +63,8 @@ export function PaymentSummaryPanel({
   const deferredSearch = useDeferredValue(search);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [placement, setPlacement] = useState<PlacementFilter>(null);
+  const [period, setPeriod] = useState<PaymentPeriodFilter | null>(null);
+  const [orientation, setOrientation] = useState<PrintOrientation>("landscape");
   const [sortBy, setSortBy] = useState<PaymentSummarySortKey>("employee");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
@@ -82,6 +90,7 @@ export function PaymentSummaryPanel({
       yearTo,
       branchIds: placement?.kind === "branch" ? [placement.id] : undefined,
       clientIds: placement?.kind === "client" ? [placement.id] : undefined,
+      period: period ?? undefined,
       sortBy,
       sortDirection: direction,
       limit: pageSize,
@@ -112,6 +121,7 @@ export function PaymentSummaryPanel({
     page,
     pageSize,
     placement,
+    period,
     deferredSearch,
     sortBy,
     yearFrom,
@@ -137,6 +147,7 @@ export function PaymentSummaryPanel({
         yearTo,
         branchIds: placement?.kind === "branch" ? [placement.id] : undefined,
         clientIds: placement?.kind === "client" ? [placement.id] : undefined,
+        period: period ?? undefined,
         sortBy,
         sortDirection: direction,
       });
@@ -147,8 +158,10 @@ export function PaymentSummaryPanel({
           meta: [
             `Year: ${year}`,
             `Scope: ${placement?.label ?? "All accessible branches and clients"}`,
+            `Period: ${period?.label ?? "All uploaded periods"}`,
             `Records: ${report.total}`,
           ],
+          orientation,
           columns: [
             { label: "Date" },
             { label: "Employee" },
@@ -229,6 +242,7 @@ export function PaymentSummaryPanel({
             value={year}
             onChange={(event) => {
               setYear(event.target.value);
+              setPeriod(null);
               setPage(1);
             }}
             placeholder="2021-2025"
@@ -243,6 +257,21 @@ export function PaymentSummaryPanel({
             setPage(1);
           }}
         />
+        <PaymentPeriodSearchField
+          batches={batches.filter((batch) => {
+            const batchYear = Number(batch.payment_date.slice(0, 4));
+            return (
+              (!yearFrom || batchYear >= yearFrom) &&
+              (!yearTo || batchYear <= yearTo)
+            );
+          })}
+          value={period}
+          onChange={(value) => {
+            setPeriod(value);
+            setPage(1);
+          }}
+        />
+        <PrintOrientationToggle value={orientation} onChange={setOrientation} />
         <button
           type="button"
           className="secondary-button sm:ml-auto"
@@ -259,6 +288,7 @@ export function PaymentSummaryPanel({
             setSearch("");
             setYear(String(new Date().getFullYear()));
             setPlacement(null);
+            setPeriod(null);
             setSortBy("employee");
             setDirection("asc");
             setPage(1);

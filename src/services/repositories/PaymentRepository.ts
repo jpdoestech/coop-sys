@@ -102,6 +102,7 @@ export type PaymentSummaryQueryOptions = {
   search?: string;
   yearFrom: number;
   yearTo: number;
+  period?: PaymentPeriodFilter;
   branchIds?: string[];
   clientIds?: string[];
   sortBy?: PaymentSummarySortKey;
@@ -109,6 +110,9 @@ export type PaymentSummaryQueryOptions = {
   limit?: number;
   offset?: number;
 };
+export type PaymentPeriodFilter =
+  | { kind: "cutoff"; cutoffFrom: string; cutoffTo: string; label: string }
+  | { kind: "date"; paymentDate: string; label: string };
 export type PaymentSummaryItem = {
   employeeId: string;
   employeeNumber: string;

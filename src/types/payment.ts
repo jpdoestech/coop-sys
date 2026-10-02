@@ -70,6 +70,7 @@ export type MemberPayment = BaseRecord & {
   payment_date: string;
   method: PaymentMethod;
   remarks: string | null;
+  running_total_centavos?: number;
 };
 
 export type FinalPaySettlement = BaseRecord & {

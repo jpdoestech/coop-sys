@@ -7,6 +7,7 @@ export type PrintReport = {
   title: string;
   subtitle?: string;
   meta?: string[];
+  orientation?: "portrait" | "landscape";
   columns: PrintColumn[];
   rows: string[][];
 };
@@ -62,7 +63,7 @@ export function openPrintReport(report: PrintReport, target?: Window) {
     tr { break-inside: avoid; }
     .right { text-align: right; font-variant-numeric: tabular-nums; }
     .empty { padding: 48px 12px; color: #6b756f; text-align: center; }
-    @page { size: landscape; margin: 12mm; }
+    @page { size: ${report.orientation ?? "landscape"}; margin: 12mm; }
     @media print {
       body { background: white; }
       .toolbar { display: none; }

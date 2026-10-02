@@ -8,8 +8,9 @@ import type {
 } from "../../../types/organization";
 import type { PaymentLedger } from "../../../types/payment";
 import { formatPesos } from "../../../services/payments/paymentMath";
-import { compactPeriod } from "../paymentFilters";
+import { detailedPeriod } from "../paymentFilters";
 import { openPrintReport, openPrintWindow } from "../printPaymentReport";
+import { PrintOrientationToggle, type PrintOrientation } from "./PrintOrientationToggle";
 
 type Props = {
   employee: PaymentSummaryItem;
@@ -33,6 +34,7 @@ export function PaymentHistoryDialog({
   const [loadError, setLoadError] = useState("");
   const [printError, setPrintError] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [orientation, setOrientation] = useState<PrintOrientation>("portrait");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => {
@@ -84,46 +86,47 @@ export function PaymentHistoryDialog({
       const reportBatches = new Map(
         reportLedger.batches.map((batch) => [batch.id, batch]),
       );
-      const paymentRows = reportLedger.payments.map((payment) => {
+      const events = [
+        ...reportLedger.payments.map((payment) => {
         const batch = reportBatches.get(payment.batch_id);
         const branch = branches.find((item) => item.id === batch?.branch_id);
         const client = clients.find((item) => item.id === batch?.client_id);
-        const period = compactPeriod(
-          batch?.cutoff_from ?? null,
-          batch?.cutoff_to ?? null,
-          payment.payment_date,
-        );
         return {
           date: payment.payment_date,
-          values: [
-            payment.payment_date,
-            client
-              ? `${client.label} / ${branch?.label ?? "Unknown branch"}`
-              : `${branch?.label ?? "Unknown"} / Direct employee`,
-            `${period.month} / ${period.period}`,
-            payment.method.replace("_", " "),
-            formatPesos(payment.membership_fee_centavos),
-            formatPesos(payment.capital_share_centavos),
-            formatPesos(payment.amount_centavos),
-            payment.remarks || "-",
-          ],
+          order: payment.created_at,
+          placement: client ? `${client.label} / ${branch?.label ?? "Unknown branch"}` : `${branch?.label ?? "Unknown"} / Direct employee`,
+          period: detailedPeriod(batch?.cutoff_from ?? null, batch?.cutoff_to ?? null, payment.payment_date),
+          membershipFee: payment.membership_fee_centavos,
+          capitalShare: payment.capital_share_centavos,
+          amount: payment.amount_centavos,
+          remarks: payment.method === "payroll_deduction" ? "Payroll Deduction" : "Payment",
         };
-      });
-      const refundRows = reportLedger.refunds.map((refund) => ({
+      }),
+        ...reportLedger.refunds.map((refund) => ({
         date: refund.refund_date,
-        values: [
-          refund.refund_date,
-          "Refund",
-          refund.cutoff_from && refund.cutoff_to
-            ? `${refund.cutoff_from} to ${refund.cutoff_to}`
-            : "Date only",
-          `Refund - ${refund.method}`,
-          "-",
-          "-",
-          `-${formatPesos(refund.amount_centavos)}`,
-          refund.remarks || "-",
-        ],
-      }));
+        order: refund.created_at,
+        placement: "Over-deduction refund",
+        period: detailedPeriod(refund.cutoff_from, refund.cutoff_to, refund.refund_date),
+        membershipFee: 0,
+        capitalShare: 0,
+        amount: -refund.amount_centavos,
+        remarks: refund.remarks ? `Refund · ${refund.remarks}` : "Refund",
+      })),
+      ].sort((a, b) => a.date.localeCompare(b.date) || a.order.localeCompare(b.order));
+      let runningTotal = 0;
+      const rows = events.map((event) => {
+        runningTotal += event.amount;
+        return [
+          event.date,
+          event.placement,
+          event.period,
+          event.membershipFee ? formatPesos(event.membershipFee) : "-",
+          event.capitalShare ? formatPesos(event.capitalShare) : "-",
+          event.amount < 0 ? `-${formatPesos(Math.abs(event.amount))}` : formatPesos(event.amount),
+          formatPesos(runningTotal),
+          event.remarks,
+        ];
+      });
       openPrintReport(
         {
           title: "Payment History",
@@ -133,19 +136,18 @@ export function PaymentHistoryDialog({
             `Refunds: ${reportLedger.refundTotal}`,
             `Generated: ${new Date().toISOString().slice(0, 10)}`,
           ],
+          orientation,
           columns: [
             { label: "Date" },
             { label: "Branch / Client" },
-            { label: "Month / Period" },
-            { label: "Method" },
+            { label: "Period" },
             { label: "Membership Fee", align: "right" },
             { label: "Share Capital", align: "right" },
             { label: "Total", align: "right" },
+            { label: "Total Paid", align: "right" },
             { label: "Remarks" },
           ],
-          rows: [...paymentRows, ...refundRows]
-            .sort((a, b) => b.date.localeCompare(a.date))
-            .map((row) => row.values),
+          rows,
         },
         printWindow,
       );
@@ -178,6 +180,7 @@ export function PaymentHistoryDialog({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <PrintOrientationToggle value={orientation} onChange={setOrientation} />
             <button
               type="button"
               className="secondary-button"
@@ -208,11 +211,11 @@ export function PaymentHistoryDialog({
               <tr>
                 <th className="w-24 px-3 py-2">Date</th>
                 <th className="w-48 px-3 py-2">Branch / Client</th>
-                <th className="w-28 px-3 py-2">Period</th>
-                <th className="w-28 px-3 py-2">Method</th>
+                <th className="w-44 px-3 py-2">Period</th>
                 <th className="w-28 px-3 py-2 text-right">Membership fee</th>
                 <th className="w-28 px-3 py-2 text-right">Share capital</th>
                 <th className="w-24 px-3 py-2 text-right">Total</th>
+                <th className="w-28 px-3 py-2 text-right">Total paid</th>
                 <th className="px-3 py-2">Remarks</th>
               </tr>
             </thead>
@@ -225,7 +228,7 @@ export function PaymentHistoryDialog({
                 const client = clients.find(
                   (item) => item.id === batch?.client_id,
                 );
-                const period = compactPeriod(
+                const period = detailedPeriod(
                   batch?.cutoff_from ?? null,
                   batch?.cutoff_to ?? null,
                   payment.payment_date,
@@ -243,14 +246,8 @@ export function PaymentHistoryDialog({
                         {client ? branch?.label : "Direct employee"}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <span className="block">{period.month}</span>
-                      <span className="font-mono text-[10px] text-ink/45">
-                        {period.period}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 capitalize">
-                      {payment.method.replace("_", " ")}
+                    <td className="px-3 py-2.5 text-[11px]">
+                      {period}
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono">
                       {formatPesos(payment.membership_fee_centavos)}
@@ -261,11 +258,14 @@ export function PaymentHistoryDialog({
                     <td className="px-3 py-2.5 text-right font-mono font-semibold">
                       {formatPesos(payment.amount_centavos)}
                     </td>
+                    <td className="px-3 py-2.5 text-right font-mono font-semibold text-moss">
+                      {payment.running_total_centavos === undefined ? "-" : formatPesos(payment.running_total_centavos)}
+                    </td>
                     <td
                       className="truncate px-3 py-2.5 text-ink/60"
-                      title={payment.remarks ?? ""}
+                      title={payment.method === "payroll_deduction" ? "Payroll Deduction" : "Payment"}
                     >
-                      {payment.remarks || "-"}
+                      {payment.method === "payroll_deduction" ? "Payroll Deduction" : "Payment"}
                     </td>
                   </tr>
                 );

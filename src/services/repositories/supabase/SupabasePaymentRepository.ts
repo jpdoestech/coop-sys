@@ -62,6 +62,9 @@ export class SupabasePaymentRepository implements PaymentRepository {
       p_year_to: options.yearTo,
       p_branch_ids: options.branchIds ?? null,
       p_client_ids: options.clientIds ?? null,
+      p_cutoff_from: options.period?.kind === "cutoff" ? options.period.cutoffFrom : null,
+      p_cutoff_to: options.period?.kind === "cutoff" ? options.period.cutoffTo : null,
+      p_payment_date: options.period?.kind === "date" ? options.period.paymentDate : null,
       p_sort_key: options.sortBy ?? "employee",
       p_sort_direction: options.sortDirection ?? "asc",
       p_page_limit: options.limit ?? null,
@@ -159,6 +162,33 @@ export class SupabasePaymentRepository implements PaymentRepository {
         options.offset ?? 0,
         (options.offset ?? 0) + options.limit - 1,
       );
+    const useEmployeePaymentPage =
+      options.employeeIds?.length === 1 &&
+      !options.branchIds &&
+      !options.clientIds &&
+      !options.yearFrom &&
+      !options.yearTo;
+    const employeePaymentPage = useEmployeePaymentPage
+      ? await client.rpc("employee_payment_page", {
+          p_employee_id: options.employeeIds![0],
+          p_page_limit: options.limit ?? 2147483647,
+          p_page_offset: options.offset ?? 0,
+        })
+      : null;
+    const employeePaymentRows = (employeePaymentPage?.data ?? []) as Array<
+      MemberPayment & { total_count: number }
+    >;
+    const paymentResult = employeePaymentPage
+      ? {
+          ...employeePaymentPage,
+          count: Number(employeePaymentRows[0]?.total_count ?? 0),
+          data: employeePaymentRows.map((row) => {
+            const { total_count: totalCount, ...payment } = row;
+            void totalCount;
+            return payment;
+          }),
+        }
+      : await paymentQuery;
     let refundsQuery = client
       .from("over_deduction_refunds")
       .select("*", { count: "exact" })
@@ -179,14 +209,13 @@ export class SupabasePaymentRepository implements PaymentRepository {
       refundsQuery = options.clientIds.length
         ? refundsQuery.in("client_id", options.clientIds)
         : refundsQuery.eq("client_id", "00000000-0000-4000-8000-000000000000");
-    const [settings, aliases, payments, settlements, corrections, refunds] =
+    const [settings, aliases, settlements, corrections, refunds] =
       await Promise.all([
         client
           .from("payment_settings")
           .select("*")
           .order("effective_from", { ascending: false }),
         client.from("member_aliases").select("*").is("deleted_at", null),
-        paymentQuery,
         client
           .from("final_pay_settlements")
           .select("*")
@@ -202,7 +231,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
     const error =
       settings.error ??
       aliases.error ??
-      payments.error ??
+      paymentResult.error ??
       settlements.error ??
       corrections.error ??
       refunds.error;
@@ -211,11 +240,11 @@ export class SupabasePaymentRepository implements PaymentRepository {
       settings: settings.data ?? [],
       aliases: aliases.data ?? [],
       batches: batches.data ?? [],
-      payments: payments.data ?? [],
+      payments: paymentResult.data ?? [],
       settlements: settlements.data ?? [],
       corrections: corrections.data ?? [],
       refunds: refunds.data ?? [],
-      paymentTotal: payments.count ?? 0,
+      paymentTotal: paymentResult.count ?? 0,
       refundTotal: refunds.count ?? 0,
     } as PaymentLedger;
   }

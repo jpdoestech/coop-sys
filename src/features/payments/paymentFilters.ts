@@ -16,3 +16,25 @@ export function compactPeriod(from: string | null, to: string | null, fallbackDa
   const endMonth = end.toLocaleString("en-PH", { month: "short" });
   return { month, period: start.getMonth() === end.getMonth() ? `${month}_${start.getDate()}-${end.getDate()}` : `${month}_${start.getDate()}-${endMonth}_${end.getDate()}` };
 }
+
+function dateParts(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  return {
+    fullMonth: date.toLocaleString("en-PH", { month: "long" }),
+    shortMonth: date.toLocaleString("en-PH", { month: "short" }),
+    day: date.getDate(),
+    year: date.getFullYear(),
+  };
+}
+
+export function detailedPeriod(from: string | null, to: string | null, fallbackDate: string) {
+  if (!from || !to) {
+    const value = dateParts(fallbackDate);
+    return `${value.fullMonth} ${value.shortMonth}. ${value.day}, ${value.year}`;
+  }
+  const start = dateParts(from);
+  const end = dateParts(to);
+  if (start.year !== end.year) return `${start.fullMonth} ${start.shortMonth}. ${start.day}, ${start.year}-${end.shortMonth}. ${end.day}, ${end.year}`;
+  if (start.shortMonth !== end.shortMonth) return `${start.fullMonth} ${start.shortMonth}. ${start.day}-${end.shortMonth}. ${end.day}, ${end.year}`;
+  return `${start.fullMonth} ${start.shortMonth}. ${start.day}-${end.day}, ${end.year}`;
+}
