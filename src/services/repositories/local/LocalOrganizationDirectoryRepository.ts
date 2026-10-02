@@ -15,6 +15,7 @@ import type {
   OrganizationListOptions,
   OrganizationRecordKind,
 } from "../OrganizationDirectoryRepository";
+import { flushDatabaseStorage, readPersistentItem, writePersistentItem } from "../../server/databaseStorage";
 
 const STORAGE_KEY = "coop_sys_organization_directory";
 
@@ -39,9 +40,9 @@ const seedDirectory: OrganizationDirectory = {
 };
 
 function readDirectory(): OrganizationDirectory {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = readPersistentItem(STORAGE_KEY);
   if (raw) return JSON.parse(raw) as OrganizationDirectory;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(seedDirectory));
+  writePersistentItem(STORAGE_KEY, JSON.stringify(seedDirectory));
   return structuredClone(seedDirectory);
 }
 
@@ -80,7 +81,7 @@ function ensureUnique(
 }
 
 function write(directory: OrganizationDirectory) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(directory));
+  writePersistentItem(STORAGE_KEY, JSON.stringify(directory));
 }
 
 export class LocalOrganizationDirectoryRepository
@@ -131,12 +132,14 @@ export class LocalOrganizationDirectoryRepository
     ensureUnique(directory, "branches", record.id, record.code, record.label);
     upsert(directory.branches, record);
     write(directory);
+    await flushDatabaseStorage();
   }
   async saveClient(record: OrganizationClient) {
     const directory = readDirectory();
     ensureUnique(directory, "clients", record.id, record.code, record.label);
     upsert(directory.clients, record);
     write(directory);
+    await flushDatabaseStorage();
   }
   async saveDepartment(record: OrganizationDepartment) {
     const directory = readDirectory();
@@ -149,11 +152,13 @@ export class LocalOrganizationDirectoryRepository
     );
     upsert(directory.departments, record);
     write(directory);
+    await flushDatabaseStorage();
   }
   async savePosition(record: OrganizationPosition) {
     const directory = readDirectory();
     ensureUnique(directory, "positions", record.id, record.code, record.label);
     upsert(directory.positions, record);
     write(directory);
+    await flushDatabaseStorage();
   }
 }

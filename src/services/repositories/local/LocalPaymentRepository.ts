@@ -21,6 +21,7 @@ import type {
   RefundQueryOptions,
   SettlementInput,
 } from "../PaymentRepository";
+import { flushDatabaseStorage, readPersistentItem, writePersistentItem } from "../../server/databaseStorage";
 
 const STORAGE_KEY = "coop_sys_payment_ledger";
 const DEFAULT_SETTINGS: PaymentSettings = {
@@ -49,7 +50,7 @@ function emptyLedger(): PaymentLedger {
 }
 
 function readLedger(): PaymentLedger {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = readPersistentItem(STORAGE_KEY);
   if (!raw) return emptyLedger();
   const stored = JSON.parse(raw) as Partial<PaymentLedger>;
   return {
@@ -60,7 +61,7 @@ function readLedger(): PaymentLedger {
 }
 
 function writeLedger(ledger: PaymentLedger) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ledger));
+  writePersistentItem(STORAGE_KEY, JSON.stringify(ledger));
 }
 
 function recordMeta(timestamp: string) {
@@ -297,6 +298,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     };
     ledger.settings.push(settings);
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return settings;
   }
 
@@ -337,12 +339,14 @@ export class LocalPaymentRepository implements PaymentRepository {
         alias.id === existing.id ? updated : alias,
       );
       writeLedger(ledger);
+      await flushDatabaseStorage();
       return updated;
     }
     const timestamp = new Date().toISOString();
     const alias = { ...recordMeta(timestamp), ...input };
     ledger.aliases.push(alias);
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return alias;
   }
 
@@ -360,6 +364,7 @@ export class LocalPaymentRepository implements PaymentRepository {
         : alias,
     );
     writeLedger(ledger);
+    await flushDatabaseStorage();
   }
 
   async postBatch(input: PaymentBatchInput, lines: PaymentLineInput[]) {
@@ -397,6 +402,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     });
     ledger.batches.push(batch);
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return { batch, payments };
   }
 
@@ -459,6 +465,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     }
     ledger.corrections.push(correction);
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return {
       payment: ledger.payments.find((item) => item.id === payment.id)!,
       correction,
@@ -493,6 +500,7 @@ export class LocalPaymentRepository implements PaymentRepository {
       ? ledger.refunds.map((item) => (item.id === existing.id ? refund : item))
       : [...ledger.refunds, refund];
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return refund;
   }
 
@@ -526,6 +534,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     };
     ledger.settlements.push(settlement);
     writeLedger(ledger);
+    await flushDatabaseStorage();
     return settlement;
   }
 }

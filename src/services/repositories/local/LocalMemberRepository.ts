@@ -3,6 +3,7 @@ import type { ListOptions } from "../Repository";
 import type { MemberRepository } from "../MemberRepository";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { createUuid } from "../../../utils/createUuid";
+import { flushDatabaseStorage, readPersistentItem } from "../../server/databaseStorage";
 
 function now() {
   return new Date().toISOString();
@@ -17,7 +18,7 @@ export class LocalMemberRepository implements MemberRepository {
     if (options.typeId) members = members.filter((member) => member.membership_type_id === options.typeId);
     if (options.approvalStatus) members = members.filter((member) => member.bod_approval_status === options.approvalStatus);
     if (options.branchId || options.clientId) {
-      const assignments = (JSON.parse(localStorage.getItem("coop_sys_employees") ?? "[]") as Array<{ member_id?: string | null; active_assignment?: { branch_id?: string | null; client_id?: string | null } | null }>);
+      const assignments = (JSON.parse(readPersistentItem("coop_sys_employees") ?? "[]") as Array<{ member_id?: string | null; active_assignment?: { branch_id?: string | null; client_id?: string | null } | null }>);
       const visible = new Set(assignments.filter((employee) => employee.member_id && (!options.branchId || employee.active_assignment?.branch_id === options.branchId) && (!options.clientId || employee.active_assignment?.client_id === options.clientId)).map((employee) => employee.member_id));
       members = members.filter((member) => visible.has(member.id));
     }
@@ -53,6 +54,7 @@ export class LocalMemberRepository implements MemberRepository {
       sync_status: "pending_create"
     };
     writeStoredMembers([...readStoredMembers(), member]);
+    await flushDatabaseStorage();
     return member;
   }
 
@@ -77,6 +79,7 @@ export class LocalMemberRepository implements MemberRepository {
     };
     members[index] = member;
     writeStoredMembers(members);
+    await flushDatabaseStorage();
     return member;
   }
 
@@ -96,6 +99,7 @@ export class LocalMemberRepository implements MemberRepository {
         members[index].sync_status === "pending_create" ? "pending_create" : "pending_delete"
     };
     writeStoredMembers(members);
+    await flushDatabaseStorage();
   }
 
   async restore(id: string) {
@@ -115,6 +119,7 @@ export class LocalMemberRepository implements MemberRepository {
     };
     members[index] = restored;
     writeStoredMembers(members);
+    await flushDatabaseStorage();
     return restored;
   }
 }

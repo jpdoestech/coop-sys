@@ -1,6 +1,7 @@
 import { developmentMembers } from "../../../database/seeds/memberSeed";
 import type { Member } from "../../../types/member";
 import { normalizePersonNumber } from "../../identity/personNumber";
+import { readPersistentItem, writePersistentItem } from "../../server/databaseStorage";
 
 const STORAGE_KEY = "coop_sys_members";
 
@@ -23,9 +24,9 @@ function normalizeMember(member: Member): Member {
 }
 
 export function readStoredMembers(): Member[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = readPersistentItem(STORAGE_KEY);
   if (raw) {
-    const employeeRaw = localStorage.getItem("coop_sys_employees");
+    const employeeRaw = readPersistentItem("coop_sys_employees");
     const employeeBeneficiaries = new Map<string, Member["beneficiaries"]>();
     if (employeeRaw) {
       (JSON.parse(employeeRaw) as Array<{ member_id?: string | null; beneficiaries?: Member["beneficiaries"] }>).forEach((employee) => {
@@ -45,5 +46,5 @@ export function readStoredMembers(): Member[] {
 }
 
 export function writeStoredMembers(members: Member[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
+  writePersistentItem(STORAGE_KEY, JSON.stringify(members));
 }

@@ -6,6 +6,7 @@ import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { normalizePersonNumber } from "../../identity/personNumber";
 import { createUuid } from "../../../utils/createUuid";
+import { flushDatabaseStorage, readPersistentItem, writePersistentItem } from "../../server/databaseStorage";
 
 const STORAGE_KEY = "coop_sys_employees";
 
@@ -14,7 +15,7 @@ function now() {
 }
 
 function writeEmployees(employees: Employee[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
+  writePersistentItem(STORAGE_KEY, JSON.stringify(employees));
 }
 
 function normalizeBeneficiaries(input: BeneficiaryInput[], existing: Beneficiary[], timestamp: string): Beneficiary[] {
@@ -68,7 +69,7 @@ function normalizeEmployee(employee: Employee): Employee {
 }
 
 function readEmployees(): Employee[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = readPersistentItem(STORAGE_KEY);
   if (raw) return (JSON.parse(raw) as Employee[]).map(normalizeEmployee);
   if (import.meta.env.DEV) {
     writeEmployees(developmentEmployees);
@@ -125,6 +126,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       sync_status: "pending_create"
     };
     writeEmployees([...readEmployees(), employee]);
+    await flushDatabaseStorage();
     return employee;
   }
 
@@ -171,6 +173,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     };
     employees[index] = employee;
     writeEmployees(employees);
+    await flushDatabaseStorage();
     return employee;
   }
 
@@ -180,6 +183,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     if (index === -1) throw new Error("Employee not found.");
     employees[index] = { ...employees[index], deleted_at: now(), updated_at: now(), sync_status: "pending_delete" };
     writeEmployees(employees);
+    await flushDatabaseStorage();
   }
 
   async restore(id: string) {
@@ -188,6 +192,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     if (index === -1) throw new Error("Employee not found.");
     employees[index] = { ...employees[index], deleted_at: null, updated_at: now(), sync_status: "pending_update" };
     writeEmployees(employees);
+    await flushDatabaseStorage();
     return employees[index];
   }
 }
