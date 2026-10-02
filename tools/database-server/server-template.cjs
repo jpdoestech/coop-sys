@@ -359,10 +359,27 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+function findLanAddress() {
+  const virtualAdapter = /(virtual|hyper-v|vethernet|vmware|virtualbox|docker|wsl|vpn|\btap\b|tunnel|bluetooth)/i;
+  const candidates = Object.entries(os.networkInterfaces()).flatMap(([name, addresses]) =>
+    (addresses || [])
+      .filter((item) => item && item.family === "IPv4" && !item.internal)
+      .map((item) => ({ name, address: item.address })),
+  );
+  const score = ({ name, address }) => {
+    let value = virtualAdapter.test(name) ? -500 : 0;
+    if (address.startsWith("192.168.")) value += 30;
+    else if (address.startsWith("10.")) value += 20;
+    else if (/^172\.(1[6-9]|2\d|3[01])\./.test(address)) value += 10;
+    return value;
+  };
+  return candidates.sort((left, right) => score(right) - score(left))[0]?.address || "127.0.0.1";
+}
+
 server.listen(port, "0.0.0.0", () => {
-  const address = Object.values(os.networkInterfaces()).flat().find((item) => item && item.family === "IPv4" && !item.internal);
-  if (process.send) process.send({ type: "ready", port, databasePath, publicUrl: `http://${address ? address.address : "127.0.0.1"}:${port}/` });
-  console.log(`READY|${port}|${databasePath}|http://${address ? address.address : "127.0.0.1"}:${port}/`);
+  const address = findLanAddress();
+  if (process.send) process.send({ type: "ready", port, databasePath, publicUrl: `http://${address}:${port}/` });
+  console.log(`READY|${port}|${databasePath}|http://${address}:${port}/`);
 });
 
 let syncing = false;

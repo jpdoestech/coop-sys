@@ -359,23 +359,43 @@ namespace CooperativeRecords.Server
             try
             {
                 NetworkInterface[] networks = NetworkInterface.GetAllNetworkInterfaces();
-                foreach (NetworkInterface network in networks.OrderByDescending(HasDefaultGateway))
-                {
-                    if (network.OperationalStatus != OperationalStatus.Up || network.NetworkInterfaceType == NetworkInterfaceType.Loopback || network.NetworkInterfaceType == NetworkInterfaceType.Tunnel) continue;
-                    foreach (UnicastIPAddressInformation address in network.GetIPProperties().UnicastAddresses)
-                    {
-                        if (address.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address.Address) && IsPrivateAddress(address.Address)) return address.Address.ToString();
-                    }
-                }
+                var candidates = networks
+                    .Where(network => network.OperationalStatus == OperationalStatus.Up)
+                    .Where(network => network.NetworkInterfaceType != NetworkInterfaceType.Loopback && network.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                    .SelectMany(network => network.GetIPProperties().UnicastAddresses
+                        .Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(item.Address))
+                        .Select(item => new { Network = network, Address = item.Address }))
+                    .Where(item => IsPrivateAddress(item.Address))
+                    .OrderByDescending(item => AddressScore(item.Network, item.Address))
+                    .ToList();
+                if (candidates.Count > 0) return candidates[0].Address.ToString();
             }
             catch { }
             return "127.0.0.1";
+        }
+
+        private static int AddressScore(NetworkInterface network, IPAddress address)
+        {
+            int score = HasDefaultGateway(network) ? 100 : 0;
+            if (network.NetworkInterfaceType == NetworkInterfaceType.Ethernet || network.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || network.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet || network.NetworkInterfaceType == NetworkInterfaceType.FastEthernetFx || network.NetworkInterfaceType == NetworkInterfaceType.FastEthernetT) score += 50;
+            byte[] bytes = address.GetAddressBytes();
+            if (bytes[0] == 192 && bytes[1] == 168) score += 20;
+            else if (bytes[0] == 10) score += 10;
+            if (IsVirtualAdapter(network)) score -= 500;
+            return score;
         }
 
         private static bool HasDefaultGateway(NetworkInterface network)
         {
             try { return network.GetIPProperties().GatewayAddresses.Any(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !item.Address.Equals(IPAddress.Any)); }
             catch { return false; }
+        }
+
+        private static bool IsVirtualAdapter(NetworkInterface network)
+        {
+            string value = (network.Name + " " + network.Description).ToLowerInvariant();
+            string[] markers = { "virtual", "hyper-v", "vethernet", "vmware", "virtualbox", "docker", "wsl", "vpn", "tap", "tunnel", "bluetooth" };
+            return markers.Any(value.Contains);
         }
 
         private static bool IsPrivateAddress(IPAddress address)

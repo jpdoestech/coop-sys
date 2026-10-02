@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -114,7 +115,7 @@ namespace CooperativeRecords.DatabaseServer
             string[] parts = eventArgs.Data.Split('|');
             BeginInvoke((MethodInvoker)delegate {
                 status.Text = "Database server is running (SQLite WAL)";
-                address.Text = parts.Length > 3 ? parts[3] : "http://" + FindAddress() + ":" + port + "/";
+                address.Text = "http://" + FindAddress() + ":" + port + "/";
                 database.Text = "Database: " + (parts.Length > 2 ? parts[2] : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "cooperative-records.db"));
                 open.Enabled = true;
             });
@@ -130,11 +131,51 @@ namespace CooperativeRecords.DatabaseServer
         private static Button NewButton(string text, int x, int y, int width, Color background, Color foreground) { return new Button { Text = text, Location = new Point(x, y), Size = new Size(width, 35), FlatStyle = FlatStyle.Flat, BackColor = background, ForeColor = foreground, Cursor = Cursors.Hand }; }
         private static string FindAddress()
         {
-            foreach (NetworkInterface network in NetworkInterface.GetAllNetworkInterfaces())
-                if (network.OperationalStatus == OperationalStatus.Up && network.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                    foreach (UnicastIPAddressInformation item in network.GetIPProperties().UnicastAddresses)
-                        if (item.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(item.Address)) return item.Address.ToString();
+            try
+            {
+                var candidates = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(network => network.OperationalStatus == OperationalStatus.Up)
+                    .Where(network => network.NetworkInterfaceType != NetworkInterfaceType.Loopback && network.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                    .SelectMany(network => network.GetIPProperties().UnicastAddresses
+                        .Where(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(item.Address))
+                        .Select(item => new { Network = network, Address = item.Address }))
+                    .Where(item => IsPrivateAddress(item.Address))
+                    .OrderByDescending(item => AddressScore(item.Network, item.Address))
+                    .ToList();
+                if (candidates.Count > 0) return candidates[0].Address.ToString();
+            }
+            catch { }
             return "127.0.0.1";
+        }
+
+        private static int AddressScore(NetworkInterface network, IPAddress address)
+        {
+            int score = HasDefaultGateway(network) ? 100 : 0;
+            if (network.NetworkInterfaceType == NetworkInterfaceType.Ethernet || network.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || network.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet || network.NetworkInterfaceType == NetworkInterfaceType.FastEthernetFx || network.NetworkInterfaceType == NetworkInterfaceType.FastEthernetT) score += 50;
+            byte[] bytes = address.GetAddressBytes();
+            if (bytes[0] == 192 && bytes[1] == 168) score += 20;
+            else if (bytes[0] == 10) score += 10;
+            if (IsVirtualAdapter(network)) score -= 500;
+            return score;
+        }
+
+        private static bool HasDefaultGateway(NetworkInterface network)
+        {
+            try { return network.GetIPProperties().GatewayAddresses.Any(item => item.Address.AddressFamily == AddressFamily.InterNetwork && !item.Address.Equals(IPAddress.Any)); }
+            catch { return false; }
+        }
+
+        private static bool IsVirtualAdapter(NetworkInterface network)
+        {
+            string value = (network.Name + " " + network.Description).ToLowerInvariant();
+            string[] markers = { "virtual", "hyper-v", "vethernet", "vmware", "virtualbox", "docker", "wsl", "vpn", "tap", "tunnel", "bluetooth" };
+            return markers.Any(value.Contains);
+        }
+
+        private static bool IsPrivateAddress(IPAddress address)
+        {
+            byte[] bytes = address.GetAddressBytes();
+            return bytes[0] == 10 || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) || (bytes[0] == 192 && bytes[1] == 168);
         }
     }
 }
