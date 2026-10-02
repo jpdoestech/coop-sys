@@ -10,7 +10,10 @@ import type { PaymentLedger } from "../../../types/payment";
 import { formatPesos } from "../../../services/payments/paymentMath";
 import { detailedPeriod } from "../paymentFilters";
 import { openPrintReport, openPrintWindow } from "../printPaymentReport";
-import { PrintOrientationToggle, type PrintOrientation } from "./PrintOrientationToggle";
+import {
+  PrintOrientationDialog,
+  type PrintOrientation,
+} from "./PrintOrientationDialog";
 
 type Props = {
   employee: PaymentSummaryItem;
@@ -34,7 +37,7 @@ export function PaymentHistoryDialog({
   const [loadError, setLoadError] = useState("");
   const [printError, setPrintError] = useState("");
   const [printing, setPrinting] = useState(false);
-  const [orientation, setOrientation] = useState<PrintOrientation>("portrait");
+  const [choosingOrientation, setChoosingOrientation] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => {
@@ -76,7 +79,8 @@ export function PaymentHistoryDialog({
   ]
     .filter(Boolean)
     .join(" ");
-  async function printHistory() {
+  async function printHistory(orientation: PrintOrientation) {
+    setChoosingOrientation(false);
     let printWindow: Window | undefined;
     try {
       printWindow = openPrintWindow("Preparing Payment History");
@@ -180,11 +184,10 @@ export function PaymentHistoryDialog({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <PrintOrientationToggle value={orientation} onChange={setOrientation} />
             <button
               type="button"
               className="secondary-button"
-              onClick={() => void printHistory()}
+              onClick={() => setChoosingOrientation(true)}
               disabled={!ledger || printing}
             >
               <Printer className="h-3.5 w-3.5" />
@@ -340,6 +343,13 @@ export function PaymentHistoryDialog({
           }}
         />
       </section>
+      {choosingOrientation ? (
+        <PrintOrientationDialog
+          title="Payment History"
+          onSelect={(value) => void printHistory(value)}
+          onCancel={() => setChoosingOrientation(false)}
+        />
+      ) : null}
     </div>
   );
 }

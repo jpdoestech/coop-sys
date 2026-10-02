@@ -27,7 +27,10 @@ import { parseYearFilter } from "../paymentFilters";
 import { openPrintReport, openPrintWindow } from "../printPaymentReport";
 import { PaymentHistoryDialog } from "./PaymentHistoryDialog";
 import { PaymentPeriodSearchField } from "./PaymentPeriodSearchField";
-import { PrintOrientationToggle, type PrintOrientation } from "./PrintOrientationToggle";
+import {
+  PrintOrientationDialog,
+  type PrintOrientation,
+} from "./PrintOrientationDialog";
 import {
   PlacementSearchField,
   type PlacementFilter,
@@ -64,7 +67,7 @@ export function PaymentSummaryPanel({
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [placement, setPlacement] = useState<PlacementFilter>(null);
   const [period, setPeriod] = useState<PaymentPeriodFilter | null>(null);
-  const [orientation, setOrientation] = useState<PrintOrientation>("landscape");
+  const [choosingOrientation, setChoosingOrientation] = useState(false);
   const [sortBy, setSortBy] = useState<PaymentSummarySortKey>("employee");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
@@ -134,8 +137,9 @@ export function PaymentSummaryPanel({
     setPage(1);
   }
 
-  async function printSummary() {
+  async function printSummary(orientation: PrintOrientation) {
     if (!yearFrom || !yearTo) return;
+    setChoosingOrientation(false);
     let printWindow: Window | undefined;
     try {
       printWindow = openPrintWindow("Preparing Payment Summary");
@@ -271,11 +275,10 @@ export function PaymentSummaryPanel({
             setPage(1);
           }}
         />
-        <PrintOrientationToggle value={orientation} onChange={setOrientation} />
         <button
           type="button"
           className="secondary-button sm:ml-auto"
-          onClick={() => void printSummary()}
+          onClick={() => setChoosingOrientation(true)}
           disabled={printing || !result.total || !years}
         >
           <Printer className="h-3.5 w-3.5" />
@@ -433,6 +436,13 @@ export function PaymentSummaryPanel({
           clients={clients}
           onLoadLedger={onLoadEmployeeLedger}
           onClose={() => setHistoryEmployee(null)}
+        />
+      ) : null}
+      {choosingOrientation ? (
+        <PrintOrientationDialog
+          title="Payment Summary"
+          onSelect={(value) => void printSummary(value)}
+          onCancel={() => setChoosingOrientation(false)}
         />
       ) : null}
     </>
