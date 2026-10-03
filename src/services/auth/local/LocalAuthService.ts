@@ -1,5 +1,7 @@
 import type { SystemUser } from "../../../types/systemUser";
 import type { AccessProfile } from "../../access/accessControl";
+import { accessProfileForUser, ACCESS_ROLES_STORAGE_KEY, normalizeSystemUser } from "../../access/userAccessModel";
+import { createDefaultRoles, type AccessRole } from "../../access/accessControl";
 import type { AuthService, AuthSession } from "../types";
 import { ensureDevelopmentCredentials, localCredentialFor, setLocalCredential, verifyLocalCredential } from "./localCredentialStore";
 
@@ -8,11 +10,16 @@ const SESSION_KEY = "coop_sys_local_session";
 
 function readUsers(): SystemUser[] {
   const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) as SystemUser[] : [];
+  return raw ? (JSON.parse(raw) as SystemUser[]).map(normalizeSystemUser) : [];
+}
+
+function readRoles(): AccessRole[] {
+  const raw = localStorage.getItem(ACCESS_ROLES_STORAGE_KEY);
+  return raw ? JSON.parse(raw) as AccessRole[] : createDefaultRoles();
 }
 
 function sessionFor(user: SystemUser): AuthSession {
-  const profile: AccessProfile = { userId: user.id, displayName: user.display_name, role: user.role, branchIds: user.branch_ids };
+  const profile: AccessProfile = accessProfileForUser(user, readRoles());
   return { profile, email: user.email, mode: "offline", mustChangePassword: localCredentialFor(user.id)?.mustChangePassword ?? true };
 }
 

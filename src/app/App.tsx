@@ -26,15 +26,15 @@ export function App() {
           <Route path="/members" element={<RequirePermission permission="members.view"><MembersPage /></RequirePermission>} />
           <Route path="/employees" element={<RequirePermission permission="employees.view"><EmployeesPage /></RequirePermission>} />
           <Route path="/payments" element={<RequirePermission permission="payments.view"><PaymentsPage /></RequirePermission>} />
-          <Route path="/organization/departments" element={<RequirePermission permission="organization.manage"><DepartmentsPage /></RequirePermission>} />
-          <Route path="/organization/positions" element={<RequirePermission permission="organization.manage"><PositionsPage /></RequirePermission>} />
-          <Route path="/organization" element={<RequirePermission permission="organization.manage"><OrganizationPage /></RequirePermission>} />
+          <Route path="/organization/departments" element={<RequirePermission permission="organization.view"><DepartmentsPage /></RequirePermission>} />
+          <Route path="/organization/positions" element={<RequirePermission permission="organization.view"><PositionsPage /></RequirePermission>} />
+          <Route path="/organization" element={<RequirePermission permission="organization.view"><OrganizationPage /></RequirePermission>} />
           <Route path="/documents" element={<RequirePermission permission="documents.view"><DocumentsPage /></RequirePermission>} />
           <Route path="/reports" element={<RequirePermission permission="reports.view"><ReportsPage /></RequirePermission>} />
-          <Route path="/sync" element={<RequirePermission permission="sync.manage"><SynchronizationPage /></RequirePermission>} />
+          <Route path="/sync" element={<RequirePermission permission="sync.view"><SynchronizationPage /></RequirePermission>} />
           <Route path="/audit-logs" element={<RequirePermission permission="audit.view"><AuditLogsPage /></RequirePermission>} />
-          <Route path="/settings" element={<RequirePermission permission="settings.manage"><SettingsPage /></RequirePermission>} />
-          <Route path="/settings/users" element={<RequirePermission permission="users.manage"><UsersPage /></RequirePermission>} />
+          <Route path="/settings" element={<RequirePermission permission="settings.view"><SettingsPage /></RequirePermission>} />
+          <Route path="/settings/users" element={<RequirePermission permission="users.view"><UsersPage /></RequirePermission>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

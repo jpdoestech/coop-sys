@@ -32,13 +32,13 @@ const navItems: Array<{ to: string; label: string; icon: typeof Gauge; permissio
   { to: "/members", label: "Members", icon: Users, permission: "members.view" },
   { to: "/employees", label: "Employees", icon: UserSquare2, permission: "employees.view" },
   { to: "/payments", label: "Payments", icon: WalletCards, permission: "payments.view" },
-  { to: "/organization", label: "Organization", icon: Building2, permission: "organization.manage" },
+  { to: "/organization", label: "Organization", icon: Building2, permission: "organization.view" },
   { to: "/documents", label: "Documents", icon: FileText, permission: "documents.view" },
   { to: "/reports", label: "Reports", icon: BarChart3, permission: "reports.view" },
-  { to: "/sync", label: "Synchronization", icon: Wifi, permission: "sync.manage" },
+  { to: "/sync", label: "Synchronization", icon: Wifi, permission: "sync.view" },
   { to: "/audit-logs", label: "Audit Logs", icon: ShieldCheck, permission: "audit.view" },
-  { to: "/settings/users", label: "User Access", icon: UserCog, permission: "users.manage" },
-  { to: "/settings", label: "Settings", icon: Settings, permission: "settings.manage" }
+  { to: "/settings/users", label: "User Access", icon: UserCog, permission: "users.view" },
+  { to: "/settings", label: "Settings", icon: Settings, permission: "settings.view" }
 ];
 
 export function AppShell({ children }: AppShellProps) {

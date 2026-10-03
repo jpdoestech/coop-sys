@@ -55,7 +55,7 @@ export function useEmployees(options: ListOptions) {
   });
   const saveEmployee = useMutation({
     mutationFn: async ({ employee, submission }: { employee: Employee | null; submission: EmployeeSubmission }) => {
-      assertPermission(profile, "employees.manage");
+      assertPermission(profile, employee ? "employees.update" : "employees.create");
       if (employee && !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your assigned branches.");
       let input: EmployeeInput = submission.input;
       if (!employee) input = { ...input, employee_number: personNumber.data ?? input.employee_number };
@@ -98,7 +98,7 @@ export function useEmployees(options: ListOptions) {
   });
   const archiveEmployee = useMutation({
     mutationFn: async (id: string) => {
-      assertPermission(profile, "employees.manage");
+      assertPermission(profile, "employees.delete");
       const employee = await repositories.employees.getById(id);
       if (!employee || !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your assigned branches.");
       return repositories.employees.archive(id);
@@ -107,7 +107,7 @@ export function useEmployees(options: ListOptions) {
   });
   const importEmployees = useMutation({
     mutationFn: async ({ rows, branchId, clientId }: { rows: PersonImportRow[]; branchId: string; clientId: string }) => {
-      assertPermission(profile, "employees.manage");
+      assertPermission(profile, "employees.import");
       if (!branchIsInScope(branchId, profile)) throw new Error("The selected branch is outside your assigned scope.");
       const [memberRecords, employeeRecords] = await Promise.all([repositories.members.list({ limit: 10000 }), repositories.employees.list({ limit: 10000 })]);
       const used = new Set([...memberRecords.map((item) => item.membership_number), ...employeeRecords.map((item) => item.employee_number)]);

@@ -22,6 +22,8 @@ type MemberFormProps = {
   suggestedNumber: string;
   saving: boolean;
   aliasEditor?: ReactNode;
+  canViewSensitive?: boolean;
+  canEditSensitive?: boolean;
   onCancel: () => void;
   onSubmit: (input: MemberInput) => void;
 };
@@ -108,7 +110,7 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-export function MemberForm({ member, suggestedNumber, saving, aliasEditor, onCancel, onSubmit }: MemberFormProps) {
+export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: MemberFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const addressValue: AddressValue = {
@@ -214,9 +216,9 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, onCan
 
           {aliasEditor ? <Section title="Payroll aliases" description="Manage the client-specific names used to match payroll imports.">{aliasEditor}</Section> : null}
 
-          <Section title="Government numbers" description="Government-issued identifiers synchronize with a linked employee record; the system never invents these values.">
-            <GovernmentIdFields value={governmentIdValue} errors={errors} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
-          </Section>
+          {canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize with a linked employee record; the system never invents these values.">
+            <GovernmentIdFields disabled={!canEditSensitive} value={governmentIdValue} errors={errors} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
+          </Section> : null}
 
           <Section title="Contact" description="Current contact and residential information.">
             <Field label="Mobile number"><input className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>

@@ -67,6 +67,17 @@ db.exec(`
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS access_roles (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    permissions TEXT NOT NULL DEFAULT '[]',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    is_system INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS server_sync_log (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
@@ -79,6 +90,46 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS server_users_email_idx ON server_users(email);
   CREATE INDEX IF NOT EXISTS server_sessions_expiry_idx ON server_sessions(expires_at);
 `);
+
+function ensureColumn(table, name, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((column) => column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+}
+ensureColumn("server_users", "role_ids", "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn("server_users", "client_ids", "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn("server_users", "direct_grants", "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn("server_users", "direct_denies", "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn("server_users", "scope_type", "TEXT NOT NULL DEFAULT 'organization'");
+ensureColumn("server_users", "resource_assignments", "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn("server_users", "linked_employee_id", "TEXT");
+ensureColumn("server_users", "manager_user_id", "TEXT");
+db.prepare("UPDATE server_users SET scope_type='assigned_branches' WHERE role IN ('branch_admin','branch_user') AND branch_ids <> '[]' AND scope_type='organization'").run();
+
+const permissionModules = {
+  dashboard: ["view"], members: ["view","create","update","delete","import","export","approve","manage"],
+  "members.sensitive": ["view","update"], employees: ["view","create","update","delete","import","export","approve","manage"],
+  "employees.sensitive": ["view","update"], payments: ["view","create","update","delete","import","export","approve","manage"],
+  "payments.settings": ["view","manage"], organization: ["view","create","update","delete","manage"],
+  documents: ["view","create","update","delete","export","manage"], reports: ["view","export"], sync: ["view","manage"],
+  audit: ["view","export"], settings: ["view","manage"], users: ["view","create","update","delete","manage"], roles: ["view","create","update","delete","manage"],
+};
+const allPermissions = Object.entries(permissionModules).flatMap(([module, actions]) => actions.map((action) => `${module}.${action}`));
+const permissionsFor = (...modules) => modules.flatMap((module) => (permissionModules[module] || []).map((action) => `${module}.${action}`));
+const defaultRolePolicies = [
+  ["super_admin","Super Admin",allPermissions,true],
+  ["general_manager","General Manager",permissionsFor("dashboard","members","employees","payments","organization","documents","reports","audit"),false],
+  ["hr_manager","HR Manager",permissionsFor("dashboard","members","employees","organization","documents","reports","audit"),false],
+  ["accounting_manager","Accounting Manager",[...permissionsFor("dashboard","reports"),"members.view","employees.view","payments.view","payments.create","payments.update","payments.import","payments.export","payments.manage","documents.view"],false],
+  ["head_office_staff","Head Office Staff",permissionsFor("dashboard","members","employees","payments","documents","reports"),false],
+  ["branch_admin","Branch Admin",permissionsFor("dashboard","members","employees","payments","documents","reports"),false],
+  ["branch_user","Branch User",["dashboard.view","members.view","employees.view","payments.view","documents.view"],false],
+];
+
+function seedRoles() {
+  const timestamp = now();
+  const insert = db.prepare(`INSERT OR IGNORE INTO access_roles(id,code,name,description,permissions,is_active,is_system,created_at,updated_at) VALUES(?,?,?,?,?,1,?,?,?)`);
+  defaultRolePolicies.forEach(([code, name, permissions, system], index) => insert.run(`70000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, code, name, `${name} default access policy.`, JSON.stringify(permissions), system ? 1 : 0, timestamp, timestamp));
+}
 
 function now() { return new Date().toISOString(); }
 function id() { return crypto.randomUUID(); }
@@ -93,7 +144,14 @@ function seedAdmin() {
     VALUES (?, ?, ?, ?, '[]', 1, ?, ?, 1, ?, ?)`)
     .run("72000000-0000-4000-8000-000000000001", "System Administrator", "admin@example.test", "super_admin", salt, passwordHash("ChangeMe123!", salt), timestamp, timestamp);
 }
+seedRoles();
 seedAdmin();
+db.prepare("UPDATE server_users SET role_ids=? WHERE role='super_admin' AND (role_ids='[]' OR role_ids IS NULL)").run(JSON.stringify(["70000000-0000-4000-8000-000000000001"]));
+for (const existingUser of db.prepare("SELECT id,role,role_ids FROM server_users").all()) {
+  if (parseArray(existingUser.role_ids).length) continue;
+  const matchingRole = db.prepare("SELECT id FROM access_roles WHERE code=?").get(existingUser.role);
+  if (matchingRole) db.prepare("UPDATE server_users SET role_ids=? WHERE id=?").run(JSON.stringify([matchingRole.id]), existingUser.id);
+}
 
 const readStorage = db.prepare("SELECT storage_key, value, revision, modified_at FROM app_storage");
 const getStorage = db.prepare("SELECT storage_key, value, revision, modified_at FROM app_storage WHERE storage_key = ?");
@@ -128,12 +186,42 @@ function mergeStorageValue(key, currentValue, incomingValue) {
   return incomingValue;
 }
 
-const writableRoles = {
-  coop_sys_members: new Set(["super_admin", "general_manager", "hr_manager", "head_office_staff", "branch_admin"]),
-  coop_sys_employees: new Set(["super_admin", "general_manager", "hr_manager", "head_office_staff", "branch_admin"]),
-  coop_sys_organization_directory: new Set(["super_admin", "general_manager", "hr_manager"]),
-  coop_sys_payment_ledger: new Set(["super_admin", "general_manager", "accounting_manager", "head_office_staff", "branch_admin"]),
-};
+const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments" };
+function parseArray(value) { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
+function rolesForUser(user) {
+  const roleIds = parseArray(user.role_ids);
+  const placeholders = roleIds.map(() => "?").join(",");
+  const byIds = placeholders ? db.prepare(`SELECT * FROM access_roles WHERE is_active=1 AND id IN (${placeholders})`).all(...roleIds) : [];
+  return byIds.length ? byIds : db.prepare("SELECT * FROM access_roles WHERE is_active=1 AND code=?").all(user.role);
+}
+function permissionsForUser(user) {
+  if (user.role === "super_admin") return new Set(allPermissions);
+  const denied = new Set(parseArray(user.direct_denies));
+  const permissions = new Set([...rolesForUser(user).flatMap((role) => parseArray(role.permissions)), ...parseArray(user.direct_grants)]);
+  denied.forEach((permission) => permissions.delete(permission));
+  return permissions;
+}
+function hasPermission(user, permission) { return user.role === "super_admin" || permissionsForUser(user).has(permission); }
+function canWriteStorage(user, key) {
+  const module = storageModules[key]; if (!module) return false;
+  return ["create","update","delete","import","manage"].some((action) => hasPermission(user, `${module}.${action}`));
+}
+function validateAccessInput(actor, input) {
+  const roleIds = Array.isArray(input.role_ids) ? input.role_ids : [];
+  if (!roleIds.length) return "Assign at least one role.";
+  const roles = roleIds.map((roleId) => db.prepare("SELECT * FROM access_roles WHERE id=? AND is_active=1").get(roleId));
+  if (roles.some((role) => !role)) return "One or more assigned roles are unavailable.";
+  if (actor.role !== "super_admin" && roles.some((role) => role.code === "super_admin")) return "Only Super Admin can assign unrestricted access.";
+  const actorPermissions = permissionsForUser(actor);
+  const requested = [...roles.flatMap((role) => parseArray(role.permissions)), ...(input.direct_grants || [])];
+  if (actor.role !== "super_admin" && requested.some((permission) => !actorPermissions.has(permission))) return "You cannot grant access that you do not hold.";
+  if ((input.direct_grants || []).some((permission) => !allPermissions.includes(permission)) || (input.direct_denies || []).some((permission) => !allPermissions.includes(permission))) return "One or more permission overrides are invalid.";
+  if ((input.direct_grants || []).some((permission) => (input.direct_denies || []).includes(permission))) return "A permission cannot be both granted and denied.";
+  if (input.scope_type === "assigned_branches" && !(input.branch_ids || []).length) return "Assign at least one branch.";
+  if (input.scope_type === "assigned_clients" && !(input.client_ids || []).length) return "Assign at least one client.";
+  if (input.scope_type === "self" && !input.linked_employee_id) return "Link an employee for self-only access.";
+  return null;
+}
 
 function parseCookies(req) {
   return Object.fromEntries(String(req.headers.cookie || "").split(";").map((part) => part.trim().split("=")).filter((pair) => pair.length === 2));
@@ -146,8 +234,9 @@ function currentUser(req) {
     WHERE s.token_hash=? AND s.expires_at>? AND u.is_active=1`).get(tokenHash, now()) || null;
 }
 function sessionFor(user) {
+  const assignedRoles = rolesForUser(user);
   return {
-    profile: { userId: user.id, displayName: user.display_name, role: user.role, branchIds: JSON.parse(user.branch_ids || "[]") },
+    profile: { userId: user.id, displayName: user.display_name, role: assignedRoles[0]?.code || user.role, roleIds: assignedRoles.map((role) => role.id), roleLabels: assignedRoles.map((role) => role.name), branchIds: parseArray(user.branch_ids), clientIds: parseArray(user.client_ids), scopeType: user.scope_type, linkedEmployeeId: user.linked_employee_id, managerUserId: user.manager_user_id, directGrants: parseArray(user.direct_grants), directDenies: parseArray(user.direct_denies), effectivePermissions: [...permissionsForUser(user)] },
     email: user.email,
     mode: "offline",
     mustChangePassword: Boolean(user.must_change_password),
@@ -172,7 +261,49 @@ function requireUser(req, res) {
   return user;
 }
 function safeUser(row) {
-  return { id: row.id, display_name: row.display_name, email: row.email, role: row.role, branch_ids: JSON.parse(row.branch_ids || "[]"), is_active: Boolean(row.is_active), created_at: row.created_at, updated_at: row.updated_at };
+  return { id: row.id, display_name: row.display_name, email: row.email, role: row.role, role_ids: parseArray(row.role_ids), branch_ids: parseArray(row.branch_ids), client_ids: parseArray(row.client_ids), direct_grants: parseArray(row.direct_grants), direct_denies: parseArray(row.direct_denies), scope_type: row.scope_type || "organization", resource_assignments: parseArray(row.resource_assignments), linked_employee_id: row.linked_employee_id || null, manager_user_id: row.manager_user_id || null, is_active: Boolean(row.is_active), created_at: row.created_at, updated_at: row.updated_at };
+}
+function safeRole(row) { return { ...row, permissions: parseArray(row.permissions), is_active: Boolean(row.is_active), is_system: Boolean(row.is_system) }; }
+function recordInScope(record, user) {
+  if (user.scope_type === "organization") return true;
+  if (user.scope_type === "self") return record.id === user.linked_employee_id;
+  const assignment = record.active_assignment;
+  if (!assignment) return false;
+  if (user.scope_type === "assigned_clients") return Boolean(assignment.client_id && parseArray(user.client_ids).includes(assignment.client_id));
+  return Boolean(assignment.branch_id && parseArray(user.branch_ids).includes(assignment.branch_id));
+}
+function redactIdentifiers(record) {
+  return { ...record, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null };
+}
+function filteredStorageValue(user, key, rawValue) {
+  const module = storageModules[key];
+  if (module && !hasPermission(user, `${module}.view`)) return undefined;
+  try {
+    const value = JSON.parse(rawValue);
+    const employeeRaw = key === "coop_sys_employees" ? rawValue : getStorage.get("coop_sys_employees")?.value;
+    const employees = employeeRaw ? JSON.parse(employeeRaw) : [];
+    const visibleEmployees = employees.filter((employee) => recordInScope(employee, user));
+    const visibleEmployeeIds = new Set(visibleEmployees.map((employee) => employee.id));
+    const visibleMemberIds = new Set(visibleEmployees.map((employee) => employee.member_id).filter(Boolean));
+    if (key === "coop_sys_employees") return JSON.stringify(visibleEmployees.map((record) => hasPermission(user, "employees.sensitive.view") ? record : redactIdentifiers(record)));
+    if (key === "coop_sys_members") {
+      const records = user.scope_type === "organization" ? value : value.filter((member) => visibleMemberIds.has(member.id));
+      return JSON.stringify(records.map((record) => hasPermission(user, "members.sensitive.view") ? record : redactIdentifiers(record)));
+    }
+    if (key === "coop_sys_organization_directory") {
+      const branchIds = new Set(parseArray(user.branch_ids)); const clientIds = new Set(parseArray(user.client_ids));
+      if (user.scope_type === "organization") return rawValue;
+      const scopedClients = (value.clients || []).filter((client) => user.scope_type === "assigned_clients" ? clientIds.has(client.id) : branchIds.has(client.branchId));
+      scopedClients.forEach((client) => branchIds.add(client.branchId));
+      return JSON.stringify({ ...value, branches: (value.branches || []).filter((branch) => branchIds.has(branch.id)), clients: scopedClients });
+    }
+    if (key === "coop_sys_payment_ledger") {
+      const payments = (value.payments || []).filter((payment) => visibleEmployeeIds.has(payment.employee_id));
+      const paymentIds = new Set(payments.map((payment) => payment.id)); const batchIds = new Set(payments.map((payment) => payment.batch_id));
+      return JSON.stringify({ ...value, aliases: (value.aliases || []).filter((item) => visibleEmployeeIds.has(item.employee_id)), batches: (value.batches || []).filter((item) => batchIds.has(item.id)), payments, settlements: (value.settlements || []).filter((item) => visibleEmployeeIds.has(item.employee_id)), corrections: (value.corrections || []).filter((item) => paymentIds.has(item.payment_id)), refunds: (value.refunds || []).filter((item) => visibleEmployeeIds.has(item.employee_id)) });
+    }
+  } catch {}
+  return rawValue;
 }
 
 async function runSync() {
@@ -273,21 +404,54 @@ async function api(req, res, url) {
 
   const user = requireUser(req, res); if (!user) return;
   if (req.method === "GET" && url.pathname === "/api/storage") {
-    return json(res, 200, Object.fromEntries(readStorage.all().map((row) => [row.storage_key, row.value])));
+    return json(res, 200, Object.fromEntries(readStorage.all().map((row) => [row.storage_key, filteredStorageValue(user, row.storage_key, row.value)]).filter((entry) => entry[1] !== undefined)));
   }
   if (req.method === "PUT" && url.pathname.startsWith("/api/storage/")) {
     const key = decodeURIComponent(url.pathname.slice("/api/storage/".length));
-    if (!writableRoles[key] || !writableRoles[key].has(user.role)) return json(res, 403, { error: "Your role does not permit this change." });
+    if (!canWriteStorage(user, key)) return json(res, 403, { error: "Your effective access does not permit this change." });
     const input = await body(req);
     if (typeof input.value !== "string") return json(res, 400, { error: "Storage value must be a string." });
     const existing = getStorage.get(key);
     const merged = mergeStorageValue(key, existing && existing.value, input.value);
     saveStorage.run(key, merged, now(), user.id);
     const saved = getStorage.get(key);
-    return json(res, 200, { ok: true, revision: saved.revision, value: saved.value });
+    return json(res, 200, { ok: true, revision: saved.revision, value: filteredStorageValue(user, key, saved.value) });
+  }
+  if (req.method === "GET" && url.pathname === "/api/access/roles") {
+    if (!hasPermission(user, "roles.view") && !hasPermission(user, "users.view")) return json(res, 403, { error: "Your effective access does not permit viewing roles." });
+    return json(res, 200, db.prepare("SELECT * FROM access_roles ORDER BY name").all().map(safeRole));
+  }
+  if (req.method === "POST" && url.pathname === "/api/access/roles") {
+    if (!hasPermission(user, "roles.create")) return json(res, 403, { error: "Your effective access does not permit creating roles." });
+    const input = await body(req); const code = String(input.code || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (!code || !String(input.name || "").trim()) return json(res, 400, { error: "Role name and code are required." });
+    if (user.role !== "super_admin" && (input.permissions || []).some((permission) => !permissionsForUser(user).has(permission))) return json(res, 403, { error: "You cannot grant access that you do not hold." });
+    const timestamp = now(), roleId = id();
+    try { db.prepare("INSERT INTO access_roles(id,code,name,description,permissions,is_active,is_system,created_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?)").run(roleId, code, String(input.name).trim(), String(input.description || "").trim(), JSON.stringify((input.permissions || []).filter((permission) => allPermissions.includes(permission))), input.is_active ? 1 : 0, timestamp, timestamp); }
+    catch (error) { return json(res, 400, { error: String(error.message).includes("UNIQUE") ? "Role code already exists." : error.message }); }
+    return json(res, 201, safeRole(db.prepare("SELECT * FROM access_roles WHERE id=?").get(roleId)));
+  }
+  if (req.method === "PUT" && url.pathname.startsWith("/api/access/roles/")) {
+    if (!hasPermission(user, "roles.update")) return json(res, 403, { error: "Your effective access does not permit updating roles." });
+    const roleId = decodeURIComponent(url.pathname.slice("/api/access/roles/".length)); const input = await body(req);
+    const existing = db.prepare("SELECT * FROM access_roles WHERE id=?").get(roleId);
+    if (!existing) return json(res, 404, { error: "Role was not found." });
+    if (existing.is_system) return json(res, 400, { error: "The Super Admin policy is immutable." });
+    if (user.role !== "super_admin" && (input.permissions || []).some((permission) => !permissionsForUser(user).has(permission))) return json(res, 403, { error: "You cannot grant access that you do not hold." });
+    db.prepare("UPDATE access_roles SET name=?,description=?,permissions=?,is_active=?,updated_at=? WHERE id=?").run(String(input.name || "").trim(), String(input.description || "").trim(), JSON.stringify((input.permissions || []).filter((permission) => allPermissions.includes(permission))), input.is_active ? 1 : 0, now(), roleId);
+    return json(res, 200, safeRole(db.prepare("SELECT * FROM access_roles WHERE id=?").get(roleId)));
+  }
+  if (req.method === "DELETE" && url.pathname.startsWith("/api/access/roles/")) {
+    if (!hasPermission(user, "roles.delete")) return json(res, 403, { error: "Your effective access does not permit deleting roles." });
+    const roleId = decodeURIComponent(url.pathname.slice("/api/access/roles/".length)); const role = db.prepare("SELECT * FROM access_roles WHERE id=?").get(roleId);
+    if (!role) return json(res, 204, {});
+    if (role.is_system) return json(res, 400, { error: "System roles cannot be deleted." });
+    const assigned = db.prepare("SELECT role_ids FROM server_users").all().some((row) => parseArray(row.role_ids).includes(roleId));
+    if (assigned) return json(res, 400, { error: "Reassign users before deleting this role." });
+    db.prepare("DELETE FROM access_roles WHERE id=?").run(roleId); return json(res, 200, { ok: true });
   }
   if (req.method === "GET" && url.pathname === "/api/users") {
-    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can manage users." });
+    if (!hasPermission(user, "users.view")) return json(res, 403, { error: "Your effective access does not permit viewing users." });
     const search = `%${String(url.searchParams.get("search") || "").toLowerCase()}%`;
     const status = url.searchParams.get("status") || "all";
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") || 25)));
@@ -298,25 +462,28 @@ async function api(req, res, url) {
     return json(res, 200, { items: rows.map(safeUser), total });
   }
   if (req.method === "POST" && url.pathname === "/api/users") {
-    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can manage users." });
+    if (!hasPermission(user, "users.create")) return json(res, 403, { error: "Your effective access does not permit creating users." });
     const input = await body(req);
+    const accessError = validateAccessInput(user, input); if (accessError) return json(res, 400, { error: accessError });
     if (!input.temporary_password || String(input.temporary_password).length < 12) return json(res, 400, { error: "A temporary password of at least 12 characters is required." });
     const timestamp = now(), userId = id(), salt = crypto.randomBytes(16).toString("base64");
     try {
-      db.prepare(`INSERT INTO server_users(id,display_name,email,role,branch_ids,is_active,password_salt,password_hash,must_change_password,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,1,?,?)`).run(userId, input.display_name, input.email, input.role, JSON.stringify(input.branch_ids || []), input.is_active ? 1 : 0, salt, passwordHash(input.temporary_password, salt), timestamp, timestamp);
+      db.prepare(`INSERT INTO server_users(id,display_name,email,role,role_ids,branch_ids,client_ids,direct_grants,direct_denies,scope_type,resource_assignments,linked_employee_id,manager_user_id,is_active,password_salt,password_hash,must_change_password,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`).run(userId, input.display_name, input.email, input.role, JSON.stringify(input.role_ids || []), JSON.stringify(input.branch_ids || []), JSON.stringify(input.client_ids || []), JSON.stringify(input.direct_grants || []), JSON.stringify(input.direct_denies || []), input.scope_type || "organization", JSON.stringify(input.resource_assignments || []), input.linked_employee_id || null, input.manager_user_id || null, input.is_active ? 1 : 0, salt, passwordHash(input.temporary_password, salt), timestamp, timestamp);
     } catch (error) { return json(res, 400, { error: String(error.message).includes("UNIQUE") ? "Email address already belongs to a system user." : error.message }); }
     return json(res, 201, safeUser(db.prepare("SELECT * FROM server_users WHERE id=?").get(userId)));
   }
   if (req.method === "PUT" && url.pathname.startsWith("/api/users/")) {
-    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can manage users." });
+    if (!hasPermission(user, "users.update")) return json(res, 403, { error: "Your effective access does not permit updating users." });
     const userId = decodeURIComponent(url.pathname.slice("/api/users/".length)); const input = await body(req);
     const existing = db.prepare("SELECT * FROM server_users WHERE id=?").get(userId);
     if (!existing) return json(res, 404, { error: "System user was not found." });
+    const accessError = validateAccessInput(user, input); if (accessError) return json(res, 400, { error: accessError });
+    if (existing.role === "super_admin" && !(input.role_ids || []).includes("70000000-0000-4000-8000-000000000001")) return json(res, 400, { error: "The built-in Super Admin role cannot be removed." });
     let salt = existing.password_salt, hash = existing.password_hash, mustChange = existing.must_change_password;
     if (input.temporary_password) { if (String(input.temporary_password).length < 12) return json(res, 400, { error: "A temporary password must contain at least 12 characters." }); salt = crypto.randomBytes(16).toString("base64"); hash = passwordHash(input.temporary_password, salt); mustChange = 1; }
-    db.prepare(`UPDATE server_users SET display_name=?,email=?,role=?,branch_ids=?,is_active=?,password_salt=?,password_hash=?,must_change_password=?,updated_at=? WHERE id=?`)
-      .run(input.display_name, input.email, input.role, JSON.stringify(input.branch_ids || []), input.is_active ? 1 : 0, salt, hash, mustChange, now(), userId);
+    db.prepare(`UPDATE server_users SET display_name=?,email=?,role=?,role_ids=?,branch_ids=?,client_ids=?,direct_grants=?,direct_denies=?,scope_type=?,resource_assignments=?,linked_employee_id=?,manager_user_id=?,is_active=?,password_salt=?,password_hash=?,must_change_password=?,updated_at=? WHERE id=?`)
+      .run(input.display_name, input.email, input.role, JSON.stringify(input.role_ids || []), JSON.stringify(input.branch_ids || []), JSON.stringify(input.client_ids || []), JSON.stringify(input.direct_grants || []), JSON.stringify(input.direct_denies || []), input.scope_type || "organization", JSON.stringify(input.resource_assignments || []), input.linked_employee_id || null, input.manager_user_id || null, input.is_active ? 1 : 0, salt, hash, mustChange, now(), userId);
     return json(res, 200, safeUser(db.prepare("SELECT * FROM server_users WHERE id=?").get(userId)));
   }
   if (req.method === "GET" && url.pathname === "/api/sync/status") {

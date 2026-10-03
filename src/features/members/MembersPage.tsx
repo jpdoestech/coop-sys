@@ -27,8 +27,11 @@ export function MembersPage() {
   const deferredSearch = useDeferredValue(search);
   const { branches, clients } = useOrganization();
   const { profile, can } = useAccess();
-  const canManage = can("members.manage");
-  const canCreate = canManage && !isBranchScoped(profile);
+  const canCreate = can("members.create") && !isBranchScoped(profile);
+  const canImport = can("members.import") && !isBranchScoped(profile);
+  const canEdit = can("members.update");
+  const canDelete = can("members.delete");
+  const canApprove = can("members.approve");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [approvalFilter, setApprovalFilter] = useState("");
@@ -39,7 +42,7 @@ export function MembersPage() {
   const [pageSize, setPageSize] = useState(10);
   const activeFilterCount = [statusFilter, branchFilter, clientFilter].filter(Boolean).length;
   const { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
-  const aliasManagement = useAliasManagement("members.manage");
+  const aliasManagement = useAliasManagement("members.update");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
   const pageMembers = query.data?.items ?? [];
   const editingEmployee = (placementEmployees.data ?? []).find((employee) => employee.member_id === editingMember?.id) ?? null;
@@ -73,9 +76,7 @@ export function MembersPage() {
           title="Cooperative members"
           description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
         />
-        {canCreate ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto"><button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> New member
-        </button></div> : null}
+        {canCreate || canImport ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto">{canImport ? <button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button> : null}{canCreate ? <button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={openCreate}><Plus className="h-4 w-4" /> New member</button> : null}</div> : null}
       </div>
 
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
@@ -101,18 +102,18 @@ export function MembersPage() {
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select></div>
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
-          {canManage && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}
+          {canApprove && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}
         </div>
         {query.isError ? (
           <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load member records.</div>
         ) : (
-          <MemberTable members={pageMembers} loading={query.isLoading} canManage={canManage} selectedIds={selectedIds} onToggle={toggleSelection} onTogglePage={(ids, selected) => setSelectedIds((current) => { const next = new Set(current); ids.forEach((id) => selected ? next.add(id) : next.delete(id)); return next; })} onEdit={(member) => { setEditingMember(member); setFormOpen(true); }} onArchive={archive} />
+          <MemberTable members={pageMembers} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} canApprove={canApprove} selectedIds={selectedIds} onToggle={toggleSelection} onTogglePage={(ids, selected) => setSelectedIds((current) => { const next = new Set(current); ids.forEach((id) => selected ? next.add(id) : next.delete(id)); return next; })} onEdit={(member) => { setEditingMember(member); setFormOpen(true); }} onArchive={archive} />
         )}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
 
       {formOpen ? (
-        <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} aliasEditor={canManage ? <AliasEditor employeeId={editingEmployee?.id ?? null} clientId={editingEmployee?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={clients.filter((client) => !isBranchScoped(profile) || profile.branchIds.includes(client.branchId))} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} />
+        <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} canViewSensitive={can("members.sensitive.view")} canEditSensitive={can("members.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editingEmployee?.id ?? null} clientId={editingEmployee?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={clients.filter((client) => !isBranchScoped(profile) || profile.branchIds.includes(client.branchId))} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} />
       ) : null}
       {importOpen ? <PersonImportDialog kind="member" linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows) => importMembers.mutate(rows, { onSuccess: () => setImportOpen(false) })} /> : null}
       {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}

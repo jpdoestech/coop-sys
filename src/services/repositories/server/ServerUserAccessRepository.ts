@@ -1,6 +1,8 @@
 import type { SystemUser, SystemUserInput } from "../../../types/systemUser";
 import { serverRequest } from "../../server/serverApi";
 import type { UserAccessRepository, UserListOptions } from "../UserAccessRepository";
+import type { AccessRoleInput } from "../UserAccessRepository";
+import type { AccessRole } from "../../access/accessControl";
 
 export class ServerUserAccessRepository implements UserAccessRepository {
   async listPage(options: UserListOptions = {}) {
@@ -19,4 +21,9 @@ export class ServerUserAccessRepository implements UserAccessRepository {
   async update(id: string, input: SystemUserInput) {
     return serverRequest<SystemUser>(`/users/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) });
   }
+
+  async listRoles() { return serverRequest<AccessRole[]>("/access/roles"); }
+  async createRole(input: AccessRoleInput) { return serverRequest<AccessRole>("/access/roles", { method: "POST", body: JSON.stringify(input) }); }
+  async updateRole(id: string, input: AccessRoleInput) { return serverRequest<AccessRole>(`/access/roles/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }); }
+  async deleteRole(id: string) { await serverRequest(`/access/roles/${encodeURIComponent(id)}`, { method: "DELETE" }); }
 }

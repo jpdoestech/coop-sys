@@ -24,7 +24,10 @@ export function EmployeesPage() {
   const [importOpen, setImportOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const { can, profile } = useAccess();
-  const canManage = can("employees.manage");
+  const canCreate = can("employees.create");
+  const canImport = can("employees.import");
+  const canEdit = can("employees.update");
+  const canDelete = can("employees.delete");
   const { branches, clients, departments } = useOrganization();
   const scopedBranches = branches.filter((branch) => branchIsInScope(branch.id, profile));
   const scopedBranchIds = new Set(scopedBranches.map((branch) => branch.id));
@@ -38,7 +41,7 @@ export function EmployeesPage() {
   const [pageSize, setPageSize] = useState(10);
   const activeFilterCount = [branchFilter, clientFilter].filter(Boolean).length;
   const { query, members, formerEmployees, personNumber, saveEmployee, archiveEmployee, importEmployees } = useEmployees({ search: deferredSearch, statusId: statusFilter, branchId: branchFilter, clientId: clientFilter, departmentId: departmentFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
-  const aliasManagement = useAliasManagement("employees.manage");
+  const aliasManagement = useAliasManagement("employees.update");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, branchFilter, clientFilter, departmentFilter, sort, pageSize]);
   const pageEmployees = query.data?.items ?? [];
 
@@ -50,7 +53,7 @@ export function EmployeesPage() {
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader eyebrow="Employees" title="Employee records" description="Manage employment, cooperative membership links, client deployments, and beneficiary records." />
-        {canManage ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto"><button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button><button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> New employee</button></div> : null}
+        {canCreate || canImport ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto">{canImport ? <button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button> : null}{canCreate ? <button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> New employee</button> : null}</div> : null}
       </div>
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
         <div className="flex flex-wrap items-center gap-2 p-2">
@@ -66,10 +69,10 @@ export function EmployeesPage() {
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
         </div>
-        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canManage={canManage} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { if (window.confirm(`Archive ${employee.first_name} ${employee.last_name}?`)) archiveEmployee.mutate(employee.id); }} />}
+        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { if (window.confirm(`Archive ${employee.first_name} ${employee.last_name}?`)) archiveEmployee.mutate(employee.id); }} />}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
-      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} aliasEditor={canManage ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
+      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} canViewSensitive={can("employees.sensitive.view")} canEditSensitive={can("employees.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
       {importOpen ? <PersonImportDialog kind="employee" branches={scopedBranches} clients={scopedClients} linkOptions={(members.data ?? []).map((member) => ({ id: member.id, number: member.membership_number, name: `${member.last_name}, ${member.first_name}`, isActive: member.membership_status_id === MEMBER_STATUS.active }))} importing={importEmployees.isPending} importError={importEmployees.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importEmployees.mutate({ rows, branchId: branchId ?? "", clientId: clientId ?? "" }, { onSuccess: () => setImportOpen(false) })} /> : null}
     </>
   );

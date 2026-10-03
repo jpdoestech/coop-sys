@@ -31,6 +31,8 @@ type Props = {
   saving: boolean;
   saveError?: string;
   aliasEditor?: ReactNode;
+  canViewSensitive?: boolean;
+  canEditSensitive?: boolean;
   onCancel: () => void;
   onSubmit: (submission: EmployeeSubmission) => void;
 };
@@ -114,7 +116,7 @@ function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput
   ) as unknown as EmployeeInput;
 }
 
-export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, onCancel, onSubmit }: Props) {
+export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
   const { departments, positions } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
@@ -317,9 +319,9 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
 
           {aliasEditor ? <Section title="Payroll aliases" description="Alternate payroll names are client-specific and can also be maintained during imports.">{aliasEditor}</Section> : null}
 
-          <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
-            <GovernmentIdFields value={governmentIdValue} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
-          </Section>
+          {canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
+            <GovernmentIdFields disabled={!canEditSensitive} value={governmentIdValue} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
+          </Section> : null}
 
           <Section title="Home address" description="Type to search, then choose a valid Philippine region, province, city, and barangay.">
             <AddressFields value={addressValue} disabled={Boolean(linkedMember)} onChange={(value) => setDraft((current) => ({ ...current, ...value }))} />

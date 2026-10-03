@@ -132,37 +132,37 @@ export function PaymentsPage() {
       id: "manual",
       label: "Manual payment",
       icon: Banknote,
-      visible: can("payments.manage"),
+      visible: can("payments.create"),
     },
     {
       id: "import",
       label: "Payroll import",
       icon: FileUp,
-      visible: can("payments.manage"),
+      visible: can("payments.import"),
     },
     {
       id: "aliases",
       label: "Import aliases",
       icon: Tags,
-      visible: can("payments.manage"),
+      visible: can("payments.update") || can("payments.import"),
     },
     {
       id: "refunds",
       label: "Refunds",
       icon: Undo2,
-      visible: can("payments.manage"),
+      visible: can("payments.create"),
     },
     {
       id: "final",
       label: "Final pay",
       icon: RotateCcw,
-      visible: can("payments.manage"),
+      visible: can("payments.create"),
     },
     {
       id: "export",
       label: "Export",
       icon: Download,
-      visible: can("payments.view"),
+      visible: can("payments.export"),
     },
     {
       id: "settings",
@@ -256,7 +256,7 @@ export function PaymentsPage() {
             yearError={Boolean(deferredYear.trim() && !parsedYear)}
             page={page}
             pageSize={pageSize}
-            canEdit={can("payments.manage")}
+            canEdit={can("payments.update")}
             onFiltersChange={setFilters}
             onPageChange={setPage}
             onPageSizeChange={(size) => {

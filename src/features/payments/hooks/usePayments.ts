@@ -87,14 +87,14 @@ export function usePayments(
   });
   const saveAlias = useMutation({
     mutationFn: (input: AliasInput) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, "payments.update");
       return paymentRepository.saveAlias(input);
     },
     onSuccess: refresh,
   });
   const archiveAlias = useMutation({
     mutationFn: (id: string) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, "payments.delete");
       return paymentRepository.archiveAlias(id);
     },
     onSuccess: refresh,
@@ -107,34 +107,34 @@ export function usePayments(
       batch: PaymentBatchInput;
       lines: PaymentLineInput[];
     }) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, batch.method === "payroll_deduction" ? "payments.import" : "payments.create");
       return paymentRepository.postBatch(batch, lines);
     },
     onSuccess: refresh,
   });
   const correctPayment = useMutation({
     mutationFn: (input: PaymentCorrectionInput) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, "payments.update");
       return paymentRepository.correctPayment(input);
     },
     onSuccess: refresh,
   });
   const saveRefund = useMutation({
     mutationFn: (input: RefundInput) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, "payments.create");
       return paymentRepository.saveRefund(input);
     },
     onSuccess: refresh,
   });
   const settle = useMutation({
     mutationFn: (input: SettlementInput) => {
-      assertPermission(profile, "payments.manage");
+      assertPermission(profile, "payments.create");
       return paymentRepository.settleFinalPay(input);
     },
     onSuccess: refresh,
   });
   const loadExportLedger = useCallback(() => {
-    assertPermission(profile, "payments.view");
+    assertPermission(profile, "payments.export");
     return paymentRepository.getLedger({
       employeeIds: (employees.data ?? []).map((employee) => employee.id),
     });

@@ -8,7 +8,9 @@ type MemberTableProps = {
   loading: boolean;
   onEdit: (member: Member) => void;
   onArchive: (member: Member) => void;
-  canManage: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canApprove: boolean;
   selectedIds: Set<string>;
   onToggle: (memberId: string) => void;
   onTogglePage: (memberIds: string[], selected: boolean) => void;
@@ -20,7 +22,7 @@ function displayName(member: Member) {
     .join(", ");
 }
 
-export function MemberTable({ members, loading, onEdit, onArchive, canManage, selectedIds, onToggle, onTogglePage }: MemberTableProps) {
+export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canDelete, canApprove, selectedIds, onToggle, onTogglePage }: MemberTableProps) {
   if (loading) {
     return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60">Loading member records...</div>;
   }
@@ -43,7 +45,7 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage, se
       <table className="w-full min-w-[850px] border-collapse text-left text-sm">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-line bg-[#f8faf8] text-[10px] uppercase text-ink/45">
-            {canManage ? <th className="w-10 px-3 py-2.5"><input type="checkbox" checked={allPendingSelected} disabled={!pendingIds.length} onChange={(event) => onTogglePage(pendingIds, event.target.checked)} aria-label="Select all pending members on this page" className="h-3.5 w-3.5 accent-moss" /></th> : null}
+            {canApprove ? <th className="w-10 px-3 py-2.5"><input type="checkbox" checked={allPendingSelected} disabled={!pendingIds.length} onChange={(event) => onTogglePage(pendingIds, event.target.checked)} aria-label="Select all pending members on this page" className="h-3.5 w-3.5 accent-moss" /></th> : null}
             <th className="px-5 py-2.5 font-semibold">Member</th>
             <th className="px-4 py-2.5 font-semibold">Type</th>
             <th className="px-4 py-2.5 font-semibold">Status</th>
@@ -51,13 +53,13 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage, se
             <th className="px-4 py-2.5 font-semibold">BOD approval</th>
             <th className="px-4 py-2.5 font-semibold">Contact</th>
             <th className="px-4 py-2.5 font-semibold">Joined</th>
-            {canManage ? <th className="w-24 px-4 py-2.5 text-right font-semibold">Actions</th> : null}
+            {canEdit || canDelete ? <th className="w-24 px-4 py-2.5 text-right font-semibold">Actions</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-line bg-white">
           {members.map((member) => (
             <tr key={member.id} className="transition-colors hover:bg-[#f8faf8]">
-              {canManage ? <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(member.id)} disabled={member.bod_approval_status !== "pending"} onChange={() => onToggle(member.id)} aria-label={`Select ${displayName(member)} for approval`} className="h-3.5 w-3.5 accent-moss disabled:opacity-30" /></td> : null}
+              {canApprove ? <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(member.id)} disabled={member.bod_approval_status !== "pending"} onChange={() => onToggle(member.id)} aria-label={`Select ${displayName(member)} for approval`} className="h-3.5 w-3.5 accent-moss disabled:opacity-30" /></td> : null}
               <td className="px-5 py-2.5">
                 <p className="font-semibold text-ink">{displayName(member)}</p>
                 <p className="mt-0.5 font-mono text-[11px] text-ink/45">{member.membership_number}</p>
@@ -78,14 +80,14 @@ export function MemberTable({ members, loading, onEdit, onArchive, canManage, se
                 <p className="mt-0.5 text-xs text-ink/55">{member.email || "No email"}</p>
               </td>
               <td className="px-4 py-2.5 text-ink/70">{member.membership_date || "Not set"}</td>
-              {canManage ? <td className="px-4 py-2.5">
+              {canEdit || canDelete ? <td className="px-4 py-2.5">
                 <div className="flex justify-end gap-1">
-                  <button className="icon-button h-8 w-8" onClick={() => onEdit(member)} title="Edit member" aria-label={`Edit ${displayName(member)}`}>
+                  {canEdit ? <button className="icon-button h-8 w-8" onClick={() => onEdit(member)} title="Edit member" aria-label={`Edit ${displayName(member)}`}>
                     <Pencil className="h-4 w-4" />
-                  </button>
-                  <button className="icon-button h-8 w-8 hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(member)} title="Archive member" aria-label={`Archive ${displayName(member)}`}>
+                  </button> : null}
+                  {canDelete ? <button className="icon-button h-8 w-8 hover:border-red-100 hover:bg-red-50 hover:text-red-700" onClick={() => onArchive(member)} title="Archive member" aria-label={`Archive ${displayName(member)}`}>
                     <Archive className="h-4 w-4" />
-                  </button>
+                  </button> : null}
                 </div>
               </td> : null}
             </tr>

@@ -43,7 +43,7 @@ export function useMembers(options: ListOptions) {
 
   const saveMember = useMutation({
     mutationFn: async ({ member, input }: { member: Member | null; input: MemberInput }) => {
-      assertPermission(profile, "members.manage");
+      assertPermission(profile, member ? "members.update" : "members.create");
       if (!member && isBranchScoped(profile)) throw new Error("Create branch members from the employee workflow so their branch scope is recorded.");
       if (member && isBranchScoped(profile)) {
         const linked = await repositories.employees.listByMemberId(member.id);
@@ -71,7 +71,7 @@ export function useMembers(options: ListOptions) {
 
   const archiveMember = useMutation({
     mutationFn: async (id: string) => {
-      assertPermission(profile, "members.manage");
+      assertPermission(profile, "members.delete");
       if (isBranchScoped(profile)) {
         const linked = await repositories.employees.listByMemberId(id);
         if (!linked.some((employee) => employeeIsInScope(employee, profile))) throw new Error("This member is outside your assigned branches.");
@@ -83,7 +83,7 @@ export function useMembers(options: ListOptions) {
 
   const approveMembers = useMutation({
     mutationFn: async ({ ids, approvalDate }: { ids: string[]; approvalDate: string }) => {
-      assertPermission(profile, "members.manage");
+      assertPermission(profile, "members.approve");
       if (!ids.length) throw new Error("Select at least one pending member.");
       const allMembers = await repositories.members.list({ limit: 10000 });
       const selected = allMembers.filter((member) => ids.includes(member.id));
@@ -112,7 +112,7 @@ export function useMembers(options: ListOptions) {
 
   const importMembers = useMutation({
     mutationFn: async (rows: PersonImportRow[]) => {
-      assertPermission(profile, "members.manage");
+      assertPermission(profile, "members.import");
       if (isBranchScoped(profile)) throw new Error("Branch users must import employees so placement scope is recorded.");
       const [members, employees] = await Promise.all([repositories.members.list({ limit: 10000 }), repositories.employees.list({ limit: 10000 })]);
       const used = new Set([...members.map((item) => item.membership_number), ...employees.map((item) => item.employee_number)]);

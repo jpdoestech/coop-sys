@@ -20,10 +20,15 @@ describe("access control", () => {
   });
 
   it("separates payment posting from admin-only payment settings", () => {
-    expect(hasPermission(profile, "payments.view")).toBe(false);
+    expect(hasPermission(profile, "payments.view")).toBe(true);
     expect(hasPermission({ ...profile, role: "branch_admin" }, "payments.manage")).toBe(true);
     expect(hasPermission({ ...profile, role: "branch_admin" }, "payments.settings.manage")).toBe(false);
     expect(hasPermission({ ...profile, role: "super_admin" }, "payments.settings.manage")).toBe(true);
+  });
+
+  it("applies direct deny after role grants and supports direct grants", () => {
+    expect(hasPermission({ ...profile, effectivePermissions: ["payments.create"], directDenies: ["payments.create"] }, "payments.create")).toBe(false);
+    expect(hasPermission({ ...profile, effectivePermissions: ["payments.create"] }, "payments.create")).toBe(true);
   });
 });
 
