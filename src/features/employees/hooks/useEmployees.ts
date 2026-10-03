@@ -49,8 +49,8 @@ export function useEmployees(options: ListOptions) {
   const personNumber = useQuery({
     queryKey: ["next-person-number"],
     queryFn: async () => nextPersonNumber(
-      await repositories.members.list({ limit: 10000 }),
-      await repositories.employees.list({ limit: 10000 }),
+      await repositories.members.list({ includeDeleted: true, limit: 10000 }),
+      await repositories.employees.list({ includeDeleted: true, limit: 10000 }),
     ),
   });
   const saveEmployee = useMutation({
@@ -109,7 +109,10 @@ export function useEmployees(options: ListOptions) {
     mutationFn: async ({ rows, branchId, clientId }: { rows: PersonImportRow[]; branchId: string; clientId: string }) => {
       assertPermission(profile, "employees.import");
       if (!branchIsInScope(branchId, profile)) throw new Error("The selected branch is outside your assigned scope.");
-      const [memberRecords, employeeRecords] = await Promise.all([repositories.members.list({ limit: 10000 }), repositories.employees.list({ limit: 10000 })]);
+      const [memberRecords, employeeRecords] = await Promise.all([
+        repositories.members.list({ includeDeleted: true, limit: 10000 }),
+        repositories.employees.list({ includeDeleted: true, limit: 10000 }),
+      ]);
       const used = new Set([...memberRecords.map((item) => item.membership_number), ...employeeRecords.map((item) => item.employee_number)]);
       const imported = new Set<string>();
       let sequence = Number(nextPersonNumber(memberRecords, employeeRecords));

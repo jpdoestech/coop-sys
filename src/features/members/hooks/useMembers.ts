@@ -32,8 +32,8 @@ export function useMembers(options: ListOptions) {
   const personNumber = useQuery({
     queryKey: ["next-person-number"],
     queryFn: async () => nextPersonNumber(
-      await repositories.members.list({ limit: 10000 }),
-      await repositories.employees.list({ limit: 10000 }),
+      await repositories.members.list({ includeDeleted: true, limit: 10000 }),
+      await repositories.employees.list({ includeDeleted: true, limit: 10000 }),
     ),
   });
   const approvalSequence = useQuery({
@@ -114,7 +114,10 @@ export function useMembers(options: ListOptions) {
     mutationFn: async (rows: PersonImportRow[]) => {
       assertPermission(profile, "members.import");
       if (isBranchScoped(profile)) throw new Error("Branch users must import employees so placement scope is recorded.");
-      const [members, employees] = await Promise.all([repositories.members.list({ limit: 10000 }), repositories.employees.list({ limit: 10000 })]);
+      const [members, employees] = await Promise.all([
+        repositories.members.list({ includeDeleted: true, limit: 10000 }),
+        repositories.employees.list({ includeDeleted: true, limit: 10000 }),
+      ]);
       const used = new Set([...members.map((item) => item.membership_number), ...employees.map((item) => item.employee_number)]);
       const imported = new Set<string>();
       let sequence = Number(nextPersonNumber(members, employees));
