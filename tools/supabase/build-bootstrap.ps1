@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$migrationDirectory = Join-Path $projectRoot "src\database\supabase\migrations"
+$migrationDirectory = Join-Path $projectRoot "supabase\migrations"
 
 if (-not $OutputPath) {
   $OutputPath = Join-Path $projectRoot "release\supabase\cooperative-records-bootstrap.sql"
@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
 $header = @"
 -- Cooperative Records Supabase bootstrap
--- Generated from src/database/supabase/migrations in filename order.
+-- Generated from supabase/migrations in filename order.
 -- Run once in the Supabase SQL Editor for a new project.
 
 begin;

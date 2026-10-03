@@ -8,9 +8,34 @@ Required environment variables:
 
 ```bash
 VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_APP_MODE=ONLINE
 ```
+
+## Supabase from GitHub
+
+Keep the Supabase integration working directory set to `.`. The root
+`supabase/config.toml` configures the project, and timestamped files in
+`supabase/migrations/` are applied in order. New migrations should always be
+committed instead of making production schema changes directly in the Table or
+SQL Editor.
+
+### Existing manually bootstrapped project
+
+If `cooperative-records-bootstrap.sql` was already run in the SQL Editor, the
+schema exists but Supabase migration history does not contain migrations 1-18.
+Before enabling automatic production deployment, link the CLI and mark those
+versions as applied once:
+
+```powershell
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase migration repair --status applied 20261003000001 20261003000002 20261003000003 20261003000004 20261003000005 20261003000006 20261003000007 20261003000008 20261003000009 20261003000010 20261003000011 20261003000012 20261003000013 20261003000014 20261003000015 20261003000016 20261003000017 20261003000018
+npx supabase db push --dry-run
+```
+
+The dry run should list only `20261003000019_rls_hardening.sql`. The next
+GitHub production deployment can then apply that migration safely.
 
 ## GitHub Pages
 

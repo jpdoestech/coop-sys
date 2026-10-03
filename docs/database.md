@@ -41,7 +41,7 @@ sync_queue 1---* sync_conflicts
 
 ## Migrations
 
-- Supabase PostgreSQL: `src/database/supabase/migrations/0001_initial_schema.sql`
+- Supabase PostgreSQL: `supabase/migrations/20261003000001_initial_schema.sql`
 - SQLite: `src/database/sqlite/migrations/0001_initial_schema.sql`
 - Seed data: `src/database/seeds/dev_seed.sql`
 
