@@ -20,6 +20,8 @@ export type Member = BaseRecord &
     membership_status_id: string | null;
     membership_type_id: string | null;
     member_category: string | null;
+    proposed_branch_id: string | null;
+    proposed_client_id: string | null;
     religion_affiliation_id: string | null;
     sss_number: string | null;
     pagibig_number: string | null;

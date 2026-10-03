@@ -19,6 +19,8 @@ function normalizeMember(member: Member): Member {
     acceptance_resolution_number: resolutionNumber,
     acceptance_date: member.acceptance_date ?? (approvalStatus === "approved" ? member.membership_date : null),
     bod_approval_status: approvalStatus,
+    proposed_branch_id: member.proposed_branch_id ?? null,
+    proposed_client_id: member.proposed_client_id ?? null,
     beneficiaries: member.beneficiaries ?? [],
   };
 }

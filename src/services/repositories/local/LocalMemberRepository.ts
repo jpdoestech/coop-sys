@@ -20,7 +20,11 @@ export class LocalMemberRepository implements MemberRepository {
     if (options.branchId || options.clientId) {
       const assignments = (JSON.parse(readPersistentItem("coop_sys_employees") ?? "[]") as Array<{ member_id?: string | null; active_assignment?: { branch_id?: string | null; client_id?: string | null } | null }>);
       const visible = new Set(assignments.filter((employee) => employee.member_id && (!options.branchId || employee.active_assignment?.branch_id === options.branchId) && (!options.clientId || employee.active_assignment?.client_id === options.clientId)).map((employee) => employee.member_id));
-      members = members.filter((member) => visible.has(member.id));
+      members = members.filter((member) =>
+        ((!options.branchId || member.proposed_branch_id === options.branchId) &&
+          (!options.clientId || member.proposed_client_id === options.clientId)) ||
+        visible.has(member.id),
+      );
     }
     return members.sort((a, b) => options.sort === "name-desc" ? b.last_name.localeCompare(a.last_name) : options.sort === "number-asc" ? a.membership_number.localeCompare(b.membership_number) : options.sort === "joined-desc" ? (b.membership_date ?? "").localeCompare(a.membership_date ?? "") : a.last_name.localeCompare(b.last_name));
   }

@@ -1,7 +1,8 @@
-import { Archive, Pencil, Users } from "lucide-react";
+import { Archive, Building2, Pencil, Users } from "lucide-react";
 import type { Member } from "../../../types/member";
 import { memberStatuses, memberTypes, optionLabel } from "../data/memberOptions";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
+import { useOrganization } from "../../../services/organization/useOrganization";
 
 type MemberTableProps = {
   members: Member[];
@@ -23,6 +24,7 @@ function displayName(member: Member) {
 }
 
 export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canDelete, canApprove, selectedIds, onToggle, onTogglePage }: MemberTableProps) {
+  const { branches, clients } = useOrganization();
   if (loading) {
     return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60">Loading member records...</div>;
   }
@@ -51,6 +53,7 @@ export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canD
             <th className="px-4 py-2.5 font-semibold">Status</th>
             <th className="px-4 py-2.5 font-semibold">Dependents</th>
             <th className="px-4 py-2.5 font-semibold">BOD approval</th>
+            <th className="px-4 py-2.5 font-semibold">Intended placement</th>
             <th className="px-4 py-2.5 font-semibold">Contact</th>
             <th className="px-4 py-2.5 font-semibold">Joined</th>
             {canEdit || canDelete ? <th className="w-24 px-4 py-2.5 text-right font-semibold">Actions</th> : null}
@@ -75,6 +78,7 @@ export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canD
               </td>
               <td className="px-4 py-2.5"><span className="font-semibold">{activeBeneficiaryCount(member.beneficiaries)}</span><span className="text-ink/35"> / 3</span></td>
               <td className="px-4 py-2.5">{member.bod_approval_status === "approved" ? <div><span className="font-medium text-emerald-700">Approved</span><p className="mt-0.5 font-mono text-[10px] text-ink/45">{member.acceptance_resolution_number}</p></div> : <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">Pending</span>}</td>
+              <td className="px-4 py-2.5"><div className="flex items-start gap-2"><Building2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-moss" /><div><p className="font-medium text-ink/80">{branches.find((branch) => branch.id === member.proposed_branch_id)?.label ?? "Not assigned"}</p><p className="mt-0.5 text-[11px] text-ink/45">{clients.find((client) => client.id === member.proposed_client_id)?.label ?? "Direct office / branch"}</p></div></div></td>
               <td className="px-4 py-2.5">
                 <p className="text-ink/80">{member.mobile_number || "No mobile"}</p>
                 <p className="mt-0.5 text-xs text-ink/55">{member.email || "No email"}</p>

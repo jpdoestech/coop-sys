@@ -112,6 +112,8 @@ export function newMemberFromEmployee(
     membership_status_id: MEMBER_STATUS.inactive,
     membership_type_id: ASSOCIATE_MEMBER_TYPE_ID,
     member_category: "Manpower",
+    proposed_branch_id: employee.active_assignment?.branch_id ?? null,
+    proposed_client_id: employee.active_assignment?.client_id ?? null,
     religion_affiliation_id: employee.religion_affiliation_id,
     sss_number: employee.sss_number,
     pagibig_number: employee.pagibig_number,

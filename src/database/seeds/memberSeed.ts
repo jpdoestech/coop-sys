@@ -32,6 +32,8 @@ function member(
     membership_status_id: statusId,
     membership_type_id: typeId,
     member_category: index % 2 === 0 ? "Manpower" : "Community",
+    proposed_branch_id: index % 2 === 0 ? "60000000-0000-4000-8000-000000000001" : "60000000-0000-4000-8000-000000000002",
+    proposed_client_id: index % 2 === 0 ? "61000000-0000-4000-8000-000000000001" : "61000000-0000-4000-8000-000000000002",
     religion_affiliation_id: `35000000-0000-4000-8000-00000000000${(index % 8) + 1}`,
     sss_number: null,
     pagibig_number: null,

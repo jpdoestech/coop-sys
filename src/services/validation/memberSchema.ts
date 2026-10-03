@@ -33,6 +33,8 @@ export const memberInputSchema = z.object({
   membership_status_id: nullableText,
   membership_type_id: nullableText,
   member_category: nullableText,
+  proposed_branch_id: nullableText,
+  proposed_client_id: nullableText,
   religion_affiliation_id: nullableText,
   sss_number: governmentId([9], "SSS number", 11, [/^\d{2}-\d{6}-\d$/]),
   pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),

@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { History, Link2, Save, UserPlus, X } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  FileText,
+  History,
+  Link2,
+  Save,
+  ShieldCheck,
+  UserPlus,
+  UserRound,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
 import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/forms/GovernmentIdFields";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
@@ -22,6 +33,15 @@ import { MemberSearchField } from "./MemberSearchField";
 import { createUuid } from "../../../utils/createUuid";
 
 type MembershipMode = "none" | "existing" | "create";
+type EmployeeTab = "personal" | "employment" | "government" | "beneficiaries" | "additional";
+
+const employeeTabs: Array<{ id: EmployeeTab; label: string; icon: typeof UserRound }> = [
+  { id: "personal", label: "Personal info", icon: UserRound },
+  { id: "employment", label: "Employment", icon: BriefcaseBusiness },
+  { id: "government", label: "Government IDs", icon: ShieldCheck },
+  { id: "beneficiaries", label: "Beneficiaries", icon: UsersRound },
+  { id: "additional", label: "Additional", icon: FileText },
+];
 
 type Props = {
   employee: Employee | null;
@@ -117,12 +137,13 @@ function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput
 }
 
 export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
-  const { departments, positions } = useOrganization();
+  const { branches, departments, positions } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
   const [membershipMode, setMembershipMode] = useState<MembershipMode>(employee?.member_id ? "existing" : "none");
   const [rehireSourceId, setRehireSourceId] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [tab, setTab] = useState<EmployeeTab>("personal");
   const linkedMember = useMemo(
     () => members.find((member) => member.id === draft.member_id) ?? null,
     [members, draft.member_id],
@@ -139,6 +160,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     setMembershipMode(employee?.member_id ? "existing" : "none");
     setRehireSourceId("");
     setTransferring(false);
+    setTab("personal");
     setError("");
   }, [employee, suggestedNumber]);
 
@@ -152,7 +174,23 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
       setValue("member_id", null);
       return;
     }
-    setDraft((current) => ({ ...current, ...employeeProfileFromMember(member) }));
+    const branch = branches.find((item) => item.id === member.proposed_branch_id);
+    setDraft((current) => ({
+      ...current,
+      ...employeeProfileFromMember(member),
+      active_assignment: member.proposed_branch_id ? {
+        id: createUuid(),
+        branch_id: member.proposed_branch_id,
+        client_id: member.proposed_client_id,
+        assignment_code: null,
+        start_date: current.date_hired ?? new Date().toISOString().slice(0, 10),
+        end_date: null,
+        work_location: branch?.label ?? null,
+        transfer_reason: "Initial placement from membership application",
+        notes: null,
+      } : current.active_assignment,
+      work_location: member.proposed_branch_id ? branch?.label ?? null : current.work_location,
+    }));
   }
 
   function changeMembershipMode(mode: MembershipMode) {
@@ -197,10 +235,12 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
   function submit(event: FormEvent) {
     event.preventDefault();
     if (membershipMode === "existing" && !draft.member_id) {
+      setTab("personal");
       setError("Select the existing member ID to link.");
       return;
     }
     if (transferring && !draft.active_assignment?.transfer_reason?.trim()) {
+      setTab("employment");
       setError("Enter a reason for the employee transfer.");
       return;
     }
@@ -210,6 +250,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
       draft.active_assignment &&
       draft.active_assignment.start_date < employee.active_assignment.start_date
     ) {
+      setTab("employment");
       setError("Transfer date cannot be earlier than the current assignment start date.");
       return;
     }
@@ -228,6 +269,18 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
         : draft;
     const result = employeeInputSchema.safeParse(submissionDraft);
     if (!result.success) {
+      const field = String(result.error.issues[0]?.path[0] ?? "");
+      if (["employment_status_id", "employment_type_id", "date_hired", "date_regularized", "date_separated", "position_id", "department_id", "supervisor_id", "work_location", "active_assignment"].includes(field)) {
+        setTab("employment");
+      } else if (["sss_number", "pagibig_number", "philhealth_number", "tax_identification_number"].includes(field)) {
+        setTab("government");
+      } else if (field === "beneficiaries") {
+        setTab("beneficiaries");
+      } else if (field === "notes") {
+        setTab("additional");
+      } else {
+        setTab("personal");
+      }
       setError(result.error.issues[0]?.message ?? "Please review the employee record.");
       return;
     }
@@ -261,9 +314,28 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <div><p className="text-xs font-semibold uppercase text-clay">Employee record</p><h2 id="employee-form-title" className="mt-1 font-display text-2xl font-semibold">{employee ? "Edit employee" : "New employee"}</h2></div>
             <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={onCancel} aria-label="Close employee form"><X className="h-5 w-5" /></button>
           </header>
+          <nav className="sticky top-[85px] z-[9] overflow-x-auto border-b border-line bg-white/95 px-4 backdrop-blur sm:px-8" aria-label="Employee information sections">
+            <div className="flex min-w-max gap-1">
+              {employeeTabs.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`focus-ring inline-flex h-12 items-center gap-2 border-b-2 px-3 text-xs font-semibold transition-colors ${tab === item.id ? "border-moss text-moss" : "border-transparent text-ink/55 hover:text-ink"}`}
+                    onClick={() => setTab(item.id)}
+                    aria-current={tab === item.id ? "page" : undefined}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
           {error || saveError ? <div className="mx-6 mt-5 border-l-4 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-800 sm:mx-8">{error || saveError}</div> : null}
 
-          {!employee && formerEmployees.length ? (
+          {tab === "personal" && !employee && formerEmployees.length ? (
             <Section title="Re-employment" description="Start from a former employee's identity while re-entering employment details for the new engagement.">
               <div className="sm:col-span-2">
                 <Field label="Previous employee record">
@@ -277,7 +349,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             </Section>
           ) : null}
 
-          <Section title="Identity and membership" description="Choose whether to reuse an existing member ID or register a separate new membership.">
+          {tab === "personal" ? <Section title="Identity and membership" description="Choose whether to reuse an existing member ID or register a separate new membership.">
             <fieldset className="sm:col-span-2">
               <legend className="text-xs font-semibold text-ink/75">Membership handling</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -315,19 +387,21 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Field label="Date of birth"><input type="date" disabled={Boolean(linkedMember)} className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} /></Field>
             <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
-          </Section>
+          </Section> : null}
 
-          {aliasEditor ? <Section title="Payroll aliases" description="Alternate payroll names are client-specific and can also be maintained during imports.">{aliasEditor}</Section> : null}
+          {tab === "additional" && aliasEditor ? <Section title="Payroll aliases" description="Alternate payroll names are maintained here and can also be matched during payroll imports.">{aliasEditor}</Section> : null}
 
-          {canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
+          {tab === "government" && canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
             <GovernmentIdFields disabled={!canEditSensitive} value={governmentIdValue} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
           </Section> : null}
 
-          <Section title="Home address" description="Type to search, then choose a valid Philippine region, province, city, and barangay.">
-            <AddressFields value={addressValue} disabled={Boolean(linkedMember)} onChange={(value) => setDraft((current) => ({ ...current, ...value }))} />
-          </Section>
+          {tab === "government" && !canViewSensitive ? <div className="px-6 py-12 text-center text-sm text-ink/55 sm:px-8">You do not have permission to view government identifiers.</div> : null}
 
-          <Section title="Employment" description="Current status and organizational placement.">
+          {tab === "personal" ? <Section title="Home address" description="Type to search, then choose a valid Philippine region, province, city, and barangay.">
+            <AddressFields value={addressValue} disabled={Boolean(linkedMember)} onChange={(value) => setDraft((current) => ({ ...current, ...value }))} />
+          </Section> : null}
+
+          {tab === "employment" ? <Section title="Employment" description="Current status and work details.">
             <Field label="Employment status"><select className={inputClass} value={draft.employment_status_id ?? ""} onChange={(event) => { const status = event.target.value || null; setValue("employment_status_id", status); if (!status || !terminalEmploymentStatuses.has(status)) setValue("date_separated", null); }}>{employmentStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
             <Field label="Employment type"><select className={inputClass} value={draft.employment_type_id ?? ""} onChange={(event) => setValue("employment_type_id", event.target.value || null)}>{employmentTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
             <Field label="Date hired"><input type="date" className={inputClass} value={draft.date_hired ?? ""} onChange={(event) => setValue("date_hired", event.target.value || null)} /></Field>
@@ -335,9 +409,9 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             {employmentEnded ? <Field label="Resignation / termination date"><input type="date" className={inputClass} value={draft.date_separated ?? ""} onChange={(event) => setValue("date_separated", event.target.value || null)} /></Field> : null}
             <Field label="Department"><select className={inputClass} value={draft.department_id ?? ""} onChange={(event) => { setValue("department_id", event.target.value || null); setValue("position_id", null); }}><option value="">Not set</option>{departments.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
             <Field label="Position"><select className={inputClass} value={draft.position_id ?? ""} onChange={(event) => setValue("position_id", event.target.value || null)}><option value="">Not set</option>{availablePositions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
-          </Section>
+          </Section> : null}
 
-          <Section title="Organizational placement" description="Head Office employees are direct; branch clients appear only under their assigned branch. Transfers retain prior placements.">
+          {tab === "employment" ? <Section title="Organizational placement" description="Head Office employees are direct; branch clients appear only under their assigned branch. Transfers retain prior placements.">
             <AssignmentEditor
               value={draft.active_assignment}
               history={employee?.assignment_history ?? []}
@@ -356,13 +430,13 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
                 setValue("active_assignment", employee?.active_assignment ?? null);
               }}
             />
-          </Section>
+          </Section> : null}
 
-          <Section title="Beneficiaries" description="The displayed dependent count is calculated from active beneficiary records.">
+          {tab === "beneficiaries" ? <Section title="Beneficiaries" description="The displayed dependent count is calculated from active beneficiary records.">
             <BeneficiaryEditor value={draft.beneficiaries} onChange={(value) => setValue("beneficiaries", value)} />
-          </Section>
+          </Section> : null}
 
-          <Section title="Notes" description="Optional internal context for authorized staff."><div className="sm:col-span-2"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></div></Section>
+          {tab === "additional" ? <Section title="Notes" description="Optional internal context for authorized staff."><div className="sm:col-span-2"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></div></Section> : null}
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={onCancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : "Save employee"}</button></footer>
         </form>
       </div>
