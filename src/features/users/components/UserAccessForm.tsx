@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Save, ShieldAlert, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Save, ShieldAlert, X } from "lucide-react";
 import { permissionModules, type AccessRole, type Permission } from "../../../services/access/accessControl";
 import { defaultRoleId, normalizeSystemUser } from "../../../services/access/userAccessModel";
 import { branches, clients } from "../../../services/lookups/organization";
@@ -28,12 +28,33 @@ export function UserAccessForm({ user, roles, users, employees, saving, error, o
   const activeRoles = roles.filter((role) => role.is_active || value.role_ids.includes(role.id));
   const applicableClients = value.branch_ids.length ? clients.filter((client) => value.branch_ids.includes(client.branchId)) : clients;
   const managerOptions = useMemo(() => users.filter((item) => item.id !== user?.id).map((item) => ({ id: item.id, label: `${item.display_name} (${item.email})` })), [users, user]);
+  const sections = ["account", "scope", "overrides"] as const;
+  const sectionIndex = sections.indexOf(section);
+  function accountError() {
+    if (!value.display_name.trim()) return "Enter the user's display name.";
+    if (!value.email.trim() || !value.email.includes("@")) return "Enter a valid email address.";
+    if (!value.role_ids.length) return "Assign at least one role.";
+    return "";
+  }
+  function scopeError() {
+    if (value.scope_type === "assigned_branches" && !value.branch_ids.length) return "Assign at least one branch.";
+    if (value.scope_type === "assigned_clients" && !value.client_ids.length) return "Assign at least one client.";
+    if (value.scope_type === "self" && !value.linked_employee_id) return "Link an employee for self-only access.";
+    return "";
+  }
+  function nextSection() {
+    const nextError = section === "account" ? accountError() : scopeError();
+    if (nextError) return setValidationError(nextError);
+    setValidationError("");
+    setSection(sections[Math.min(sectionIndex + 1, sections.length - 1)]);
+  }
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!value.role_ids.length) return setValidationError("Assign at least one role.");
-    if (value.scope_type === "assigned_branches" && !value.branch_ids.length) return setValidationError("Assign at least one branch.");
-    if (value.scope_type === "assigned_clients" && !value.client_ids.length) return setValidationError("Assign at least one client.");
-    if (value.scope_type === "self" && !value.linked_employee_id) return setValidationError("Link an employee for self-only access.");
+    const missingAccount = accountError();
+    if (missingAccount) { setSection("account"); return setValidationError(missingAccount); }
+    const missingScope = scopeError();
+    if (missingScope) { setSection("scope"); return setValidationError(missingScope); }
+    setValidationError("");
     const primary = roles.find((role) => role.id === value.role_ids[0])?.code ?? value.role;
     onSubmit({ ...value, role: primary, email: value.email.trim().toLowerCase(), display_name: value.display_name.trim() });
   }
@@ -42,7 +63,7 @@ export function UserAccessForm({ user, roles, users, employees, saving, error, o
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-3"><form onSubmit={submit} className="flex h-[min(760px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-line bg-white shadow-2xl">
     <header className="flex items-center justify-between border-b border-line px-5 py-3"><div><p className="text-[10px] font-bold uppercase text-moss">Access control</p><h2 className="text-lg font-semibold">{user ? "Edit system user" : "Add system user"}</h2></div><button type="button" onClick={onCancel} className="icon-button" aria-label="Close"><X className="h-4 w-4" /></button></header>
-    <nav className="flex gap-1 border-b border-line px-5 pt-2">{([['account','Account & roles'],['scope','Scope & assignments'],['overrides','Direct overrides']] as const).map(([id,label]) => <button type="button" key={id} onClick={() => setSection(id)} className={`border-b-2 px-3 py-2 text-xs font-semibold ${section === id ? "border-moss text-moss" : "border-transparent text-ink/55 hover:text-ink"}`}>{label}</button>)}</nav>
+    <nav className="flex gap-1 overflow-x-auto border-b border-line px-5 pt-2">{([['account','Account & roles'],['scope','Scope & assignments'],['overrides','Direct overrides']] as const).map(([id,label], index) => <button type="button" key={id} onClick={() => { setValidationError(""); setSection(id); }} aria-current={section === id ? "step" : undefined} className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold ${section === id ? "border-moss text-moss" : "border-transparent text-ink/55 hover:text-ink"}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${section === id ? "bg-moss text-white" : "bg-paper text-ink/55"}`}>{index + 1}</span>{label}</button>)}</nav>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">
       {immutable ? <div className="mb-4 flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><ShieldAlert className="h-4 w-4" /> Super Admin is unrestricted. Its roles and overrides are locked.</div> : null}
       {section === "account" ? <div className="grid gap-4 sm:grid-cols-2">
@@ -63,6 +84,6 @@ export function UserAccessForm({ user, roles, users, employees, saving, error, o
       {section === "overrides" ? <div className="overflow-auto rounded border border-line"><table className="w-full min-w-[780px] text-xs"><thead className="sticky top-0 bg-[#f6f8f6]"><tr><th className="px-3 py-2 text-left">Permission</th><th className="w-28 px-2 py-2">Inherit</th><th className="w-28 px-2 py-2 text-emerald-700">Grant</th><th className="w-28 px-2 py-2 text-red-700">Deny</th></tr></thead><tbody className="divide-y divide-line">{permissionModules.flatMap((module) => module.actions.map((action) => { const mode = value.direct_denies.includes(action.permission) ? "deny" : value.direct_grants.includes(action.permission) ? "grant" : "inherit"; return <tr key={action.permission}><td className="px-3 py-1.5"><strong>{module.label}</strong><span className="ml-2 text-ink/45">{action.label}</span></td>{(["inherit","grant","deny"] as const).map((item) => <td key={item} className="px-2 text-center"><button disabled={immutable} type="button" onClick={() => setOverride(action.permission, item)} className={`mx-auto grid h-6 w-6 place-items-center rounded border ${mode === item ? item === "deny" ? "border-red-600 bg-red-600 text-white" : item === "grant" ? "border-emerald-600 bg-emerald-600 text-white" : "border-ink/40 bg-ink/5 text-ink" : "border-line text-transparent"}`}><Check className="h-3.5 w-3.5" /></button></td>)}</tr>; }))}</tbody></table></div> : null}
       {validationError || error ? <p className="mt-4 text-sm text-red-700">{validationError || error}</p> : null}
     </div>
-    <footer className="flex justify-end gap-2 border-t border-line bg-paper/50 px-5 py-3"><button type="button" onClick={onCancel} className="secondary-button"><X className="h-4 w-4" /> Cancel</button><button disabled={saving || immutable} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : "Save user"}</button></footer>
+    <footer className="flex flex-wrap justify-end gap-2 border-t border-line bg-paper/50 px-5 py-3"><button type="button" onClick={onCancel} className="secondary-button"><X className="h-4 w-4" /> Cancel</button>{sectionIndex > 0 ? <button type="button" onClick={() => { setValidationError(""); setSection(sections[sectionIndex - 1]); }} className="secondary-button"><ArrowLeft className="h-4 w-4" /> Back</button> : null}{section !== "overrides" ? <button type="button" disabled={immutable} onClick={nextSection} className="primary-button">Next <ArrowRight className="h-4 w-4" /></button> : <button disabled={saving || immutable} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : "Save user"}</button>}</footer>
   </form></div>;
 }

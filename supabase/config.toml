@@ -11,5 +11,5 @@ major_version = 17
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+site_url = "https://coop-sys.vercel.app"
+additional_redirect_urls = ["https://coop-sys.vercel.app", "http://127.0.0.1:5173", "http://localhost:5173"]

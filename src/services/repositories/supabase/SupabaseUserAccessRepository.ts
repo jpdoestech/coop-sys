@@ -30,6 +30,21 @@ type UserRow = {
 
 const userSelect = "id,email,display_name,is_active,scope_type,employee_id,manager_user_id,created_at,updated_at,user_roles(role_id,roles(id,code)),user_branch_access(branch_id),user_client_access(client_id),user_permission_overrides(permission,effect),user_resource_assignments(resource_key)";
 
+async function functionErrorMessage(error: unknown) {
+  if (error && typeof error === "object" && "context" in error) {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      try {
+        const payload = await context.clone().json() as { error?: string; message?: string };
+        if (payload.error || payload.message) return payload.error ?? payload.message!;
+      } catch {
+        // Fall through to the SDK message when the response is not JSON.
+      }
+    }
+  }
+  return error instanceof Error ? error.message : "The user invitation could not be completed.";
+}
+
 function toSystemUser(row: UserRow): SystemUser {
   const roleValue = row.user_roles?.[0]?.roles;
   const role =
@@ -90,7 +105,7 @@ export class SupabaseUserAccessRepository implements UserAccessRepository {
     const { data, error } = await supabase.functions.invoke("invite-user", {
       body: input,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await functionErrorMessage(error));
     return data as SystemUser;
   }
 
