@@ -2,7 +2,7 @@
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
-title Cooperative Records - Build Windows EXE
+title Cooperative Records - Build Legacy Offline EXE
 set "TOOLS_DIR=%CD%\tools\windows-server"
 set "OUTPUT_DIR=%CD%\release\windows-lan-server"
 set "ASSET_ZIP=%TOOLS_DIR%\web-assets.zip"
@@ -10,7 +10,7 @@ set "OUTPUT_EXE=%OUTPUT_DIR%\CooperativeRecordsServer.exe"
 
 echo.
 echo ========================================
-echo   Cooperative Records - Windows EXE
+echo   Cooperative Records - Legacy Offline EXE
 echo ========================================
 echo.
 
@@ -39,8 +39,13 @@ if errorlevel 1 goto :failed
 call npm test -- --run
 if errorlevel 1 goto :failed
 
-echo [3/5] Building the production web bundle...
-call npm run build
+echo [3/5] Building the browser-local offline web bundle...
+set "VITE_DATA_BACKEND=LOCAL"
+set "VITE_APP_MODE=OFFLINE"
+set "VITE_SUPABASE_URL=offline://disabled"
+set "VITE_SUPABASE_PUBLISHABLE_KEY=offline"
+set "VITE_SUPABASE_ANON_KEY=offline"
+call npm run build -- --mode offline
 if errorlevel 1 goto :failed
 
 echo [4/5] Embedding the web bundle...
@@ -71,6 +76,8 @@ echo   %OUTPUT_EXE%
 echo.
 echo Run the EXE on the host PC, allow it through Windows Firewall for
 echo Private networks if prompted, then share the displayed LAN address.
+echo NOTE: Records in this legacy build are stored separately per browser.
+echo Use build-database-exe.bat for the supported shared offline/LAN system.
 echo.
 pause
 exit /b 0

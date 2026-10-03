@@ -29,7 +29,10 @@ if errorlevel 1 goto :failed
 echo [2/7] Building the server-connected web application...
 set "VITE_DATA_BACKEND=SERVER"
 set "VITE_APP_MODE=OFFLINE"
-call npm run build
+set "VITE_SUPABASE_URL=offline://disabled"
+set "VITE_SUPABASE_PUBLISHABLE_KEY=offline"
+set "VITE_SUPABASE_ANON_KEY=offline"
+call npm run build -- --mode offline
 if errorlevel 1 goto :failed
 
 echo [3/7] Embedding the web application in the database engine...

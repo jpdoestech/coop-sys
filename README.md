@@ -68,25 +68,25 @@ migration in order, creates profiles for existing Supabase Auth users, and
 assigns the oldest Auth user as the initial Super Admin only when the project
 does not have one yet.
 
-### Windows LAN executable
+### Windows offline/LAN executable
 
-Run `build-exe.bat` to validate the project, build the production bundle, and
-create a standalone Windows server at:
+Run `build-database-exe.bat` to validate the project and create the supported
+shared offline/LAN server at:
 
 ```text
-release\windows-lan-server\CooperativeRecordsServer.exe
+release\windows-database-server\CooperativeRecordsDatabaseServer.exe
 ```
 
 The host PC does not need Node.js after the EXE has been built. Start the EXE,
 allow Private-network access if Windows Firewall prompts, and share the LAN URL
 shown in its control window. Closing or selecting **Hide** keeps the server in
 the notification area; use **Terminate** to stop it. The default port is `8787`
-and can be changed with `CooperativeRecordsServer.exe --port=9000`.
+and can be changed with `CooperativeRecordsDatabaseServer.exe --port=9000`.
 
-The EXE shares the application over the LAN. To share the same records between
-devices, configure `.env.local` with Supabase credentials and
-`VITE_APP_MODE=ONLINE` before building. An OFFLINE build stores data separately
-inside each user's browser.
+The EXE stores shared records in SQLite WAL on the host PC. `build-exe.bat` is a
+legacy browser-local offline build and should not be used when devices need to
+share one database. The primary cloud system is the Vercel deployment backed by
+Supabase.
 
 ## Verification
 

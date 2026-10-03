@@ -30,6 +30,16 @@ Conflicts are detected and logged
 Local database marks synchronized records as synced
 ```
 
+## Current Transport Boundary
+
+Synchronization is available only in the SQLite database-server build and is
+restricted by `sync.view` and `sync.manage`. Its current remote endpoint is
+another Cooperative Records database server at `/api/replication/exchange`.
+It does not currently write to Supabase's normalized member, employee, payment,
+and access-control tables. A Supabase synchronization bridge must map each data
+group to those tables before the offline server can safely synchronize with the
+Vercel deployment.
+
 ## Initial Conflict Rule
 
 The first implementation uses last-modified wins:
