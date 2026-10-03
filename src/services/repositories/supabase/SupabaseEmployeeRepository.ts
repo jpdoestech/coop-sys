@@ -132,10 +132,22 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
   }
 
   async create(input: EmployeeInput) {
-    const { data, error } = await client().from("employees").insert({ ...employeeFields(input), sync_status: "synced" }).select("*").single();
-    if (error) throw error;
-    await saveRelations(data.id as string, input);
-    return (await this.getById(data.id as string))!;
+    const db = client();
+    const { data, error } = await db.from("employees").insert({ ...employeeFields(input), sync_status: "synced" }).select("*").single();
+    let employeeId = data?.id as string | undefined;
+    if (error) {
+      if (error.code !== "23505" || !input.active_assignment) throw error;
+      const recovery = await db.rpc("recover_unassigned_employee", {
+        p_employee_number: input.employee_number,
+        p_member_id: input.member_id,
+        p_assignment: input.active_assignment,
+      });
+      if (recovery.error) throw recovery.error;
+      employeeId = recovery.data as string;
+    }
+    if (!employeeId) throw new Error("The employee record could not be created.");
+    await saveRelations(employeeId, input);
+    return (await this.getById(employeeId))!;
   }
 
   async update(id: string, input: Partial<EmployeeInput>) {
