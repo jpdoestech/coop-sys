@@ -83,12 +83,27 @@ db.exec(`
     status TEXT NOT NULL,
     direction TEXT NOT NULL,
     records_processed INTEGER NOT NULL DEFAULT 0,
+    records_sent INTEGER NOT NULL DEFAULT 0,
+    records_received INTEGER NOT NULL DEFAULT 0,
+    conflicts_detected INTEGER NOT NULL DEFAULT 0,
     message TEXT,
     started_at TEXT NOT NULL,
     completed_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS server_sync_conflicts (
+    id TEXT PRIMARY KEY,
+    sync_log_id TEXT,
+    storage_key TEXT NOT NULL,
+    record_key TEXT NOT NULL,
+    current_updated_at TEXT,
+    incoming_updated_at TEXT,
+    resolution TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
   CREATE INDEX IF NOT EXISTS server_users_email_idx ON server_users(email);
   CREATE INDEX IF NOT EXISTS server_sessions_expiry_idx ON server_sessions(expires_at);
+  CREATE INDEX IF NOT EXISTS server_sync_log_started_idx ON server_sync_log(started_at DESC);
+  CREATE INDEX IF NOT EXISTS server_sync_conflicts_created_idx ON server_sync_conflicts(created_at DESC);
 `);
 
 function ensureColumn(table, name, definition) {
@@ -103,6 +118,9 @@ ensureColumn("server_users", "scope_type", "TEXT NOT NULL DEFAULT 'organization'
 ensureColumn("server_users", "resource_assignments", "TEXT NOT NULL DEFAULT '[]'");
 ensureColumn("server_users", "linked_employee_id", "TEXT");
 ensureColumn("server_users", "manager_user_id", "TEXT");
+ensureColumn("server_sync_log", "records_sent", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("server_sync_log", "records_received", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("server_sync_log", "conflicts_detected", "INTEGER NOT NULL DEFAULT 0");
 db.prepare("UPDATE server_users SET scope_type='assigned_branches' WHERE role IN ('branch_admin','branch_user') AND branch_ids <> '[]' AND scope_type='organization'").run();
 
 const permissionModules = {
@@ -159,31 +177,81 @@ const saveStorage = db.prepare(`INSERT INTO app_storage(storage_key,value,revisi
   VALUES(?,?,1,?,?) ON CONFLICT(storage_key) DO UPDATE SET value=excluded.value,
   revision=app_storage.revision+1, modified_at=excluded.modified_at, modified_by=excluded.modified_by`);
 
-function mergeById(current, incoming) {
+function comparable(value) {
+  return JSON.stringify(value, (key, item) => key === "sync_status" ? undefined : item);
+}
+function recordTimestamp(record, fallback) {
+  return String(record && (record.updated_at || record.updatedAt || record.created_at || record.createdAt) || fallback || "");
+}
+function mergeById(current, incoming, context) {
   const records = new Map((Array.isArray(current) ? current : []).map((item) => [item.id, item]));
   for (const item of Array.isArray(incoming) ? incoming : []) {
     const existing = records.get(item.id);
-    if (!existing || !existing.updated_at || !item.updated_at || item.updated_at >= existing.updated_at) records.set(item.id, item);
+    if (!existing) { records.set(item.id, item); continue; }
+    if (comparable(existing) === comparable(item)) {
+      records.set(item.id, { ...existing, ...item, sync_status: existing.sync_status || item.sync_status });
+      continue;
+    }
+    const currentUpdatedAt = recordTimestamp(existing, context.currentModifiedAt);
+    const incomingUpdatedAt = recordTimestamp(item, context.incomingModifiedAt);
+    const incomingWins = incomingUpdatedAt > currentUpdatedAt || (incomingUpdatedAt === currentUpdatedAt && comparable(item) > comparable(existing));
+    records.set(item.id, incomingWins ? item : existing);
+    context.conflicts.push({ recordKey: `${context.collection}:${item.id}`, currentUpdatedAt, incomingUpdatedAt, resolution: incomingWins ? "incoming_wins" : "current_wins" });
   }
   return Array.from(records.values());
 }
-function mergeStorageValue(key, currentValue, incomingValue) {
-  if (!currentValue) return incomingValue;
+function mergeStorageValueDetailed(key, currentValue, incomingValue, currentModifiedAt = "", incomingModifiedAt = "") {
+  if (!currentValue) return { value: incomingValue, conflicts: [] };
+  const conflicts = [];
+  const merge = (current, incoming, collection) => mergeById(current, incoming, { collection, conflicts, currentModifiedAt, incomingModifiedAt });
   try {
     const current = JSON.parse(currentValue), incoming = JSON.parse(incomingValue);
-    if (key === "coop_sys_members" || key === "coop_sys_employees") return JSON.stringify(mergeById(current, incoming));
-    if (key === "coop_sys_organization_directory") return JSON.stringify({
-      branches: mergeById(current.branches, incoming.branches), clients: mergeById(current.clients, incoming.clients),
-      departments: mergeById(current.departments, incoming.departments), positions: mergeById(current.positions, incoming.positions),
-    });
-    if (key === "coop_sys_payment_ledger") return JSON.stringify({
-      settings: mergeById(current.settings, incoming.settings), aliases: mergeById(current.aliases, incoming.aliases),
-      batches: mergeById(current.batches, incoming.batches), payments: mergeById(current.payments, incoming.payments),
-      settlements: mergeById(current.settlements, incoming.settlements), corrections: mergeById(current.corrections, incoming.corrections),
-      refunds: mergeById(current.refunds, incoming.refunds), paymentTotal: incoming.paymentTotal || 0, refundTotal: incoming.refundTotal || 0,
-    });
+    if (key === "coop_sys_members" || key === "coop_sys_employees") return { value: JSON.stringify(merge(current, incoming, key)), conflicts };
+    if (key === "coop_sys_organization_directory") return { value: JSON.stringify({
+      branches: merge(current.branches, incoming.branches, "branches"), clients: merge(current.clients, incoming.clients, "clients"),
+      departments: merge(current.departments, incoming.departments, "departments"), positions: merge(current.positions, incoming.positions, "positions"),
+    }), conflicts };
+    if (key === "coop_sys_payment_ledger") {
+      const merged = {
+        settings: merge(current.settings, incoming.settings, "settings"), aliases: merge(current.aliases, incoming.aliases, "aliases"),
+        batches: merge(current.batches, incoming.batches, "batches"), payments: merge(current.payments, incoming.payments, "payments"),
+        settlements: merge(current.settlements, incoming.settlements, "settlements"), corrections: merge(current.corrections, incoming.corrections, "corrections"),
+        refunds: merge(current.refunds, incoming.refunds, "refunds"), paymentTotal: 0, refundTotal: 0,
+      };
+      merged.paymentTotal = merged.payments.length; merged.refundTotal = merged.refunds.length;
+      return { value: JSON.stringify(merged), conflicts };
+    }
   } catch {}
-  return incomingValue;
+  const incomingWins = incomingModifiedAt >= currentModifiedAt;
+  if (currentValue !== incomingValue) conflicts.push({ recordKey: key, currentUpdatedAt: currentModifiedAt, incomingUpdatedAt: incomingModifiedAt, resolution: incomingWins ? "incoming_wins" : "current_wins" });
+  return { value: incomingWins ? incomingValue : currentValue, conflicts };
+}
+function mergeStorageValue(key, currentValue, incomingValue) { return mergeStorageValueDetailed(key, currentValue, incomingValue).value; }
+function markStorageSynced(rawValue) {
+  try {
+    const visit = (value) => Array.isArray(value) ? value.map(visit) : value && typeof value === "object"
+      ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === "sync_status" ? "synced" : visit(item)])) : value;
+    return JSON.stringify(visit(JSON.parse(rawValue)));
+  } catch { return rawValue; }
+}
+function countSyncStates() {
+  const counts = { pending: 0, conflicts: 0, synced: 0 };
+  const visit = (value) => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== "object") return;
+    if (typeof value.sync_status === "string") {
+      if (value.sync_status === "conflict") counts.conflicts += 1;
+      else if (value.sync_status.startsWith("pending_")) counts.pending += 1;
+      else if (value.sync_status === "synced") counts.synced += 1;
+    }
+    Object.values(value).forEach(visit);
+  };
+  for (const row of readStorage.all()) { try { visit(JSON.parse(row.value)); } catch {} }
+  return counts;
+}
+function persistConflicts(syncLogId, storageKey, conflicts) {
+  const insert = db.prepare("INSERT INTO server_sync_conflicts(id,sync_log_id,storage_key,record_key,current_updated_at,incoming_updated_at,resolution,created_at) VALUES(?,?,?,?,?,?,?,?)");
+  for (const conflict of conflicts) insert.run(id(), syncLogId || null, storageKey, conflict.recordKey, conflict.currentUpdatedAt || null, conflict.incomingUpdatedAt || null, conflict.resolution, now());
 }
 
 const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments" };
@@ -306,7 +374,10 @@ function filteredStorageValue(user, key, rawValue) {
   return rawValue;
 }
 
+let syncing = false;
 async function runSync() {
+  if (syncing) throw new Error("Synchronization is already running.");
+  syncing = true;
   const config = readConfig();
   const startedAt = now();
   const logId = id();
@@ -314,6 +385,7 @@ async function runSync() {
   if (config.deploymentMode !== "HYBRID" || !config.remoteUrl) {
     const message = "Hybrid mode is not configured. Update data/server-config.json on the host.";
     db.prepare("UPDATE server_sync_log SET status='failed',message=?,completed_at=? WHERE id=?").run(message, now(), logId);
+    syncing = false;
     throw new Error(message);
   }
   try {
@@ -325,27 +397,32 @@ async function runSync() {
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || `Remote server returned ${response.status}.`);
-    let processed = 0;
+    let received = 0; const conflicts = [];
     db.exec("BEGIN IMMEDIATE");
     try {
       for (const record of payload.records || []) {
         const localRecord = getStorage.get(record.storage_key);
-        if (!localRecord || record.modified_at > localRecord.modified_at) {
+        const merged = mergeStorageValueDetailed(record.storage_key, localRecord && localRecord.value, record.value, localRecord && localRecord.modified_at, record.modified_at);
+        const synchronizedValue = markStorageSynced(merged.value);
+        conflicts.push(...merged.conflicts.map((conflict) => ({ ...conflict, storageKey: record.storage_key })));
+        if (!localRecord || synchronizedValue !== localRecord.value || record.modified_at > localRecord.modified_at) {
           db.prepare(`INSERT INTO app_storage(storage_key,value,revision,modified_at,modified_by) VALUES(?,?,?,?,?)
             ON CONFLICT(storage_key) DO UPDATE SET value=excluded.value,revision=excluded.revision,modified_at=excluded.modified_at,modified_by='sync'`)
-            .run(record.storage_key, record.value, record.revision || 1, record.modified_at, "sync");
-          processed += 1;
+            .run(record.storage_key, synchronizedValue, Math.max(Number(record.revision || 1), Number(localRecord && localRecord.revision || 0)), [record.modified_at, localRecord && localRecord.modified_at].filter(Boolean).sort().pop() || now(), "sync");
+          received += 1;
         }
       }
+      for (const item of conflicts) persistConflicts(logId, item.storageKey, [item]);
       db.exec("COMMIT");
     } catch (error) { db.exec("ROLLBACK"); throw error; }
-    db.prepare("UPDATE server_sync_log SET status='completed',records_processed=?,message=?,completed_at=? WHERE id=?")
-      .run(processed, "Synchronization completed.", now(), logId);
-    return { status: "completed", recordsProcessed: processed, completedAt: now() };
+    const completedAt = now();
+    db.prepare("UPDATE server_sync_log SET status='completed',records_processed=?,records_sent=?,records_received=?,conflicts_detected=?,message=?,completed_at=? WHERE id=?")
+      .run(local.length + received, local.length, received, conflicts.length, "Synchronization completed.", completedAt, logId);
+    return { status: "completed", recordsProcessed: local.length + received, recordsSent: local.length, recordsReceived: received, conflictsDetected: conflicts.length, completedAt };
   } catch (error) {
     db.prepare("UPDATE server_sync_log SET status='failed',message=?,completed_at=? WHERE id=?").run(error.message, now(), logId);
     throw error;
-  }
+  } finally { syncing = false; }
 }
 
 async function api(req, res, url) {
@@ -391,11 +468,14 @@ async function api(req, res, url) {
     try {
       for (const record of input.records || []) {
         const existing = getStorage.get(record.storage_key);
-        if (!existing || record.modified_at > existing.modified_at) {
+        const merged = mergeStorageValueDetailed(record.storage_key, existing && existing.value, record.value, existing && existing.modified_at, record.modified_at);
+        const synchronizedValue = markStorageSynced(merged.value);
+        if (!existing || synchronizedValue !== existing.value || record.modified_at > existing.modified_at) {
           db.prepare(`INSERT INTO app_storage(storage_key,value,revision,modified_at,modified_by) VALUES(?,?,?,?,?)
             ON CONFLICT(storage_key) DO UPDATE SET value=excluded.value,revision=excluded.revision,modified_at=excluded.modified_at,modified_by='sync'`)
-            .run(record.storage_key, record.value, record.revision || 1, record.modified_at, "sync");
+            .run(record.storage_key, synchronizedValue, Math.max(Number(record.revision || 1), Number(existing && existing.revision || 0)), [record.modified_at, existing && existing.modified_at].filter(Boolean).sort().pop() || now(), "sync");
         }
+        persistConflicts(null, record.storage_key, merged.conflicts);
       }
       db.exec("COMMIT");
     } catch (error) { db.exec("ROLLBACK"); throw error; }
@@ -412,8 +492,9 @@ async function api(req, res, url) {
     const input = await body(req);
     if (typeof input.value !== "string") return json(res, 400, { error: "Storage value must be a string." });
     const existing = getStorage.get(key);
-    const merged = mergeStorageValue(key, existing && existing.value, input.value);
-    saveStorage.run(key, merged, now(), user.id);
+    const timestamp = now();
+    const merged = mergeStorageValueDetailed(key, existing && existing.value, input.value, existing && existing.modified_at, timestamp).value;
+    saveStorage.run(key, merged, timestamp, user.id);
     const saved = getStorage.get(key);
     return json(res, 200, { ok: true, revision: saved.revision, value: filteredStorageValue(user, key, saved.value) });
   }
@@ -487,11 +568,14 @@ async function api(req, res, url) {
     return json(res, 200, safeUser(db.prepare("SELECT * FROM server_users WHERE id=?").get(userId)));
   }
   if (req.method === "GET" && url.pathname === "/api/sync/status") {
-    const config = readConfig(); const latest = db.prepare("SELECT * FROM server_sync_log ORDER BY started_at DESC LIMIT 1").get() || null;
-    return json(res, 200, { deploymentMode: config.deploymentMode, autoSync: Boolean(config.autoSync), syncIntervalMinutes: config.syncIntervalMinutes, remoteUrl: config.remoteUrl, replicationKey: config.replicationKey, configured: Boolean(config.remoteUrl), latest });
+    if (!hasPermission(user, "sync.view")) return json(res, 403, { error: "Your effective access does not permit viewing synchronization." });
+    const config = readConfig(); const history = db.prepare("SELECT * FROM server_sync_log ORDER BY started_at DESC LIMIT 20").all();
+    const recentConflicts = db.prepare("SELECT * FROM server_sync_conflicts ORDER BY created_at DESC LIMIT 20").all();
+    const storageGroups = readStorage.all().map((row) => ({ storageKey: row.storage_key, revision: row.revision, modifiedAt: row.modified_at }));
+    return json(res, 200, { deploymentMode: config.deploymentMode, autoSync: Boolean(config.autoSync), syncIntervalMinutes: config.syncIntervalMinutes, remoteUrl: config.remoteUrl, replicationKey: config.replicationKey, configured: Boolean(config.remoteUrl), running: syncing, counts: countSyncStates(), storageGroups, latest: history[0] || null, history, recentConflicts });
   }
   if (req.method === "PUT" && url.pathname === "/api/sync/config") {
-    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can configure synchronization." });
+    if (!hasPermission(user, "sync.manage")) return json(res, 403, { error: "Your effective access does not permit managing synchronization." });
     const input = await body(req); const existing = readConfig();
     const deploymentMode = input.deploymentMode === "HYBRID" ? "HYBRID" : "LAN_ONLY";
     const syncIntervalMinutes = Math.min(1440, Math.max(1, Number(input.syncIntervalMinutes || 5)));
@@ -499,11 +583,27 @@ async function api(req, res, url) {
     if (deploymentMode === "HYBRID" && remoteUrl && !/^https?:\/\//i.test(remoteUrl)) return json(res, 400, { error: "Remote server URL must start with http:// or https://." });
     const next = { ...existing, deploymentMode, autoSync: deploymentMode === "HYBRID" && Boolean(input.autoSync), syncIntervalMinutes, remoteUrl, replicationKey: String(input.replicationKey || existing.replicationKey) };
     fs.writeFileSync(configPath, JSON.stringify(next, null, 2));
-    return json(res, 200, { deploymentMode: next.deploymentMode, autoSync: next.autoSync, syncIntervalMinutes: next.syncIntervalMinutes, remoteUrl: next.remoteUrl, replicationKey: next.replicationKey, configured: Boolean(next.remoteUrl) });
+    const history = db.prepare("SELECT * FROM server_sync_log ORDER BY started_at DESC LIMIT 20").all();
+    return json(res, 200, { deploymentMode: next.deploymentMode, autoSync: next.autoSync, syncIntervalMinutes: next.syncIntervalMinutes, remoteUrl: next.remoteUrl, replicationKey: next.replicationKey, configured: Boolean(next.remoteUrl), running: syncing, counts: countSyncStates(), storageGroups: readStorage.all().map((row) => ({ storageKey: row.storage_key, revision: row.revision, modifiedAt: row.modified_at })), latest: history[0] || null, history, recentConflicts: db.prepare("SELECT * FROM server_sync_conflicts ORDER BY created_at DESC LIMIT 20").all() });
   }
   if (req.method === "POST" && url.pathname === "/api/sync/run") {
-    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can synchronize the server." });
+    if (!hasPermission(user, "sync.manage")) return json(res, 403, { error: "Your effective access does not permit running synchronization." });
     try { return json(res, 200, await runSync()); } catch (error) { return json(res, 400, { error: error.message }); }
+  }
+  if (req.method === "POST" && url.pathname === "/api/sync/test") {
+    if (!hasPermission(user, "sync.manage")) return json(res, 403, { error: "Your effective access does not permit testing synchronization." });
+    const input = await body(req); const config = readConfig();
+    const remoteUrl = String(input.remoteUrl || config.remoteUrl || "").trim().replace(/\/$/, "");
+    const replicationKey = String(input.replicationKey || config.replicationKey || "");
+    if (!remoteUrl) return json(res, 400, { error: "Enter a remote server URL first." });
+    if (!/^https?:\/\//i.test(remoteUrl)) return json(res, 400, { error: "Remote server URL must start with http:// or https://." });
+    try {
+      const healthResponse = await fetch(`${remoteUrl}/api/health`, { signal: AbortSignal.timeout(10000) });
+      const health = await healthResponse.json(); if (!healthResponse.ok) throw new Error(health.error || `Remote server returned ${healthResponse.status}.`);
+      const authResponse = await fetch(`${remoteUrl}/api/replication/exchange`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${replicationKey}` }, body: JSON.stringify({ records: [] }), signal: AbortSignal.timeout(10000) });
+      const authResult = await authResponse.json(); if (!authResponse.ok) throw new Error(authResult.error || `Replication authentication returned ${authResponse.status}.`);
+      return json(res, 200, { ok: true, database: health.database || "Remote database", deploymentMode: health.deploymentMode || "Unknown" });
+    } catch (error) { return json(res, 400, { error: `Remote host could not be reached: ${error.message}` }); }
   }
   return json(res, 404, { error: "API endpoint was not found." });
 }
@@ -549,13 +649,12 @@ server.listen(port, "0.0.0.0", () => {
   console.log(`READY|${port}|${databasePath}|http://${address}:${port}/`);
 });
 
-let syncing = false;
 let lastAutomaticSync = 0;
 setInterval(async () => {
   const config = readConfig();
   const interval = Math.max(1, Number(config.syncIntervalMinutes || 5)) * 60_000;
   if (!config.autoSync || config.deploymentMode !== "HYBRID" || syncing || Date.now() - lastAutomaticSync < interval) return;
-  syncing = true; lastAutomaticSync = Date.now(); try { await runSync(); } catch {} finally { syncing = false; }
+  lastAutomaticSync = Date.now(); try { await runSync(); } catch {}
 }, 60_000);
 
 function shutdown() { try { server.close(); } finally { db.close(); process.exit(0); } }

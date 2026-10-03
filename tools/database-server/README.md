@@ -44,6 +44,28 @@ For a filesystem backup, terminate the server first and copy the complete
 
 Open **Synchronization** as Super Admin, select **Hybrid**, and enter the URL
 and matching replication key for another deployed Cooperative Records database
-server. Manual and interval-based synchronization use last-modified conflict
-resolution per stored record group. Use HTTPS when the remote server is exposed
-outside a trusted private network.
+server. The same key must be saved on both hosts. Use **Test connection** before
+the first synchronization; it verifies the remote health endpoint and the
+replication key without changing local records.
+
+Manual and interval-based synchronization cover the current business data
+groups:
+
+- members and beneficiaries
+- employees, assignments, and transfers
+- branches, clients, departments, and positions
+- payment settings, aliases, batches, transactions, corrections, refunds, and final pay
+
+Records are merged by ID. When both hosts changed the same record, the newer
+record timestamp wins and the decision is written to the conflict log. A
+successful exchange marks synchronized records as `synced`; a failed exchange
+keeps all local pending data unchanged. The Sync center shows pending records,
+recent runs, transferred groups, and conflict decisions.
+
+User passwords, active login sessions, and host-specific user accounts are not
+replicated. Configure users and roles independently on each host. Access to the
+Sync center follows the configurable `sync.view` and `sync.manage` permissions.
+
+Use HTTPS whenever the remote host is reachable outside a trusted private
+network. Do not expose the replication key in screenshots, email, or support
+logs.
