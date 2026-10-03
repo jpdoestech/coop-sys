@@ -49,11 +49,24 @@ Copy `.env.example` to `.env.local` and fill Supabase values when testing online
 
 ```bash
 VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_APP_MODE=AUTO
 ```
 
 `VITE_APP_MODE` supports `ONLINE`, `OFFLINE`, and `AUTO`.
+
+For a new Supabase project, generate the one-run SQL bootstrap and execute the
+result in the project's SQL Editor before the first cloud sign-in:
+
+```powershell
+.\tools\supabase\build-bootstrap.ps1
+```
+
+The generated file is
+`release\supabase\cooperative-records-bootstrap.sql`. It applies every
+migration in order, creates profiles for existing Supabase Auth users, and
+assigns the oldest Auth user as the initial Super Admin only when the project
+does not have one yet.
 
 ### Windows LAN executable
 

@@ -4,7 +4,16 @@
 
 Online mode uses Supabase Auth. The application restores the browser session, loads the matching `public.users` profile, role, and branch assignments, and signs inactive users out. Password recovery uses Supabase email links. New users are invited by the `invite-user` Edge Function so the service-role key never reaches the browser.
 
-Deploy `src/database/supabase/migrations/0007_authentication_profiles.sql`, then deploy `supabase/functions/invite-user`. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the function environment.
+For a new project, run `tools/supabase/build-bootstrap.ps1`, then execute
+`release/supabase/cooperative-records-bootstrap.sql` once in the Supabase SQL
+Editor. The bundle applies all migrations in order, creates profiles for
+existing Auth users, and assigns the oldest Auth user as the initial Super
+Admin only if no Super Admin is assigned. Deploy `supabase/functions/invite-user`
+afterward. Supabase supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE_KEY` to the function environment.
+
+The browser uses `VITE_SUPABASE_PUBLISHABLE_KEY`. The legacy
+`VITE_SUPABASE_ANON_KEY` variable remains supported for older projects.
 
 ## Offline mode
 

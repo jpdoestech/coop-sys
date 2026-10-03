@@ -22,6 +22,12 @@ async function loadSession(): Promise<AuthSession | null> {
   const authUser = authData.session?.user;
   if (!authUser) return null;
   const { data, error } = await supabase.from("users").select("id,email,display_name,is_active,scope_type,employee_id,manager_user_id,user_roles(role_id,roles(code,name,permissions,is_active)),user_branch_access(branch_id),user_client_access(client_id),user_permission_overrides(permission,effect)").eq("id", authUser.id).single();
+  if (error?.code === "PGRST205") {
+    throw new Error("The Supabase database is not initialized. Run the project migrations, then sign in again.");
+  }
+  if (error?.code === "PGRST116") {
+    throw new Error("Your Supabase Auth user has no application profile. Run the authentication profile migration, then sign in again.");
+  }
   if (error) throw new Error("Your account profile could not be loaded.");
   const row = data as unknown as ProfileRow;
   if (!row.is_active) {
