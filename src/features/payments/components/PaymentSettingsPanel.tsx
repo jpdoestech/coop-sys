@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarClock, Save } from "lucide-react";
 import type { PaymentSettings } from "../../../types/payment";
-import { formatPesos, pesosToCentavos } from "../../../services/payments/paymentMath";
+import {
+  effectiveSettings,
+  formatPesos,
+  pesosToCentavos,
+} from "../../../services/payments/paymentMath";
 import type { PaymentSettingsInput } from "../../../services/repositories/PaymentRepository";
 
 export function PaymentSettingsPanel({ settings, saving, onSave }: { settings: PaymentSettings[]; saving: boolean; onSave: (input: PaymentSettingsInput) => void }) {
@@ -9,6 +13,15 @@ export function PaymentSettingsPanel({ settings, saving, onSave }: { settings: P
   const [capital, setCapital] = useState("5000");
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
+  useEffect(() => {
+    const current = effectiveSettings(
+      settings,
+      new Date().toISOString().slice(0, 10),
+    );
+    if (!current) return;
+    setFee(String(current.membership_fee_centavos / 100));
+    setCapital(String(current.capital_share_target_centavos / 100));
+  }, [settings]);
   function submit(event: React.FormEvent) { event.preventDefault(); try { setError(""); onSave({ membership_fee_centavos: pesosToCentavos(fee), capital_share_target_centavos: pesosToCentavos(capital), effective_from: effectiveFrom }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Invalid settings."); } }
   return <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)]">
     <form onSubmit={submit} className="grid content-start gap-3 sm:grid-cols-2">

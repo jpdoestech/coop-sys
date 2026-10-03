@@ -45,7 +45,7 @@ as $$
       select s.membership_fee_centavos, s.capital_share_target_centavos from public.payment_settings s
       where s.effective_from <= make_date(p_year_to, 12, 31)
         and (s.effective_to is null or s.effective_to >= make_date(p_year_from, 1, 1))
-      order by s.effective_from desc limit 1
+      order by s.effective_from desc, s.updated_at desc, s.created_at desc, s.id desc limit 1
     ) ps on true
     left join public.member_payments mp on mp.employee_id = e.id and mp.deleted_at is null
       and mp.payment_date between make_date(p_year_from, 1, 1) and make_date(p_year_to, 12, 31)

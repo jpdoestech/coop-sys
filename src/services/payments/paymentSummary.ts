@@ -1,6 +1,7 @@
 import type { Employee } from "../../types/employee";
 import type { OrganizationBranch, OrganizationClient } from "../../types/organization";
 import type { PaymentLedger } from "../../types/payment";
+import { effectiveSettings } from "./paymentMath";
 
 export type PaymentSummaryRow = {
   employee: Employee;
@@ -16,8 +17,7 @@ export type PaymentSummaryRow = {
 };
 
 export function buildPaymentSummary(employees: Employee[], ledger: PaymentLedger, branches: OrganizationBranch[], clients: OrganizationClient[], yearFrom: number, yearTo: number) {
-  const settingsDate = `${yearTo}-12-31`;
-  const settings = [...ledger.settings].filter((item) => item.effective_from <= settingsDate && (!item.effective_to || item.effective_to >= `${yearFrom}-01-01`)).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+  const settings = effectiveSettings(ledger.settings, `${yearTo}-12-31`);
   const obligation = settings ? settings.membership_fee_centavos + settings.capital_share_target_centavos : 0;
   return employees.filter((employee) => employee.member_id).map((employee): PaymentSummaryRow => {
     const payments = ledger.payments.filter((payment) => payment.employee_id === employee.id && payment.payment_date >= `${yearFrom}-01-01` && payment.payment_date <= `${yearTo}-12-31`).sort((a, b) => a.payment_date.localeCompare(b.payment_date));

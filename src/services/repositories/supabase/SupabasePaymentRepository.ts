@@ -4,7 +4,11 @@ import type {
   PaymentLedger,
   PaymentSettings,
 } from "../../../types/payment";
-import { allocatePayment, effectiveSettings } from "../../payments/paymentMath";
+import {
+  allocatePayment,
+  effectiveSettings,
+  normalizePaymentSettings,
+} from "../../payments/paymentMath";
 import { createUuid } from "../../../utils/createUuid";
 import type {
   AliasInput,
@@ -237,7 +241,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
       refunds.error;
     if (error) throw error;
     return {
-      settings: settings.data ?? [],
+      settings: normalizePaymentSettings((settings.data ?? []) as PaymentSettings[]),
       aliases: aliases.data ?? [],
       batches: batches.data ?? [],
       payments: paymentResult.data ?? [],
@@ -250,27 +254,11 @@ export class SupabasePaymentRepository implements PaymentRepository {
   }
 
   async saveSettings(input: PaymentSettingsInput) {
-    const client = db();
-    const previousDay = new Date(
-      new Date(`${input.effective_from}T00:00:00`).getTime() - 86400000,
-    )
-      .toISOString()
-      .slice(0, 10);
-    const { error: closeError } = await client
-      .from("payment_settings")
-      .update({
-        is_active: false,
-        effective_to: previousDay,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("is_active", true)
-      .lt("effective_from", input.effective_from);
-    if (closeError) throw closeError;
-    const { data, error } = await client
-      .from("payment_settings")
-      .insert({ ...input, is_active: true })
-      .select("*")
-      .single();
+    const { data, error } = await db().rpc("save_payment_settings", {
+      p_membership_fee_centavos: input.membership_fee_centavos,
+      p_capital_share_target_centavos: input.capital_share_target_centavos,
+      p_effective_from: input.effective_from,
+    });
     if (error) throw error;
     return data as PaymentSettings;
   }

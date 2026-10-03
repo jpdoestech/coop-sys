@@ -3,7 +3,11 @@ import type {
   PaymentLedger,
   PaymentSettings,
 } from "../../../types/payment";
-import { allocatePayment, effectiveSettings } from "../../payments/paymentMath";
+import {
+  allocatePayment,
+  effectiveSettings,
+  normalizePaymentSettings,
+} from "../../payments/paymentMath";
 import { buildPaymentSummary } from "../../payments/paymentSummary";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
 import { LocalOrganizationDirectoryRepository } from "./LocalOrganizationDirectoryRepository";
@@ -56,7 +60,9 @@ function readLedger(): PaymentLedger {
   return {
     ...emptyLedger(),
     ...stored,
-    settings: stored.settings?.length ? stored.settings : [DEFAULT_SETTINGS],
+    settings: normalizePaymentSettings(
+      stored.settings?.length ? stored.settings : [DEFAULT_SETTINGS],
+    ),
   };
 }
 
@@ -301,32 +307,28 @@ export class LocalPaymentRepository implements PaymentRepository {
   async saveSettings(input: PaymentSettingsInput) {
     const ledger = readLedger();
     const timestamp = new Date().toISOString();
-    ledger.settings = ledger.settings.map((setting) =>
-      setting.is_active && setting.effective_from < input.effective_from
-        ? {
-            ...setting,
-            is_active: false,
-            effective_to: new Date(
-              new Date(`${input.effective_from}T00:00:00`).getTime() - 86400000,
-            )
-              .toISOString()
-              .slice(0, 10),
-            updated_at: timestamp,
-          }
-        : setting,
+    const existing = ledger.settings.find(
+      (setting) => setting.effective_from === input.effective_from,
     );
-    const settings: PaymentSettings = {
-      id: createUuid(),
-      ...input,
-      effective_to: null,
-      is_active: true,
-      created_at: timestamp,
-      updated_at: timestamp,
-    };
-    ledger.settings.push(settings);
+    const settings: PaymentSettings = existing
+      ? { ...existing, ...input, updated_at: timestamp }
+      : {
+          id: createUuid(),
+          ...input,
+          effective_to: null,
+          is_active: true,
+          created_at: timestamp,
+          updated_at: timestamp,
+        };
+    ledger.settings = normalizePaymentSettings([
+      ...ledger.settings.filter(
+        (setting) => setting.effective_from !== input.effective_from,
+      ),
+      settings,
+    ]);
     writeLedger(ledger);
     await flushDatabaseStorage();
-    return settings;
+    return ledger.settings.find((setting) => setting.id === settings.id)!;
   }
 
   async saveAlias(input: AliasInput) {

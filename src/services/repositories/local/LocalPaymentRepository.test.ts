@@ -1,9 +1,35 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { LocalPaymentRepository } from "./LocalPaymentRepository";
+import { effectiveSettings } from "../../payments/paymentMath";
 
 afterEach(() => localStorage.clear());
 
 describe("LocalPaymentRepository corrections and refunds", () => {
+  it("updates settings saved on the same effective date", async () => {
+    const repository = new LocalPaymentRepository();
+    await repository.saveSettings({
+      membership_fee_centavos: 50000,
+      capital_share_target_centavos: 600000,
+      effective_from: "2026-10-03",
+    });
+    await repository.saveSettings({
+      membership_fee_centavos: 50000,
+      capital_share_target_centavos: 500000,
+      effective_from: "2026-10-03",
+    });
+
+    const ledger = await repository.getLedger();
+    expect(
+      ledger.settings.filter(
+        (setting) => setting.effective_from === "2026-10-03",
+      ),
+    ).toHaveLength(1);
+    expect(
+      effectiveSettings(ledger.settings, "2026-10-03")
+        ?.capital_share_target_centavos,
+    ).toBe(500000);
+  });
+
   it("returns payment summaries as a repository-paged result", async () => {
     const repository = new LocalPaymentRepository();
     const firstPage = await repository.getPaymentSummary({

@@ -60,6 +60,7 @@ const emptyLedger: PaymentLedger = {
 
 export function PaymentsPage() {
   const { profile, can } = useAccess();
+  const isSuperAdmin = profile.role === "super_admin";
   const { branches, clients } = useOrganization();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -167,7 +168,7 @@ export function PaymentsPage() {
       id: "settings",
       label: "Settings",
       icon: Settings2,
-      visible: can("payments.settings.manage"),
+      visible: isSuperAdmin && can("payments.settings.manage"),
     },
   ];
   const post = (
@@ -189,6 +190,10 @@ export function PaymentsPage() {
       filters.sortDirection,
     ],
   );
+
+  useEffect(() => {
+    if (tab === "settings" && !isSuperAdmin) setTab("summary");
+  }, [isSuperAdmin, tab]);
 
   const mutationError =
     payments.postBatch.error ??
@@ -337,7 +342,7 @@ export function PaymentsPage() {
             onLoadLedger={payments.loadExportLedger}
           />
         ) : null}
-        {tab === "settings" ? (
+        {tab === "settings" && isSuperAdmin ? (
           <PaymentSettingsPanel
             settings={ledger.settings}
             saving={payments.saveSettings.isPending}
