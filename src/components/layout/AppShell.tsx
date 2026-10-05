@@ -52,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
   const visibleNavItems = navItems.filter((item) => can(item.permission));
 
   const sidebar = (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-line bg-white">
+    <aside className="flex h-dvh w-56 shrink-0 flex-col border-r border-line bg-white">
       <div className="flex h-14 items-center gap-3 border-b border-line px-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-md bg-moss text-white"><Landmark className="h-5 w-5" /></span>
         <div className="min-w-0">
@@ -95,7 +95,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-paper font-sans text-ink">
       <div className="flex min-h-screen">
-        <div className="hidden lg:block">{sidebar}</div>
+        <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">{sidebar}</div>
         {isOpen ? (
           <div className="fixed inset-0 z-40 lg:hidden">
             <button
@@ -109,7 +109,7 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur">
-            <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
+            <div className="workspace-width flex h-14 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
               <button
                 className="focus-ring rounded-md border border-line bg-white p-2 lg:hidden"
                 onClick={() => setIsOpen(true)}
@@ -121,7 +121,7 @@ export function AppShell({ children }: AppShellProps) {
                 <p className="truncate text-sm font-semibold">Membership &amp; Workforce</p>
                 <p className="truncate text-xs text-ink/45">Head Office / Operations</p>
               </div>
-              <div className="flex items-center gap-2 rounded-full bg-paper px-3 py-1.5 text-xs font-medium text-ink/65">
+              <div className="flex shrink-0 items-center gap-2 rounded-full bg-paper px-2 py-1.5 text-[11px] font-medium text-ink/65 sm:px-3 sm:text-xs">
                 <span
                   className={clsx(
                     "h-2 w-2 rounded-full",
@@ -132,7 +132,7 @@ export function AppShell({ children }: AppShellProps) {
               </div>
             </div>
           </header>
-          <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
+          <main className="workspace-width min-w-0 flex-1 px-3 py-4 sm:px-6">{children}</main>
         </div>
       </div>
     </div>

@@ -38,6 +38,22 @@ select {
 }
 
 @layer components {
+  .workspace-width {
+    width: 100%;
+    max-width: 1800px;
+    margin-inline: auto;
+  }
+
+  .responsive-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+    gap: 0.5rem;
+  }
+
+  .responsive-fields > * {
+    min-width: 0;
+  }
+
   .control {
     @apply focus-ring min-h-10 rounded-md border border-line bg-white px-3 text-sm text-ink shadow-sm transition placeholder:text-ink/40 hover:border-ink/20;
   }
