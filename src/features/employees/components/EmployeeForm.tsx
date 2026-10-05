@@ -1,3 +1,4 @@
+import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   BriefcaseBusiness,
@@ -148,6 +149,8 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
   const [rehireSourceId, setRehireSourceId] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [tab, setTab] = useState<EmployeeTab>("personal");
+  const { confirmLeave, confirmDiscard } = useUnsavedChanges(draftChanged(draft, toInput(employee, suggestedNumber)) || membershipMode !== (employee?.member_id ? "existing" : "none") || transferring || !addressValid, saving || validatingAddress);
+  const cancel = () => confirmLeave(onCancel);
   const linkedMember = useMemo(
     () => members.find((member) => member.id === draft.member_id) ?? null,
     [members, draft.member_id],
@@ -327,7 +330,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
         <form onSubmit={submit}>
           <header className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
             <div><p className="text-xs font-semibold uppercase text-clay">Employee record</p><h2 id="employee-form-title" className="mt-1 font-display text-2xl font-semibold">{employee ? "Edit employee" : "New employee"}</h2></div>
-            <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={onCancel} aria-label="Close employee form"><X className="h-5 w-5" /></button>
+            <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={cancel} aria-label="Close employee form"><X className="h-5 w-5" /></button>
           </header>
           <nav className="sticky top-[85px] z-[9] overflow-x-auto border-b border-line bg-white/95 px-4 backdrop-blur sm:px-8" aria-label="Employee information sections">
             <div className="flex min-w-max gap-1">
@@ -354,7 +357,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Section title="Re-employment" description="Start from a former employee's identity while re-entering employment details for the new engagement.">
               <div className="sm:col-span-2">
                 <Field label="Previous employee record">
-                  <select className={inputClass} value={rehireSourceId} onChange={(event) => selectFormerEmployee(event.target.value)}>
+                  <select className={inputClass} value={rehireSourceId} onChange={(event) => { const id = event.target.value; confirmDiscard(() => selectFormerEmployee(id)); }}>
                     <option value="">Start with a blank employee record</option>
                     {formerEmployees.map((item) => <option key={item.id} value={item.id}>{item.employee_number} - {item.last_name}, {item.first_name}</option>)}
                   </select>
@@ -404,7 +407,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
           </Section> : null}
 
-          {tab === "additional" && aliasEditor ? <Section title="Payroll aliases" description="Alternate payroll names are maintained here and can also be matched during payroll imports.">{aliasEditor}</Section> : null}
+          {aliasEditor ? <div className={tab === "additional" ? "" : "hidden"}><Section title="Payroll aliases" description="Alternate payroll names are maintained here and can also be matched during payroll imports.">{aliasEditor}</Section></div> : null}
 
           {tab === "government" && canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
             <GovernmentIdFields disabled={!canEditSensitive} value={governmentIdValue} onChange={(identifiers) => setDraft((current) => ({ ...current, ...identifiers }))} />
@@ -440,10 +443,11 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
                 setTransferring(true);
                 setValue("active_assignment", newAssignment());
               }}
-              onCancelTransfer={() => {
+              onCancelTransfer={() => confirmDiscard(() => {
                 setTransferring(false);
                 setValue("active_assignment", employee?.active_assignment ?? null);
-              }}
+                setValue("work_location", employee?.work_location ?? null);
+              })}
             />
           </Section> : null}
 
@@ -452,7 +456,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
           </Section> : null}
 
           {tab === "additional" ? <Section title="Notes" description="Optional internal context for authorized staff."><div className="sm:col-span-2"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></div></Section> : null}
-          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={onCancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving || validatingAddress} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : validatingAddress ? "Validating..." : "Save employee"}</button></footer>
+          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={cancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving || validatingAddress} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : validatingAddress ? "Validating..." : "Save employee"}</button></footer>
         </form>
       </div>
     </div>

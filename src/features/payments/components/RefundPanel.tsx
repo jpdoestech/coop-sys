@@ -1,3 +1,4 @@
+import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import {
   AlertTriangle,
   CalendarDays,
@@ -81,6 +82,8 @@ export function RefundPanel({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const baseline = editing ? { employeeId: editing.employee_id, amount: (editing.amount_centavos / 100).toFixed(2), refundDate: editing.refund_date, from: editing.cutoff_from ?? "", to: editing.cutoff_to ?? "", remarks: editing.remarks ?? "" } : { employeeId: "", amount: "", refundDate: today(), from: "", to: "", remarks: "" };
+  const { confirmDiscard } = useUnsavedChanges(matches.length > 0 || draftChanged({ employeeId, amount, refundDate, from, to, remarks }, baseline), saving);
   useEffect(() => {
     let active = true;
     void onLoadRefunds({ limit: pageSize, offset: (page - 1) * pageSize })
@@ -242,9 +245,11 @@ export function RefundPanel({
             type="button"
             className={`inline-flex items-center gap-2 rounded px-3 py-2 text-xs font-semibold ${view === item.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper"}`}
             onClick={() => {
-              setView(item.id);
-              setError("");
-              if (item.id === "manual" && view !== "manual") clearForm();
+              if (item.id === view) return;
+              confirmDiscard(() => {
+                clearForm(); setMatches([]); setFileName(""); setOverrides({});
+                setView(item.id);
+              });
             }}
           >
             <item.icon className="h-3.5 w-3.5" />
@@ -478,10 +483,10 @@ export function RefundPanel({
                 type="button"
                 className="icon-button h-10 w-10"
                 title="Cancel edit"
-                onClick={() => {
+                onClick={() => confirmDiscard(() => {
                   clearForm();
                   setView("records");
-                }}
+                })}
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
@@ -498,10 +503,7 @@ export function RefundPanel({
                 className="control mt-1 w-full"
                 disabled={fixedBranch}
                 value={branchId}
-                onChange={(event) => {
-                  setBranchId(event.target.value);
-                  setMatches([]);
-                }}
+                onChange={(event) => { const value = event.target.value; confirmDiscard(() => { setBranchId(value); setMatches([]); setFileName(""); }); }}
               >
                 <option value="">Select branch</option>
                 {branches.map((branch) => (
@@ -517,10 +519,7 @@ export function RefundPanel({
                 className="control mt-1 w-full"
                 disabled={fixedClient}
                 value={clientId}
-                onChange={(event) => {
-                  setClientId(event.target.value);
-                  setMatches([]);
-                }}
+                onChange={(event) => { const value = event.target.value; confirmDiscard(() => { setClientId(value); setMatches([]); setFileName(""); }); }}
               >
                 <option value="">Direct / all clients</option>
                 {clients
@@ -577,7 +576,7 @@ export function RefundPanel({
               className="sr-only"
               type="file"
               accept=".xlsx,.xlsm"
-              onChange={(event) => void load(event.target.files?.[0])}
+              onChange={(event) => { const file = event.target.files?.[0]; if (file) confirmDiscard(() => void load(file)); event.target.value = ""; }}
             />
           </label>
           {matches.length ? (

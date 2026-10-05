@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useMemo, useState } from "react";
 import { Banknote, CalendarDays, Save } from "lucide-react";
 import type { Employee } from "../../../types/employee";
@@ -16,6 +17,7 @@ export function ManualPaymentPanel({ employees, branches, clients, userId, savin
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState("");
+  useUnsavedChanges(Boolean(branchId || clientId || employeeId || amount || remarks || paymentDate !== new Date().toISOString().slice(0, 10)), saving);
   const scoped = useMemo(() => employees.filter((employee) => employee.member_id && employee.active_assignment?.branch_id === branchId && (!clientId || employee.active_assignment?.client_id === clientId)), [employees, branchId, clientId]);
 
   function submit(event: React.FormEvent) {

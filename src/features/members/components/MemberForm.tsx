@@ -1,3 +1,4 @@
+import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRightLeft, BriefcaseBusiness, Contact, History, MapPinned, Save, UserRound, UsersRound, X } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
@@ -131,6 +132,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
   const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
   const [transferReason, setTransferReason] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const { confirmLeave, confirmDiscard } = useUnsavedChanges(draftChanged(draft, toDraft(member, suggestedNumber)) || transferring || !addressValid, saving || validatingAddress);
+  const cancel = () => confirmLeave(onCancel);
   const { branches, clients } = useOrganization();
   const availableClients = clients.filter((client) => client.branchId === draft.proposed_branch_id && client.isActive);
   const addressValue: AddressValue = {
@@ -245,7 +248,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
                 {member ? "Edit member" : "New member"}
               </h2>
             </div>
-            <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={onCancel} aria-label="Close member form">
+            <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={cancel} aria-label="Close member form">
               <X className="h-5 w-5" />
             </button>
           </header>
@@ -316,8 +319,12 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
             <Field label="Branch client" error={errors.proposed_client_id}><select className={inputClass} disabled={(Boolean(activeAssignment) && !transferring) || !draft.proposed_branch_id || !availableClients.length} value={draft.proposed_client_id ?? ""} onChange={(event) => setValue("proposed_client_id", event.target.value || null)}><option value="">Direct office / branch employee</option>{availableClients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></Field>
             {activeAssignment ? <div className="sm:col-span-2 flex justify-end"><button type="button" className="secondary-button" onClick={() => {
               if (transferring) {
+                confirmDiscard(() => {
                 setDraft((current) => ({ ...current, proposed_branch_id: activeAssignment.branch_id, proposed_client_id: activeAssignment.client_id }));
                 setTransferReason("");
+                setTransferring(false);
+                });
+                return;
               }
               setTransferring((current) => !current);
             }}>{transferring ? <X className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}{transferring ? "Cancel transfer" : "Transfer employee"}</button></div> : null}
@@ -350,7 +357,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
             <Field label="Annual income"><input type="number" min="0" step="0.01" className={inputClass} value={draft.annual_income} onChange={(event) => setValue("annual_income", event.target.value)} /></Field>
             <div className="sm:col-span-2"><Field label="Notes"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></Field></div>
           </Section>
-          {aliasEditor ? <Section title="Payroll aliases" description="Manage the client-specific names used to match payroll imports.">{aliasEditor}</Section> : null}</> : null}
+          </> : null}
+          {aliasEditor ? <div className={tab === "background" ? "" : "hidden"}><Section title="Payroll aliases" description="Manage the client-specific names used to match payroll imports.">{aliasEditor}</Section></div> : null}
 
           {tab === "beneficiaries" ? <Section title="Beneficiaries" description="Maintain up to three active dependents. Inactive records remain available with their reason.">
             {errors.beneficiaries ? <p className="sm:col-span-2 text-xs text-red-700">{errors.beneficiaries}</p> : null}
@@ -358,7 +366,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
           </Section> : null}
 
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper/95 px-6 py-4 backdrop-blur sm:px-8">
-            <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={onCancel}><X className="h-4 w-4" /> Cancel</button>
+            <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={cancel}><X className="h-4 w-4" /> Cancel</button>
             <button type="submit" disabled={saving || validatingAddress || placementLoading} className="primary-button">
               <Save className="h-4 w-4" /> {saving ? "Saving..." : validatingAddress ? "Validating..." : placementLoading ? "Loading placement..." : "Save member"}
             </button>

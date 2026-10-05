@@ -22,6 +22,7 @@ import { getAppMode } from "../../utils/env";
 import { useAccess } from "../../services/access/useAccess";
 import { roleLabel, type Permission } from "../../services/access/accessControl";
 import { useAuth } from "../../services/auth/useAuth";
+import { useConfirmLeave } from "../forms/unsavedChanges";
 
 type AppShellProps = {
   children: ReactNode;
@@ -47,6 +48,7 @@ export function AppShell({ children }: AppShellProps) {
   const appMode = getAppMode();
   const { profile, can } = useAccess();
   const { session, signOut } = useAuth();
+  const confirmLeave = useConfirmLeave();
   const visibleNavItems = navItems.filter((item) => can(item.permission));
 
   const sidebar = (
@@ -83,7 +85,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="flex items-center gap-2 rounded-md p-2 hover:bg-paper">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e4efe9] text-xs font-bold text-moss">{profile.displayName.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>
           <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-ink">{profile.displayName}</p><p className="truncate text-[11px] text-ink/50">{roleLabel(profile.role)}</p></div>
-          <button onClick={() => void signOut()} className="icon-button h-8 w-8" title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
+          <button onClick={() => confirmLeave(() => void signOut())} className="icon-button h-8 w-8" title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
         </div>
         <div className="mt-2 flex items-center justify-between px-2 text-[10px] text-ink/40"><span>{session?.mode === "online" ? "Online account" : "Offline account"}</span><span>{appMode}</span></div>
       </div>

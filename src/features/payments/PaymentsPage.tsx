@@ -1,3 +1,4 @@
+import { useConfirmLeave } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   Banknote,
@@ -65,6 +66,7 @@ export function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [tab, setTab] = useState<Tab>("summary");
+  const confirmLeave = useConfirmLeave();
   const [editingPayment, setEditingPayment] = useState<MemberPayment | null>(
     null,
   );
@@ -221,7 +223,7 @@ export function PaymentsPage() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTab(item.id)}
+                onClick={() => { if (item.id !== tab) confirmLeave(() => setTab(item.id)); }}
                 className={`focus-ring inline-flex items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-xs font-semibold transition ${tab === item.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper hover:text-ink"}`}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -341,7 +343,7 @@ export function PaymentsPage() {
           <PaymentSettingsPanel
             settings={ledger.settings}
             saving={payments.saveSettings.isPending}
-            onSave={(input) => payments.saveSettings.mutate(input)}
+            onSave={(input) => payments.saveSettings.mutateAsync(input)}
           />
         ) : null}
       </section>

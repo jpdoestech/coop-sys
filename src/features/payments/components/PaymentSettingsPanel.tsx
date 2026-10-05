@@ -7,12 +7,15 @@ import {
   pesosToCentavos,
 } from "../../../services/payments/paymentMath";
 import type { PaymentSettingsInput } from "../../../services/repositories/PaymentRepository";
+import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 
-export function PaymentSettingsPanel({ settings, saving, onSave }: { settings: PaymentSettings[]; saving: boolean; onSave: (input: PaymentSettingsInput) => void }) {
+export function PaymentSettingsPanel({ settings, saving, onSave }: { settings: PaymentSettings[]; saving: boolean; onSave: (input: PaymentSettingsInput) => Promise<unknown> }) {
   const [fee, setFee] = useState("500");
   const [capital, setCapital] = useState("5000");
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
+  const [baseline, setBaseline] = useState({ fee: "500", capital: "5000", effectiveFrom });
+  useUnsavedChanges(draftChanged({ fee, capital, effectiveFrom }, baseline), saving);
   useEffect(() => {
     const current = effectiveSettings(
       settings,
@@ -21,8 +24,9 @@ export function PaymentSettingsPanel({ settings, saving, onSave }: { settings: P
     if (!current) return;
     setFee(String(current.membership_fee_centavos / 100));
     setCapital(String(current.capital_share_target_centavos / 100));
+    setBaseline((previous) => ({ ...previous, fee: String(current.membership_fee_centavos / 100), capital: String(current.capital_share_target_centavos / 100) }));
   }, [settings]);
-  function submit(event: React.FormEvent) { event.preventDefault(); try { setError(""); onSave({ membership_fee_centavos: pesosToCentavos(fee), capital_share_target_centavos: pesosToCentavos(capital), effective_from: effectiveFrom }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Invalid settings."); } }
+  async function submit(event: React.FormEvent) { event.preventDefault(); try { setError(""); await onSave({ membership_fee_centavos: pesosToCentavos(fee), capital_share_target_centavos: pesosToCentavos(capital), effective_from: effectiveFrom }); setBaseline({ fee, capital, effectiveFrom }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Invalid settings."); } }
   return <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)]">
     <form onSubmit={submit} className="grid content-start gap-3 sm:grid-cols-2">
       <label className="field-label">Membership fee<input className="control mt-1" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} /></label>

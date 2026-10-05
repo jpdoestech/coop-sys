@@ -1,3 +1,5 @@
+import { useConfirmation } from "../../../components/forms/unsavedChanges";
+import { useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useMemo, useState } from "react";
 import { RotateCcw, ShieldAlert } from "lucide-react";
 import type { Employee } from "../../../types/employee";
@@ -8,14 +10,16 @@ import type { SettlementInput } from "../../../services/repositories/PaymentRepo
 import { EmployeeSearchField } from "./EmployeeSearchField";
 
 export function FinalPayPanel({ employees, payments, settlements, userId, saving, onSettle }: { employees: Employee[]; payments: MemberPayment[]; settlements: FinalPaySettlement[]; userId: string; saving: boolean; onSettle: (input: SettlementInput) => void }) {
+  const confirm = useConfirmation();
   const eligible = employees.filter((employee) => employee.member_id && employee.employment_status_id && terminalEmploymentStatuses.has(employee.employment_status_id) && !settlements.some((item) => item.employee_id === employee.id));
   const [employeeId, setEmployeeId] = useState("");
   const [refundFee, setRefundFee] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState("");
+  useUnsavedChanges(Boolean(employeeId || refundFee || remarks || date !== new Date().toISOString().slice(0, 10)), saving);
   const employee = eligible.find((item) => item.id === employeeId);
   const totals = useMemo(() => payments.filter((item) => item.member_id === employee?.member_id).reduce((sum, item) => ({ fee: sum.fee + item.membership_fee_centavos, capital: sum.capital + item.capital_share_centavos }), { fee: 0, capital: 0 }), [payments, employee]);
-  function submit(event: React.FormEvent) { event.preventDefault(); if (!employee?.member_id) return; if (window.confirm(`Create final-pay refund of ${formatPesos(totals.capital + (refundFee ? totals.fee : 0))}? This settlement cannot be posted twice.`)) onSettle({ employee_id: employee.id, member_id: employee.member_id, refund_membership_fee: refundFee, settlement_date: date, remarks: remarks || null, created_by: userId }); }
+  function submit(event: React.FormEvent) { event.preventDefault(); if (!employee?.member_id) return; const input = { employee_id: employee.id, member_id: employee.member_id, refund_membership_fee: refundFee, settlement_date: date, remarks: remarks || null, created_by: userId }; confirm(`Create final-pay refund of ${formatPesos(totals.capital + (refundFee ? totals.fee : 0))}? This settlement cannot be posted twice.`, () => onSettle(input), "Confirm final-pay settlement", "Create settlement"); }
   return <div>
     <div className="flex items-center gap-3 border-b border-line bg-[#f8faf8] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#e4efe9] text-moss"><RotateCcw className="h-4 w-4" /></span><div><h3 className="text-sm font-semibold">Prepare final-pay settlement</h3><p className="text-[11px] text-ink/45">Search eligible separated employees and review refundable balances.</p></div></div>
     <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900"><ShieldAlert className="h-4 w-4 shrink-0" /> Capital share is returned in full. Returning the membership fee remains an explicit decision.</div>

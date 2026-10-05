@@ -1,3 +1,4 @@
+import { useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { AlertTriangle, Save, X } from "lucide-react";
 import { useState } from "react";
 import type { MemberPayment } from "../../../types/payment";
@@ -29,6 +30,8 @@ export function PaymentCorrectionDialog({
   );
   const [remarks, setRemarks] = useState(payment.remarks ?? "");
   const [comment, setComment] = useState("");
+  const { confirmLeave } = useUnsavedChanges(amount !== (payment.amount_centavos / 100).toFixed(2) || remarks !== (payment.remarks ?? "") || Boolean(comment), saving);
+  const close = () => confirmLeave(onClose);
   let nextAmount = 0;
   try {
     nextAmount = pesosToCentavos(amount);
@@ -64,7 +67,7 @@ export function PaymentCorrectionDialog({
           <button
             type="button"
             className="icon-button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close correction"
           >
             <X className="h-4 w-4" />
@@ -127,7 +130,7 @@ export function PaymentCorrectionDialog({
           ) : null}
         </div>
         <footer className="flex justify-end gap-2 border-t border-line px-4 py-3">
-          <button type="button" className="secondary-button" onClick={onClose}>
+          <button type="button" className="secondary-button" onClick={close}>
             Cancel
           </button>
           <button

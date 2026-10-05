@@ -1,3 +1,4 @@
+import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowUpDown, BriefcaseBusiness, CircleDotDashed, FileUp, Plus, Search } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -18,6 +19,7 @@ import { useAliasManagement } from "../payments/hooks/useAliasManagement";
 import { AliasEditor } from "../../components/forms/AliasEditor";
 
 export function EmployeesPage() {
+  const confirm = useConfirmation();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Employee | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -63,7 +65,7 @@ export function EmployeesPage() {
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
         </div>
-        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { if (window.confirm(`Archive ${employee.first_name} ${employee.last_name}?`)) archiveEmployee.mutate(employee.id); }} />}
+        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { confirm(`Archive ${employee.first_name} ${employee.last_name}?`, () => archiveEmployee.mutate(employee.id), "Archive employee", "Archive"); }} />}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
       {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} canViewSensitive={can("employees.sensitive.view")} canEditSensitive={can("employees.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}

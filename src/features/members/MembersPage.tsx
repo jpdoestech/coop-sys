@@ -1,3 +1,4 @@
+import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowUpDown, CheckCheck, CircleDotDashed, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -19,6 +20,7 @@ import { AliasEditor } from "../../components/forms/AliasEditor";
 import type { MemberSubmission } from "./types/memberWorkflow";
 
 export function MembersPage() {
+  const confirm = useConfirmation();
   const [search, setSearch] = useState("");
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -61,8 +63,7 @@ export function MembersPage() {
   }
 
   function archive(member: Member) {
-    const confirmed = window.confirm(`Archive ${member.first_name} ${member.last_name}? The record can be restored later.`);
-    if (confirmed) archiveMember.mutate(member.id);
+    confirm(`Archive ${member.first_name} ${member.last_name}? The record can be restored later.`, () => archiveMember.mutate(member.id), "Archive member", "Archive");
   }
 
   function toggleSelection(memberId: string) {
