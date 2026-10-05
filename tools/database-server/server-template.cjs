@@ -355,7 +355,13 @@ function filteredStorageValue(user, key, rawValue) {
     const visibleMemberIds = new Set(visibleEmployees.map((employee) => employee.member_id).filter(Boolean));
     if (key === "coop_sys_employees") return JSON.stringify(visibleEmployees.map((record) => hasPermission(user, "employees.sensitive.view") ? record : redactIdentifiers(record)));
     if (key === "coop_sys_members") {
-      const records = user.scope_type === "organization" ? value : value.filter((member) => visibleMemberIds.has(member.id));
+      const linkedMemberIds = new Set(employees.filter((employee) => !employee.deleted_at).map((employee) => employee.member_id));
+      const records = user.scope_type === "organization" ? value : value.filter((member) => {
+        if (linkedMemberIds.has(member.id)) return visibleMemberIds.has(member.id);
+        if (user.scope_type === "assigned_clients") return Boolean(member.proposed_client_id && parseArray(user.client_ids).includes(member.proposed_client_id));
+        if (user.scope_type === "self") return false;
+        return Boolean(member.proposed_branch_id && parseArray(user.branch_ids).includes(member.proposed_branch_id));
+      });
       return JSON.stringify(records.map((record) => hasPermission(user, "members.sensitive.view") ? record : redactIdentifiers(record)));
     }
     if (key === "coop_sys_organization_directory") {

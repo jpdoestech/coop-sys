@@ -137,6 +137,14 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       deleted_at: null,
       sync_status: "pending_create"
     };
+    if (input.member_id && input.active_assignment) {
+      const members = readStoredMembers();
+      const index = members.findIndex((item) => item.id === input.member_id);
+      if (index !== -1) {
+        members[index] = { ...members[index], proposed_branch_id: input.active_assignment.branch_id, proposed_client_id: input.active_assignment.client_id, updated_at: timestamp, sync_status: members[index].sync_status === "pending_create" ? "pending_create" : "pending_update" };
+        writeStoredMembers(members);
+      }
+    }
     writeEmployees([...readEmployees(), employee]);
     await flushDatabaseStorage();
     return employee;

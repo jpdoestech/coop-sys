@@ -30,7 +30,7 @@ export function EmployeesPage() {
   const canImport = can("employees.import");
   const canEdit = can("employees.update");
   const canDelete = can("employees.delete");
-  const { branches, clients, departments } = useOrganization();
+  const { branches, clients, departments, positions } = useOrganization();
   const { branches: scopedBranches, clients: scopedClients } = placementOptions(profile, branches, clients);
   const [statusFilter, setStatusFilter] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
@@ -69,7 +69,7 @@ export function EmployeesPage() {
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
       {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} canViewSensitive={can("employees.sensitive.view")} canEditSensitive={can("employees.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
-      {importOpen ? <PersonImportDialog kind="employee" branches={scopedBranches} clients={scopedClients} linkOptions={(members.data ?? []).map((member) => ({ id: member.id, number: member.membership_number, name: `${member.last_name}, ${member.first_name}`, isActive: member.membership_status_id === MEMBER_STATUS.active }))} importing={importEmployees.isPending} importError={importEmployees.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importEmployees.mutate({ rows, branchId: branchId ?? "", clientId: clientId ?? "" }, { onSuccess: () => setImportOpen(false) })} /> : null}
+      {importOpen ? <PersonImportDialog kind="employee" branches={scopedBranches} clients={scopedClients} lookups={{ departments, positions }} requireClient={profile.scopeType === "assigned_clients"} linkOptions={(members.data ?? []).map((member) => ({ id: member.id, number: member.membership_number, name: `${member.last_name}, ${member.first_name}`, isActive: member.membership_status_id === MEMBER_STATUS.active }))} importing={importEmployees.isPending} importError={importEmployees.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importEmployees.mutateAsync({ rows, branchId, clientId })} /> : null}
     </>
   );
 }

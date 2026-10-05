@@ -1,4 +1,5 @@
 import type { Employee } from "../../types/employee";
+import type { Member } from "../../types/member";
 
 export type RoleCode = string;
 export type Permission = string;
@@ -99,6 +100,15 @@ export function employeeIsInScope(employee: Employee, profile: AccessProfile) {
   if (!assignment) return false;
   if (profile.scopeType === "assigned_clients") return Boolean(assignment.client_id && profile.clientIds?.includes(assignment.client_id));
   return Boolean(assignment.branch_id && profile.branchIds.includes(assignment.branch_id));
+}
+
+export function memberIsInScope(member: Member, profile: AccessProfile, employees: readonly Employee[]) {
+  if (!isBranchScoped(profile)) return true;
+  const linked = employees.filter((employee) => employee.member_id === member.id && !employee.deleted_at);
+  if (linked.length) return linked.some((employee) => employeeIsInScope(employee, profile));
+  if (profile.scopeType === "self") return false;
+  if (profile.scopeType === "assigned_clients") return Boolean(member.proposed_client_id && profile.clientIds?.includes(member.proposed_client_id));
+  return Boolean(member.proposed_branch_id && profile.branchIds.includes(member.proposed_branch_id));
 }
 
 export function branchIsInScope(branchId: string | null | undefined, profile: AccessProfile) {

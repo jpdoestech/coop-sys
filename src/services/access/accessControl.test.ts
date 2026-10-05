@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { branchIsInScope, employeeIsInScope, hasPermission, type AccessProfile } from "./accessControl";
+import { branchIsInScope, employeeIsInScope, memberIsInScope, hasPermission, type AccessProfile } from "./accessControl";
 import type { Employee } from "../../types/employee";
+import type { Member } from "../../types/member";
 
 const branchId = "60000000-0000-4000-8000-000000000001";
 const profile: AccessProfile = { userId: "1", displayName: "Branch User", role: "branch_user", branchIds: [branchId] };
 
 describe("access control", () => {
+  it("includes intended-placement members without exposing employees transferred out of scope", () => {
+    const member = { id: "member-1", proposed_branch_id: branchId, proposed_client_id: "client-1" } as Member;
+    expect(memberIsInScope(member, profile, [])).toBe(true);
+    expect(memberIsInScope(member, { ...profile, scopeType: "assigned_clients", clientIds: ["client-1"] }, [])).toBe(true);
+    expect(memberIsInScope(member, { ...profile, scopeType: "assigned_clients", clientIds: ["other-client"] }, [])).toBe(false);
+    expect(memberIsInScope(member, profile, [{ member_id: member.id, active_assignment: { branch_id: "other-branch" } } as Employee])).toBe(false);
+  });
   it("reserves user management for Super Admin", () => {
     expect(hasPermission(profile, "users.manage")).toBe(false);
     expect(hasPermission({ ...profile, role: "super_admin" }, "users.manage")).toBe(true);

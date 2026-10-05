@@ -8,6 +8,7 @@ import { MemberTable } from "./components/MemberTable";
 import { useMembers } from "./hooks/useMembers";
 import { useAccess } from "../../services/access/useAccess";
 import { isBranchScoped } from "../../services/access/accessControl";
+import { placementOptions } from "../../services/access/placementOptions";
 import { memberStatuses, memberTypes } from "./data/memberOptions";
 import { useOrganization } from "../../services/organization/useOrganization";
 import { PaginationControls } from "../../components/ui/PaginationControls";
@@ -28,8 +29,9 @@ export function MembersPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const deferredSearch = useDeferredValue(search);
-  const { clients } = useOrganization();
+  const { branches, clients, departments, positions } = useOrganization();
   const { profile, can } = useAccess();
+  const { branches: scopedBranches, clients: scopedClients } = placementOptions(profile, branches, clients);
   const canCreate = can("members.create") && !isBranchScoped(profile);
   const canImport = can("members.import") && !isBranchScoped(profile);
   const canEdit = can("members.update");
@@ -126,7 +128,7 @@ export function MembersPage() {
           onSubmit={save}
         />
       ) : null}
-      {importOpen ? <PersonImportDialog kind="member" linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows) => importMembers.mutate(rows, { onSuccess: () => setImportOpen(false) })} /> : null}
+      {importOpen ? <PersonImportDialog kind="member" branches={scopedBranches} clients={scopedClients} lookups={{ departments, positions }} requireClient={profile.scopeType === "assigned_clients"} linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importMembers.mutateAsync({ rows, branchId, clientId })} /> : null}
       {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}
     </>
   );

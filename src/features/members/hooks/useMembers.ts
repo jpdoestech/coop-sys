@@ -1,24 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { createRepositories } from "../../../services/repositories/repositoryFactory";
-import type { Member, MemberInput } from "../../../types/member";
+import type { Member } from "../../../types/member";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
 import { useAccess } from "../../../services/access/useAccess";
-import { assertPermission, branchIsInScope, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
+import { assertPermission, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
 import { nextPersonNumber } from "../../../services/identity/personNumber";
 import { nextBodResolutionNumber } from "../../../services/members/membershipApproval";
 import { MEMBER_STATUS } from "../../../services/lookups/statuses";
-import type { PersonImportRow } from "../../../services/imports/personImport";
-import { memberInputSchema } from "../../../services/validation/memberSchema";
-import { memberTypes } from "../data/memberOptions";
+import { assertImportPlacement, importPersonRows, type PersonImportRequest } from "../../../services/imports/personImportWorkflow";
+import { useOrganization } from "../../../services/organization/useOrganization";
 import type { ListOptions } from "../../../services/repositories/Repository";
 import type { MemberSubmission } from "../types/memberWorkflow";
-import { createUuid } from "../../../utils/createUuid";
+import { applyMemberPlacement } from "../../../services/identity/memberPlacement";
 
 export function useMembers(options: ListOptions, editingMemberId?: string | null) {
   const repositories = useMemo(() => createRepositories(), []);
   const queryClient = useQueryClient();
   const { profile } = useAccess();
+  const directory = useOrganization();
   const queryKey = ["members", "page", options];
 
   const query = useQuery({
@@ -62,24 +62,13 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
         ? (await repositories.employees.listByMemberId(member.id)).filter((employee) => !employee.deleted_at)
         : [];
       const employeesNeedingTransfer = linkedEmployees.filter((employee) =>
-        employee.active_assignment &&
+        (!employee.active_assignment && !employee.assignment_history.length) || employee.active_assignment &&
         (employee.active_assignment.branch_id !== input.proposed_branch_id || employee.active_assignment.client_id !== input.proposed_client_id),
       );
       if (employeesNeedingTransfer.length) {
         assertPermission(profile, "employees.update");
-        if (!transfer) throw new Error("Enter an effective date and reason for the employee transfer.");
-        if (!branchIsInScope(input.proposed_branch_id, profile)) throw new Error("The destination branch is outside your assigned scope.");
-        await Promise.all(employeesNeedingTransfer.map((employee) => repositories.employees.transfer(employee.id, {
-          id: createUuid(),
-          branch_id: input.proposed_branch_id,
-          client_id: input.proposed_client_id,
-          assignment_code: employee.active_assignment?.assignment_code ?? null,
-          start_date: transfer.effectiveDate,
-          end_date: null,
-          work_location: transfer.workLocation,
-          transfer_reason: transfer.reason,
-          notes: "Transfer initiated from the linked member record",
-        }, "member")));
+        assertImportPlacement(profile, directory, input.proposed_branch_id || "", input.proposed_client_id || "");
+        await Promise.all(employeesNeedingTransfer.map((employee) => applyMemberPlacement(repositories.employees, employee, input, transfer || undefined)));
       }
       const saved = member
         ? await repositories.members.update(member.id, input)
@@ -149,31 +138,8 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
   });
 
   const importMembers = useMutation({
-    mutationFn: async (rows: PersonImportRow[]) => {
-      assertPermission(profile, "members.import");
-      if (isBranchScoped(profile)) throw new Error("Branch users must import employees so placement scope is recorded.");
-      const [members, employees] = await Promise.all([
-        repositories.members.list({ includeDeleted: true, limit: 10000 }),
-        repositories.employees.list({ includeDeleted: true, limit: 10000 }),
-      ]);
-      const used = new Set([...members.map((item) => item.membership_number), ...employees.map((item) => item.employee_number)]);
-      const imported = new Set<string>();
-      let sequence = Number(nextPersonNumber(members, employees));
-      const inputs = rows.map((row) => {
-        const linkedEmployee = row.linkedRecordId ? employees.find((item) => item.id === row.linkedRecordId) : null;
-        if (row.linkedRecordId && !linkedEmployee) throw new Error(`Row ${row.rowNumber}: linked employee was not found.`);
-        if (linkedEmployee?.member_id) throw new Error(`Row ${row.rowNumber}: linked employee already has a member record.`);
-        if (linkedEmployee && row.personNumber && row.personNumber !== linkedEmployee.employee_number) throw new Error(`Row ${row.rowNumber}: imported ID does not match the linked employee ID.`);
-        let number = linkedEmployee?.employee_number ?? row.personNumber;
-        if (!number) { while (used.has(String(sequence).padStart(6, "0"))) sequence += 1; number = String(sequence++).padStart(6, "0"); }
-        if (members.some((item) => item.membership_number === number) || imported.has(number)) throw new Error(`Row ${row.rowNumber}: ID ${number} already exists.`); used.add(number); imported.add(number);
-        const input: MemberInput = { membership_number: number, first_name: row.firstName, middle_name: row.middleName || null, last_name: row.lastName, suffix: row.suffix || null, date_of_birth: row.birthDate || null, sex: null, civil_status: null, mobile_number: row.mobile || null, email: row.email || null, address: row.address || null, barangay: row.barangay || null, city_municipality: row.city || null, province: row.province || null, postal_code: row.postalCode || null, membership_date: row.membershipDate || new Date().toISOString().slice(0, 10), membership_status_id: MEMBER_STATUS.inactive, membership_type_id: memberTypes[1].id, member_category: null, proposed_branch_id: null, proposed_client_id: null, religion_affiliation_id: null, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null, acceptance_resolution_number: null, acceptance_date: null, bod_approval_status: "pending", highest_educational_attainment: null, occupation_income_source: "Employed / Salary", annual_income: null, number_of_dependents: 0, beneficiary_name: null, religion_affiliation: null, termination_date: null, termination_reason: null, emergency_contact: null, notes: "Imported from Excel", profile_photo_ref: null, beneficiaries: [] };
-        return { input: memberInputSchema.parse(input) as MemberInput, linkedEmployee };
-      });
-      for (const record of inputs) { const saved = await repositories.members.create(record.input); if (record.linkedEmployee) await repositories.employees.update(record.linkedEmployee.id, employeeProfileFromMember(saved)); }
-      return inputs.length;
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["members"] }); queryClient.invalidateQueries({ queryKey: ["next-person-number"] }); },
+    mutationFn: (request: PersonImportRequest) => importPersonRows("member", repositories, profile, directory, request),
+    onSuccess: () => { for (const key of ["members", "employees", "member-options", "next-person-number", "member-placement-employees", "member-linked-employee", "payment-employees"]) queryClient.invalidateQueries({ queryKey: [key] }); },
   });
 
   return { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers };
