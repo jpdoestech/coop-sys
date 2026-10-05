@@ -23,6 +23,7 @@ import { useAccess } from "../../services/access/useAccess";
 import { roleLabel, type Permission } from "../../services/access/accessControl";
 import { useAuth } from "../../services/auth/useAuth";
 import { useConfirmLeave } from "../forms/unsavedChanges";
+import { ActivityIndicator } from "../ui/ActivityIndicator";
 
 type AppShellProps = {
   children: ReactNode;
@@ -94,6 +95,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-paper font-sans text-ink">
+      <ActivityIndicator />
       <div className="flex min-h-screen">
         <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">{sidebar}</div>
         {isOpen ? (

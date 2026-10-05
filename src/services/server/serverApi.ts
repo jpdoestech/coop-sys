@@ -1,3 +1,5 @@
+import { withActivity } from "../activity/activityStore";
+
 const SERVER_BACKEND = import.meta.env.VITE_DATA_BACKEND === "SERVER";
 
 export function usesServerBackend() {
@@ -5,6 +7,10 @@ export function usesServerBackend() {
 }
 
 export async function serverRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return withActivity(init?.method && init.method !== "GET" ? "Processing transaction..." : "Loading server data...", () => request<T>(path, init));
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: "same-origin",

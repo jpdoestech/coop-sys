@@ -19,7 +19,7 @@ export type PersonImportRow = {
   rowNumber: number; personNumber: string; firstName: string; middleName: string; lastName: string; suffix: string;
   birthDate: string; mobile: string; email: string; address: string; barangay: string; city: string; province: string; postalCode: string;
   dateHired: string; membershipDate: string; errors: string[]; errorTypes: ImportErrorType[]; linkedRecordId?: string;
-  employeeFields: Partial<EmployeeInput>; memberFields: Partial<MemberInput>; assignmentFields: Partial<EmploymentAssignmentInput>;
+  employeeFields: Partial<EmployeeInput>; memberFields: Partial<MemberInput>; assignmentFields: Partial<EmploymentAssignmentInput>; source?: SpreadsheetRow;
 };
 export type PersonImportOutcome = { rowNumber: number; status: "imported" | "error"; message: string; errorType?: ImportErrorType; recordId?: string };
 type Lookup = { id: string; label: string };
@@ -100,6 +100,6 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
     const today = new Date().toISOString().slice(0, 10);
     if (birthDate && birthDate > today) fail("date", "Birth date cannot be later than today.");
     if (assignmentFields.start_date && assignmentFields.end_date && assignmentFields.end_date < assignmentFields.start_date) fail("date", "Assignment end date cannot precede its start date.");
-    return { rowNumber: index + 2, personNumber: number, firstName: common.first_name, middleName: common.middle_name || "", lastName: common.last_name, suffix: common.suffix || "", birthDate, mobile: row.MOBILE || "", email: row.EMAIL || "", address: row.ADDRESS || "", barangay: row.BARANGAY || "", city: row.CITY || row.MUNICIPALITY || "", province: row.PROVINCE || "", postalCode: row["POSTAL CODE"] || "", dateHired, membershipDate, errors, errorTypes, employeeFields, memberFields, assignmentFields };
+    return { rowNumber: index + 2, personNumber: number, firstName: common.first_name, middleName: common.middle_name || "", lastName: common.last_name, suffix: common.suffix || "", birthDate, mobile: row.MOBILE || "", email: row.EMAIL || "", address: row.ADDRESS || "", barangay: row.BARANGAY || "", city: row.CITY || row.MUNICIPALITY || "", province: row.PROVINCE || "", postalCode: row["POSTAL CODE"] || "", dateHired, membershipDate, errors, errorTypes, employeeFields, memberFields, assignmentFields, source: { ...originalRow } };
   }));
 }

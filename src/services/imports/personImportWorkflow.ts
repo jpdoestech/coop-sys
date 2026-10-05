@@ -39,7 +39,9 @@ export async function importPersonRows(kind: "member" | "employee", repositories
   const used = new Set([...members.map((item) => item.membership_number), ...employees.map((item) => item.employee_number)]);
   let sequence = Number(nextPersonNumber(members, employees));
   const outcomes: PersonImportOutcome[] = [];
-  for (const row of request.rows) {
+  for (const [index, row] of request.rows.entries()) {
+    // Let pending-state rendering and navigation guards run during large local batches.
+    if (index % 25 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
     if (row.errors.length) { outcomes.push({ rowNumber: row.rowNumber, status: "error", message: row.errors.join(" "), errorType: row.errorTypes[0] || "validation" }); continue; }
     let stage: "validation" | "save" = "validation";
     let savedRecordId: string | undefined;

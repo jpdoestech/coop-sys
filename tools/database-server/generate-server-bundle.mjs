@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 const root = process.cwd();
 const dist = path.join(root, "dist");
@@ -19,5 +20,8 @@ function collect(directory, prefix = "") {
 
 if (!fs.existsSync(path.join(dist, "index.html"))) throw new Error("Run the Vite production build before generating the server bundle.");
 const template = fs.readFileSync(templatePath, "utf8");
-fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))));
+const cleanupSource = fs.readFileSync(path.join(root, "src", "services", "maintenance", "cleanupCore.ts"), "utf8");
+const cleanupCode = ts.transpileModule(cleanupSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const cleanupModule = `(() => { const exports = {}; ${cleanupCode}\nreturn exports; })()`;
+fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))).replace("__COOP_MAINTENANCE__", cleanupModule));
 console.log(`Generated ${outputPath}`);

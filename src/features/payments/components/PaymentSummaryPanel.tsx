@@ -141,6 +141,7 @@ export function PaymentSummaryPanel({
     if (!yearFrom || !yearTo) return;
     setChoosingOrientation(false);
     let printWindow: Window | undefined;
+    const done = useActivityStore.getState().start("Preparing payment summary...");
     try {
       printWindow = openPrintWindow("Preparing Payment Summary");
       setPrinting(true);
@@ -199,6 +200,7 @@ export function PaymentSummaryPanel({
         reason instanceof Error ? reason.message : "Print view could not open.",
       );
     } finally {
+      done();
       setPrinting(false);
     }
   }
@@ -448,3 +450,4 @@ export function PaymentSummaryPanel({
     </>
   );
 }
+import { useActivityStore } from "../../../services/activity/activityStore";

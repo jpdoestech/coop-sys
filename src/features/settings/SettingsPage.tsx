@@ -1,11 +1,13 @@
 import { PageHeader } from "../../components/ui/PageHeader";
+import { useAccess } from "../../services/access/useAccess";
+import { DataMaintenance } from "./components/DataMaintenance";
 
 export function SettingsPage() {
+  const { profile } = useAccess();
   return (
-    <PageHeader
+    <div className="space-y-4"><PageHeader
       eyebrow="Settings"
       title="System settings"
-      description="Configurable statuses, types, application mode, and organization settings will live here."
-    />
+    />{profile.role === "super_admin" ? <DataMaintenance /> : null}</div>
   );
 }

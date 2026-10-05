@@ -61,6 +61,7 @@ export function PaymentExportPanel({ employees, branches, clients, onLoadLedger 
     if (scope === "employee" && clientIds.length !== 1) return setMessage("Select one specific client before searching for an employee.");
     if (scope === "employee" && !employeeId) return setMessage("Search and select an employee for the per-employee export.");
     setBusy(format);
+    const done = useActivityStore.getState().start("Generating payment export...");
     try {
       const ledger = await onLoadLedger();
       const data = buildPaymentExportData(employees, ledger, {
@@ -76,6 +77,7 @@ export function PaymentExportPanel({ employees, branches, clients, onLoadLedger 
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The payment export could not be generated.");
     } finally {
+      done();
       setBusy(null);
     }
   }
@@ -104,3 +106,4 @@ export function PaymentExportPanel({ employees, branches, clients, onLoadLedger 
     </div>
   </div>;
 }
+import { useActivityStore } from "../../../services/activity/activityStore";

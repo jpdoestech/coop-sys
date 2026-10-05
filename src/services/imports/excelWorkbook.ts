@@ -1,6 +1,7 @@
 import type { PaymentImportRow } from "../../types/payment";
 import { pesosToCentavos } from "../payments/paymentMath";
 import { spreadsheetDate } from "./spreadsheetDate";
+import { withActivity } from "../activity/activityStore";
 
 export type SpreadsheetRow = Record<string, string>;
 
@@ -15,6 +16,10 @@ function cellText(value: unknown) {
 }
 
 export async function readSpreadsheet(file: File): Promise<SpreadsheetRow[]> {
+  return withActivity("Reading Excel workbook...", () => readWorkbook(file));
+}
+
+async function readWorkbook(file: File): Promise<SpreadsheetRow[]> {
   if (!/\.(xlsx|xlsm)$/i.test(file.name)) throw new Error("Select an Excel .xlsx or .xlsm file.");
   if (file.size > MAX_FILE_BYTES) throw new Error("Excel file must not exceed 8 MB.");
   const { readSheet } = await import("read-excel-file/browser");

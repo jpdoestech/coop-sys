@@ -6,9 +6,27 @@ import { readSpreadsheet } from "../../services/imports/excelWorkbook";
 import type { PersonImportRow } from "../../services/imports/personImport";
 
 vi.mock("../../services/imports/excelWorkbook", () => ({ readSpreadsheet: vi.fn() }));
-vi.mock("../../services/imports/personImportTemplate", () => ({ downloadPersonImportTemplate: vi.fn() }));
+vi.mock("../../services/imports/personImportTemplate", async (importOriginal) => ({ ...await importOriginal<typeof import("../../services/imports/personImportTemplate")>(), downloadPersonImportTemplate: vi.fn() }));
 
 describe("PersonImportDialog", () => {
+  it("corrects rows directly and revalidates duplicate IDs across the entire workbook", async () => {
+    vi.mocked(readSpreadsheet).mockResolvedValue([{ ID: "1", "FIRST NAME": "Alpha", "LAST NAME": "Test", MOBILE: "123" }, { ID: "1", "FIRST NAME": "Beta", "LAST NAME": "Test", MOBILE: "09171234567" }]);
+    render(<PersonImportDialog kind="employee" branches={[branches[1]]} clients={[clients[0]]} linkOptions={[]} importing={false} onClose={vi.fn()} onImport={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.change(screen.getByLabelText("Excel workbook"), { target: { files: [new File(["test"], "employees.xlsx")] } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit import row 2" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Edit import row 2" }));
+    fireEvent.change(screen.getByLabelText("Filter imported fields"), { target: { value: "contact" } });
+    expect(screen.getByLabelText("MOBILE")).toBeInTheDocument();
+    expect(screen.queryByLabelText("FIRST NAME")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("MOBILE"), { target: { value: "09181234567" } });
+    fireEvent.change(screen.getByLabelText("Filter imported fields"), { target: { value: "all" } });
+    fireEvent.change(screen.getByLabelText("ID"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply correction" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import 2 ready" })).toBeEnabled());
+    expect(screen.queryByText("ID is duplicated in this workbook.")).not.toBeInTheDocument();
+    expect(screen.getByText("000002")).toBeInTheDocument();
+  });
   it("requires deployment confirmation and auto-assigns a sole permitted branch/client", () => {
     render(<PersonImportDialog kind="employee" branches={[branches[1]]} clients={[clients[0]]} linkOptions={[]} importing={false} onClose={vi.fn()} onImport={vi.fn()} requireClient />);
     expect(screen.getByLabelText("Branch")).toHaveValue(branches[1].id);

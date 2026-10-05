@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 
 const ASSETS = __COOP_EMBEDDED_ASSETS__;
+const maintenance = __COOP_MAINTENANCE__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -489,6 +490,42 @@ async function api(req, res, url) {
   }
 
   const user = requireUser(req, res); if (!user) return;
+  if (url.pathname === "/api/maintenance/people") {
+    if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can manage data cleanup." });
+    const snapshot = {
+      employees: JSON.parse(getStorage.get("coop_sys_employees")?.value || "[]"),
+      members: JSON.parse(getStorage.get("coop_sys_members")?.value || "[]"),
+      ledger: JSON.parse(getStorage.get("coop_sys_payment_ledger")?.value || "{}"),
+    };
+    if (req.method === "GET") {
+      const kind = url.searchParams.get("kind");
+      if (!["employee", "member"].includes(kind)) return json(res, 400, { error: "Invalid record type." });
+      return json(res, 200, maintenance.listCleanupRecords(snapshot, { kind, search: url.searchParams.get("search"), state: url.searchParams.get("state"), unassigned: url.searchParams.get("unassigned") === "true", offset: Number(url.searchParams.get("offset")), limit: Number(url.searchParams.get("limit")) }));
+    }
+    if (req.method === "POST") {
+      const input = await body(req);
+      if (syncing) return json(res, 409, { error: "Wait for synchronization to complete before cleaning data." });
+      if (input.action !== "soft" && readConfig().remoteUrl) return json(res, 409, { error: "Disconnect replication before permanent deletion. Otherwise another replica can restore deleted data. Archive records if synchronization must remain enabled." });
+      let cleaned;
+      try { cleaned = maintenance.applyCleanup(snapshot, input, now()); }
+      catch (error) { return json(res, 400, { error: error.message }); }
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const timestamp = now();
+        saveStorage.run("coop_sys_employees", JSON.stringify(cleaned.snapshot.employees), timestamp, user.id);
+        saveStorage.run("coop_sys_members", JSON.stringify(cleaned.snapshot.members), timestamp, user.id);
+        saveStorage.run("coop_sys_payment_ledger", JSON.stringify(cleaned.snapshot.ledger), timestamp, user.id);
+        if (input.action !== "soft") {
+          const unlinkUser = db.prepare("UPDATE server_users SET linked_employee_id=NULL,updated_at=? WHERE linked_employee_id=?");
+          cleaned.employeeIds.forEach((employeeId) => unlinkUser.run(timestamp, employeeId));
+        }
+        db.prepare("INSERT INTO server_sync_log(id,status,direction,records_processed,message,started_at,completed_at) VALUES(?,?,?,?,?,?,?)")
+          .run(id(), "completed", "maintenance", cleaned.result.employees + cleaned.result.members, JSON.stringify({ action: input.action, actor: user.id, ...cleaned.result }), timestamp, timestamp);
+        db.exec("COMMIT");
+      } catch (error) { db.exec("ROLLBACK"); throw error; }
+      return json(res, 200, cleaned.result);
+    }
+  }
   if (req.method === "GET" && url.pathname === "/api/storage") {
     return json(res, 200, Object.fromEntries(readStorage.all().map((row) => [row.storage_key, filteredStorageValue(user, row.storage_key, row.value)]).filter((entry) => entry[1] !== undefined)));
   }

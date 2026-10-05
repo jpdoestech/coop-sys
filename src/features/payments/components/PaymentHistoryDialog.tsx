@@ -82,6 +82,7 @@ export function PaymentHistoryDialog({
   async function printHistory(orientation: PrintOrientation) {
     setChoosingOrientation(false);
     let printWindow: Window | undefined;
+    const done = useActivityStore.getState().start("Preparing payment history...");
     try {
       printWindow = openPrintWindow("Preparing Payment History");
       setPrinting(true);
@@ -161,6 +162,7 @@ export function PaymentHistoryDialog({
         reason instanceof Error ? reason.message : "Print view could not open.",
       );
     } finally {
+      done();
       setPrinting(false);
     }
   }
@@ -353,3 +355,4 @@ export function PaymentHistoryDialog({
     </div>
   );
 }
+import { useActivityStore } from "../../../services/activity/activityStore";
