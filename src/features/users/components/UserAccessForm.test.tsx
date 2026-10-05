@@ -32,7 +32,7 @@ describe("UserAccessForm steps", () => {
     const { container, onSubmit } = setup();
     const form = container.querySelector("form")!;
     fireEvent.submit(form);
-    expect(screen.getByLabelText("Data scope")).toBeInTheDocument();
+    expect(screen.getByLabelText("Data scope", { selector: "select" })).toBeInTheDocument();
     fireEvent.submit(form);
     expect(screen.getByText("Assign at least one branch.")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();

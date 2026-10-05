@@ -50,7 +50,7 @@ export async function createPersonImportTemplate(kind: "member" | "employee", lo
       : "FIRST NAME LAST NAME".includes(header) ? "Required. Extra spaces are trimmed and names use sentence case."
       : "Optional. Blank fields use the system default where applicable.";
     const listIndex = Object.keys(options).indexOf(header);
-    if (listIndex >= 0 && options[header].length) for (let row = 2; row <= 501; row += 1) sheet.getCell(row, index + 1).dataValidation = { type: "list", allowBlank: true, formulae: [`ImportList${listIndex}`], showErrorMessage: true, error: "Select a value from the list." };
+    if (listIndex >= 0 && options[header].length) for (let row = 2; row <= 501; row += 1) sheet.getCell(row, index + 1).dataValidation = { type: "list", allowBlank: true, formulae: [`ImportList${listIndex}`], showErrorMessage: false, showInputMessage: true, promptTitle: "Suggested values", prompt: "Choose a suggestion or type another value. Unmatched values are accepted and marked Needs attention." };
   });
   const guide = workbook.addWorksheet("IMPORT GUIDE");
   guide.addRows([
@@ -64,6 +64,7 @@ export async function createPersonImportTemplate(kind: "member" | "employee", lo
     ["Membership defaults", "Associate / Pending approval / Employed-Salary. Approved records require an acceptance date, BOD number and approval permission."],
     ["Beneficiaries", "Up to three beneficiaries. ACTIVE defaults to YES; NO requires a deactivation reason."],
     ["Government IDs", "SSS: 9 digits; PAG-IBIG and PHILHEALTH: 12; TIN: 9 or 12. Dashes are formatted automatically; sensitive-data permission is required."],
+    ["Lookup values", "Dropdowns are suggestions, not restrictions. Custom values are preserved and marked Needs attention before and after import. Department and position can be created from the entry/correction form when permitted."],
     ["Import results", "Only ready rows are submitted. Imported rows cannot be resubmitted in the same preview; errors remain available for review."],
   ]);
   guide.getColumn(1).width = 24; guide.getColumn(2).width = 100;

@@ -83,6 +83,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
   private filtered(options: ListOptions = {}) {
     let employees = readEmployees();
     if (!options.includeDeleted) employees = employees.filter((employee) => !employee.deleted_at);
+    if (options.attentionOnly) employees = employees.filter((item) => Object.keys(item.import_attention || {}).length || item.pending_department_name || item.pending_position_name);
     if (options.search) { const search = options.search.toLowerCase(); employees = employees.filter((employee) => [employee.employee_number, employee.first_name, employee.last_name, employee.work_location].join(" ").toLowerCase().includes(search)); }
     if (options.statusId) employees = employees.filter((employee) => employee.employment_status_id === options.statusId);
     if (options.departmentId) employees = employees.filter((employee) => employee.department_id === options.departmentId);
@@ -141,7 +142,7 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       const members = readStoredMembers();
       const index = members.findIndex((item) => item.id === input.member_id);
       if (index !== -1) {
-        members[index] = { ...members[index], proposed_branch_id: input.active_assignment.branch_id, proposed_client_id: input.active_assignment.client_id, updated_at: timestamp, sync_status: members[index].sync_status === "pending_create" ? "pending_create" : "pending_update" };
+        members[index] = { ...members[index], department_id: employee.department_id, position_id: employee.position_id, pending_department_name: employee.pending_department_name || null, pending_position_name: employee.pending_position_name || null, proposed_branch_id: input.active_assignment.branch_id, proposed_client_id: input.active_assignment.client_id, updated_at: timestamp, sync_status: members[index].sync_status === "pending_create" ? "pending_create" : "pending_update" };
         writeStoredMembers(members);
       }
     }
@@ -204,6 +205,10 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       if (memberIndex !== -1) {
         members[memberIndex] = {
           ...members[memberIndex],
+          department_id: employee.department_id,
+          position_id: employee.position_id,
+          pending_department_name: employee.pending_department_name || null,
+          pending_position_name: employee.pending_position_name || null,
           proposed_branch_id: activeAssignment.branch_id,
           proposed_client_id: activeAssignment.client_id,
           updated_at: timestamp,

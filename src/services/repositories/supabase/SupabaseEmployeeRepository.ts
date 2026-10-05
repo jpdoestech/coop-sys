@@ -87,6 +87,7 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
       : "*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))";
     let query = client().from("employees").select(selection, { count: "exact" });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
+    if (options.attentionOnly) query = query.or("import_attention.not.is.null,pending_department_name.not.is.null,pending_position_name.not.is.null");
     if (options.search) { const term = `%${options.search}%`; query = query.or(`employee_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`); }
     if (options.statusId) query = query.eq("employment_status_id", options.statusId);
     if (options.departmentId) query = query.eq("department_id", options.departmentId);
@@ -107,6 +108,7 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
       .select("*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))")
       .order("updated_at", { ascending: false });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
+    if (options.attentionOnly) query = query.or("import_attention.not.is.null,pending_department_name.not.is.null,pending_position_name.not.is.null");
     if (options.search) {
       const term = `%${options.search}%`;
       query = query.or(`employee_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`);

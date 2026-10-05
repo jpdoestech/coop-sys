@@ -1,6 +1,7 @@
 export type ListOptions = {
   search?: string;
   includeDeleted?: boolean;
+  attentionOnly?: boolean;
   limit?: number;
   offset?: number;
   statusId?: string;

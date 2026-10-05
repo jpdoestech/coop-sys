@@ -5,6 +5,7 @@ import type { EmploymentAssignment, EmploymentAssignmentInput } from "./assignme
 export type Employee = BaseRecord &
   PersonName & {
     employee_number: string;
+    import_attention?: Record<string, string> | null;
     member_id: string | null;
     religion_affiliation_id: string | null;
     sss_number: string | null;
@@ -28,6 +29,9 @@ export type Employee = BaseRecord &
     date_separated: string | null;
     position_id: string | null;
     department_id: string | null;
+    pending_department_name?: string | null;
+    pending_position_name?: string | null;
+    religion_affiliation?: string | null;
     supervisor_id: string | null;
     work_location: string | null;
     notes: string | null;

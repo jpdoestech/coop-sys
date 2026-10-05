@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useDeferredValue, useEffect, useState } from "react";
 import {
   BriefcaseBusiness,
@@ -128,7 +129,7 @@ export function OrganizationPage() {
               aria-label="Search organization records"
             />
           </div>
-          <select
+          <SearchableSelect
             aria-label="Filter organization status"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
@@ -137,7 +138,7 @@ export function OrganizationPage() {
             <option value="active">Active records</option>
             <option value="inactive">Inactive records</option>
             <option value="all">All statuses</option>
-          </select>
+          </SearchableSelect>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">
             {recordsQuery.data?.total ?? 0} records
           </p>

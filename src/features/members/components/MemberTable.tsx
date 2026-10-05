@@ -1,3 +1,4 @@
+import { hasImportAttention } from "../../../services/imports/importAttention";
 import { Archive, Building2, Pencil, Users } from "lucide-react";
 import type { Member } from "../../../types/member";
 import { memberStatuses, memberTypes, optionLabel } from "../data/memberOptions";
@@ -65,7 +66,7 @@ export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canD
               {canApprove ? <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(member.id)} disabled={member.bod_approval_status !== "pending"} onChange={() => onToggle(member.id)} aria-label={`Select ${displayName(member)} for approval`} className="h-3.5 w-3.5 accent-moss disabled:opacity-30" /></td> : null}
               <td className="px-5 py-2.5">
                 <p className="font-semibold text-ink">{displayName(member)}</p>
-                <p className="mt-0.5 font-mono text-[11px] text-ink/45">{member.membership_number}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-ink/45">{member.membership_number}</p>{hasImportAttention(member) ? <span className="mt-1 inline-block text-[10px] font-medium text-amber-800">Needs attention</span> : null}
               </td>
               <td className="px-4 py-2.5 text-ink/75">
                 {optionLabel(memberTypes, member.membership_type_id)}

@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowUpDown, CheckCheck, CircleDotDashed, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
@@ -37,6 +38,7 @@ export function MembersPage() {
   const canEdit = can("members.update");
   const canDelete = can("members.delete");
   const canApprove = can("members.approve");
+  const [attentionOnly, setAttentionOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [approvalFilter, setApprovalFilter] = useState("");
@@ -45,9 +47,9 @@ export function MembersPage() {
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize }, formOpen ? editingMember?.id : null);
+  const { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, attentionOnly, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize }, formOpen ? editingMember?.id : null);
   const aliasManagement = useAliasManagement("members.update");
-  useEffect(() => setPage(1), [deferredSearch, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
+  useEffect(() => setPage(1), [deferredSearch, attentionOnly, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
   const pageMembers = query.data?.items ?? [];
   const editingEmployee = linkedEmployee.data ?? null;
 
@@ -95,12 +97,12 @@ export function MembersPage() {
               aria-label="Search members"
             />
           </div>
-          <div className="relative min-w-[150px] flex-1 sm:flex-none"><ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter BOD approval" value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All approvals</option><option value="pending">Pending approval</option><option value="approved">Approved</option></select></div>
-          <div className="relative min-w-[150px] flex-1 sm:flex-none"><UsersRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+          <div className="relative min-w-[150px] flex-1 sm:flex-none"><ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter BOD approval" value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All approvals</option><option value="pending">Pending approval</option><option value="approved">Approved</option></SearchableSelect></div>
+          <div className="relative min-w-[150px] flex-1 sm:flex-none"><UsersRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></div>
           <div className="flex max-w-full flex-wrap items-center gap-2">
-            <div className="relative"><CircleDotDashed className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Membership status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="compact-control w-36 pl-8"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+            <label className="inline-flex items-center gap-1.5 text-xs text-amber-800"><input type="checkbox" checked={attentionOnly} onChange={(event) => setAttentionOnly(event.target.checked)} />Needs attention</label><div className="relative"><CircleDotDashed className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Membership status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="compact-control w-36 pl-8"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></div>
             <PlacementSelectors branchId={branchFilter} clientId={clientFilter} onBranchChange={(value) => { setBranchFilter(value); setClientFilter(""); }} onClientChange={setClientFilter} />
-            <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select></div>
+            <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></SearchableSelect></div>
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
           {canApprove && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}

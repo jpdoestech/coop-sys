@@ -7,9 +7,9 @@ describe("PaymentImportPanel", () => {
     render(<PaymentImportPanel employees={[]} aliases={[]} branches={[]} clients={[]} userId="user-1" saving={false} onSaveAlias={vi.fn()} onPost={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText("Cut-off from"), { target: { value: "2026-03-10" } });
-    expect(screen.getByLabelText("Payroll month")).toHaveValue("3");
+    expect(screen.getByLabelText("Payroll month", { selector: "select" })).toHaveValue("3");
 
-    fireEvent.change(screen.getByLabelText("Payroll month"), { target: { value: "4" } });
-    expect(screen.getByLabelText("Payroll month")).toHaveValue("4");
+    fireEvent.change(screen.getByLabelText("Payroll month", { selector: "select" }), { target: { value: "4" } });
+    expect(screen.getByLabelText("Payroll month", { selector: "select" })).toHaveValue("4");
   });
 });

@@ -11,9 +11,11 @@ const nullableText = z.string().transform(normalizeWhitespace).pipe(z.string().m
 
 export const employeeInputSchema = z
   .object({
+    import_attention: z.record(z.string(), z.string()).nullable().optional(),
     employee_number: z.string().regex(/^\d{6}$/, "Employee number must contain exactly six digits."),
     member_id: nullableText,
     religion_affiliation_id: nullableText,
+    religion_affiliation: nullableText,
     sss_number: governmentId([9], "SSS number", 11, [/^\d{2}-\d{6}-\d$/]),
     pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),
     philhealth_number: governmentId([12], "PhilHealth number", 14, [/^\d{2}-\d{9}-\d$/]),
@@ -45,6 +47,8 @@ export const employeeInputSchema = z
     date_separated: nullableText,
     position_id: nullableText,
     department_id: nullableText,
+    pending_department_name: nullableText,
+    pending_position_name: nullableText,
     supervisor_id: nullableText,
     work_location: nullableText,
     notes: z.string().trim().max(CHARACTER_LIMITS.notes, "Notes are too long.").nullable().optional(),

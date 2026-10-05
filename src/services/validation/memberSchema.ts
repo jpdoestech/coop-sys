@@ -9,6 +9,7 @@ import { beneficiariesSchema } from "./beneficiarySchema";
 const nullableText = z.string().transform(normalizeWhitespace).pipe(z.string().max(CHARACTER_LIMITS.address, "Value is too long.")).nullable().optional();
 
 export const memberInputSchema = z.object({
+  import_attention: z.record(z.string(), z.string()).nullable().optional(),
   membership_number: z.string().regex(/^\d{6}$/, "Membership number must contain exactly six digits."),
   first_name: requiredPersonName("First name"),
   middle_name: optionalPersonName,
@@ -36,6 +37,10 @@ export const memberInputSchema = z.object({
   member_category: nullableText,
   proposed_branch_id: nullableText,
   proposed_client_id: nullableText,
+  department_id: nullableText,
+  position_id: nullableText,
+  pending_department_name: nullableText,
+  pending_position_name: nullableText,
   religion_affiliation_id: nullableText,
   sss_number: governmentId([9], "SSS number", 11, [/^\d{2}-\d{6}-\d$/]),
   pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),

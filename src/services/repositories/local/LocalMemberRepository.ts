@@ -13,6 +13,7 @@ export class LocalMemberRepository implements MemberRepository {
   private filtered(options: ListOptions = {}) {
     let members = readStoredMembers();
     if (!options.includeDeleted) members = members.filter((member) => !member.deleted_at);
+    if (options.attentionOnly) members = members.filter((item) => Object.keys(item.import_attention || {}).length || item.pending_department_name || item.pending_position_name);
     if (options.search) { const search = options.search.toLowerCase(); members = members.filter((member) => [member.membership_number, member.first_name, member.last_name].join(" ").toLowerCase().includes(search)); }
     if (options.statusId) members = members.filter((member) => member.membership_status_id === options.statusId);
     if (options.typeId) members = members.filter((member) => member.membership_type_id === options.typeId);

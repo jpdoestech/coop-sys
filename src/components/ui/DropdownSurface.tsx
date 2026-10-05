@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties, type RefObject } from "react";
 
-export function DropdownSurface({ children, className = "", preferredWidth, ...props }: { children: ReactNode; className?: string; preferredWidth?: number; id?: string; role?: string }) {
+export function DropdownSurface({ children, className = "", preferredWidth, anchorRef, ...props }: { children: ReactNode; className?: string; preferredWidth?: number; anchorRef?: RefObject<HTMLElement | null>; id?: string; role?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({ position: "fixed", visibility: "hidden" });
   useLayoutEffect(() => {
-    const anchor = ref.current?.parentElement;
+    const anchor = anchorRef?.current ?? ref.current?.parentElement;
     if (!anchor) return;
     function position() {
       const rect = anchor!.getBoundingClientRect();
@@ -32,6 +32,6 @@ export function DropdownSurface({ children, className = "", preferredWidth, ...p
       window.visualViewport?.removeEventListener("resize", position);
       window.visualViewport?.removeEventListener("scroll", position);
     };
-  }, [preferredWidth]);
+  }, [preferredWidth, anchorRef]);
   return <div {...props} ref={ref} style={style} className={`rounded-md border border-line bg-white p-1 shadow-xl ${className}`}>{children}</div>;
 }

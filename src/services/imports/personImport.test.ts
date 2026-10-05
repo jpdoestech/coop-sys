@@ -3,6 +3,20 @@ import { personRowsFromSpreadsheet } from "./personImport";
 import { departments, positions } from "../../features/employees/data/employeeOptions";
 
 describe("person import validation", () => {
+  it("accepts unmatched lookup values and persists review flags without weakening email or ID validation", async () => {
+    const [row] = await personRowsFromSpreadsheet([{ "FIRST NAME": "Review", "LAST NAME": "Person", EMAIL: "invalid-email", DEPARTMENT: "New division", POSITION: "New role", "EMPLOYMENT TYPE": "Custom contract", "RELIGION / SOCIAL AFFILIATION": "Custom affiliation", "HIGHEST EDUCATIONAL ATTAINMENT": "Custom education" }]);
+    expect(row.errorTypes).toContain("contact");
+    expect(row.errorTypes).not.toContain("lookup");
+    expect(row.employeeFields).toMatchObject({ pending_department_name: "New division", pending_position_name: "New role", religion_affiliation: "Custom affiliation", import_attention: { DEPARTMENT: "New division", POSITION: "New role", "EMPLOYMENT TYPE": "Custom contract" } });
+    expect(row.memberFields.highest_educational_attainment).toBe("Custom education");
+    const [corrected] = await personRowsFromSpreadsheet([{ ...row.source, EMAIL: "review@example.test" }]);
+    expect(corrected.errors).toEqual([]);
+    expect(corrected.warnings?.length).toBeGreaterThan(0);
+  });
+  it("blocks duplicate full names, government IDs and case-insensitive emails", async () => {
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "JUAN", "LAST NAME": "CRUZ", EMAIL: "juan@example.test", "SSS NUMBER": "123456789" }, { "FIRST NAME": " Juan ", "LAST NAME": "Cruz", EMAIL: "JUAN@example.test", "SSS NUMBER": "12-345678-9" }]);
+    rows.forEach((row) => expect(row.errorTypes).toEqual(expect.arrayContaining(["duplicate", "contact", "government_id"])));
+  });
   it("maps the complete employee record, government IDs and three beneficiaries", async () => {
     const [row] = await personRowsFromSpreadsheet([{ ID: "19", "FIRST NAME": "  JUAN   CARLOS ", "LAST NAME": "DELA CRUZ", SUFFIX: "III", "BIRTH DATE": "6/15/1990", "DATE HIRED": "45292", MOBILE: "09171234567", ADDRESS: "Full free-text address", "SEX": "Male", "CIVIL STATUS": "Single", "SSS NUMBER": "123456789", "PAG-IBIG NUMBER": "123456789012", "TIN": "123456789", "RELIGION / SOCIAL AFFILIATION": "Roman Catholic", DEPARTMENT: departments[0].label, POSITION: positions[0].label, "WORK LOCATION": "Test site", "ASSIGNMENT CODE": "A-1", "ASSIGNMENT START DATE": "1/2/2024", "BENEFICIARY 1 NAME": "JANE CRUZ", "BENEFICIARY 1 RELATIONSHIP": "Spouse", "BENEFICIARY 1 BIRTH DATE": "1990-01-01", "BENEFICIARY 2 NAME": "JOHN CRUZ", "BENEFICIARY 2 RELATIONSHIP": "Child", "BENEFICIARY 3 NAME": "JUNE CRUZ", "BENEFICIARY 3 RELATIONSHIP": "Child" }]);
     expect(row.errors).toEqual([]);

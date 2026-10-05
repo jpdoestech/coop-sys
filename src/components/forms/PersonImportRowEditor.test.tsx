@@ -5,6 +5,8 @@ import { useUnsavedChanges } from "./unsavedChanges";
 import { UnsavedChangesProvider } from "./UnsavedChangesProvider";
 import { PersonImportRowEditor } from "./PersonImportRowEditor";
 import { personRowsFromSpreadsheet } from "../../services/imports/personImport";
+vi.mock("../../services/organization/useOrganization", () => ({ useOrganization: () => ({ branches: [], clients: [], departments: [], positions: [] }) }));
+vi.mock("../../services/access/useAccess", () => ({ useAccess: () => ({ can: () => false }) }));
 
 describe("import row editor", () => {
   it("only confirms discarding the edited row, not its parent workbook", async () => {

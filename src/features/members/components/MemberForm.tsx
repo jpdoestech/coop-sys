@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRightLeft, BriefcaseBusiness, Contact, History, MapPinned, Save, UserRound, UsersRound, X } from "lucide-react";
@@ -7,7 +8,10 @@ import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/
 import { educationalAttainments } from "../../../services/lookups/educationalAttainments";
 import { terminalMemberStatuses } from "../../../services/lookups/statuses";
 import { memberInputSchema } from "../../../services/validation/memberSchema";
-import { religionAffiliations } from "../../../services/lookups/religionAffiliations";
+import { ReligionAffiliationField } from "../../../components/forms/ReligionAffiliationField";
+import { EmploymentClassificationFields } from "../../../components/forms/EmploymentClassificationFields";
+import { ImportAttentionPanel } from "../../../components/forms/ImportAttentionPanel";
+import { clearImportAttention, attentionHeaderForField } from "../../../services/imports/importAttention";
 import type { Member, MemberInput } from "../../../types/member";
 import type { Employee } from "../../../types/employee";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
@@ -169,7 +173,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
   }, [member, suggestedNumber]);
 
   function setValue<K extends keyof Draft>(field: K, value: Draft[K]) {
-    setDraft((current) => ({ ...current, [field]: value }));
+    setDraft((current) => ({ ...current, [field]: value, ...(attentionHeaderForField[field] ? { import_attention: clearImportAttention(current.import_attention, attentionHeaderForField[field]) } : {}) }));
     setErrors((current) => ({ ...current, [field]: "" }));
   }
 
@@ -264,6 +268,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
           </nav>
 
           {saveError ? <p role="alert" className="mx-6 mt-4 border-l-4 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-800 sm:mx-8">{saveError}</p> : null}
+          <ImportAttentionPanel value={draft.import_attention} onChange={(value) => setValue("import_attention", value)} />
 
           {tab === "personal" ? <><Section title="Identity" description="Core details shared with an employee profile when this person has both roles.">
             <Field label="Membership number" error={errors.membership_number}>
@@ -285,20 +290,20 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
               <input type="date" className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} />
             </Field>
             <Field label="Sex">
-              <select className={inputClass} value={draft.sex ?? ""} onChange={(event) => setValue("sex", event.target.value || null)}>
+              <SearchableSelect className={inputClass} onCustomValue={(text) => setDraft((current) => ({ ...current, sex: text, import_attention: { ...current.import_attention, [attentionHeaderForField["sex"]]: text } }))} attentionValue={draft.import_attention?.[attentionHeaderForField["sex"]]} value={draft.sex ?? ""} onChange={(event) => setValue("sex", event.target.value || null)}>
                 <option value="">Not set</option><option>Female</option><option>Male</option><option>Other</option>
-              </select>
+              </SearchableSelect>
             </Field>
             <Field label="Civil status">
-              <select className={inputClass} value={draft.civil_status ?? ""} onChange={(event) => setValue("civil_status", event.target.value || null)}>
+              <SearchableSelect className={inputClass} onCustomValue={(text) => setDraft((current) => ({ ...current, civil_status: text, import_attention: { ...current.import_attention, [attentionHeaderForField["civil_status"]]: text } }))} attentionValue={draft.import_attention?.[attentionHeaderForField["civil_status"]]} value={draft.civil_status ?? ""} onChange={(event) => setValue("civil_status", event.target.value || null)}>
                 <option value="">Not set</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option>
-              </select>
+              </SearchableSelect>
             </Field>
             <Field label="Highest educational attainment">
-              <select className={inputClass} value={draft.highest_educational_attainment ?? ""} onChange={(event) => setValue("highest_educational_attainment", event.target.value || null)}>
+              <SearchableSelect className={inputClass} onCustomValue={(text) => setDraft((current) => ({ ...current, highest_educational_attainment: text, import_attention: { ...current.import_attention, [attentionHeaderForField["highest_educational_attainment"]]: text } }))} attentionValue={draft.import_attention?.[attentionHeaderForField["highest_educational_attainment"]]} value={draft.highest_educational_attainment ?? ""} onChange={(event) => setValue("highest_educational_attainment", event.target.value || null)}>
                 <option value="">Not set</option>
                 {educationalAttainments.map((attainment) => <option key={attainment} value={attainment}>{attainment}</option>)}
-              </select>
+              </SearchableSelect>
             </Field>
           </Section>
 
@@ -315,8 +320,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
           </Section> : null}
 
           {tab === "membership" ? <><Section title="Intended placement" description="Set the branch and client before BOD approval so the application is visible to the correct operational scope.">
-            <Field label="Office / branch" error={errors.proposed_branch_id}><select className={inputClass} disabled={Boolean(activeAssignment) && !transferring} value={draft.proposed_branch_id ?? ""} onChange={(event) => { const branchId = event.target.value || null; setDraft((current) => ({ ...current, proposed_branch_id: branchId, proposed_client_id: null })); setErrors((current) => ({ ...current, proposed_branch_id: "", proposed_client_id: "" })); }}><option value="">Select office or branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.type === "head_office" ? branch.label : `Branch: ${branch.label}`}</option>)}</select></Field>
-            <Field label="Branch client" error={errors.proposed_client_id}><select className={inputClass} disabled={(Boolean(activeAssignment) && !transferring) || !draft.proposed_branch_id || !availableClients.length} value={draft.proposed_client_id ?? ""} onChange={(event) => setValue("proposed_client_id", event.target.value || null)}><option value="">Direct office / branch employee</option>{availableClients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></Field>
+            <Field label="Office / branch" error={errors.proposed_branch_id}><SearchableSelect className={inputClass} disabled={Boolean(activeAssignment) && !transferring} value={draft.proposed_branch_id ?? ""} onChange={(event) => { const branchId = event.target.value || null; setDraft((current) => ({ ...current, proposed_branch_id: branchId, proposed_client_id: null })); setErrors((current) => ({ ...current, proposed_branch_id: "", proposed_client_id: "" })); }}><option value="">Select office or branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.type === "head_office" ? branch.label : `Branch: ${branch.label}`}</option>)}</SearchableSelect></Field>
+            <Field label="Branch client" error={errors.proposed_client_id}><SearchableSelect className={inputClass} disabled={(Boolean(activeAssignment) && !transferring) || !draft.proposed_branch_id || !availableClients.length} value={draft.proposed_client_id ?? ""} onChange={(event) => setValue("proposed_client_id", event.target.value || null)}><option value="">Direct office / branch employee</option>{availableClients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</SearchableSelect></Field>
             {activeAssignment ? <div className="sm:col-span-2 flex justify-end"><button type="button" className="secondary-button" onClick={() => {
               if (transferring) {
                 confirmDiscard(() => {
@@ -340,8 +345,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
             <Field label="Membership date"><input type="date" className={inputClass} value={draft.membership_date ?? ""} onChange={(event) => setValue("membership_date", event.target.value || null)} /></Field>
             <Field label="BOD approval"><input className={`${inputClass} bg-paper`} readOnly value={draft.bod_approval_status === "approved" ? "Approved" : "Pending approval"} /></Field>
             {draft.bod_approval_status === "approved" ? <Field label="Date & BOD resolution #"><input className={`${inputClass} bg-paper font-mono`} readOnly value={`${draft.acceptance_date ?? "Date not set"} / ${draft.acceptance_resolution_number ?? "Number not set"}`} /></Field> : null}
-            <Field label="Membership type"><select className={inputClass} value={draft.membership_type_id ?? ""} onChange={(event) => setValue("membership_type_id", event.target.value || null)}>{memberTypes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
-            <Field label="Membership status"><select className={inputClass} value={draft.membership_status_id ?? ""} onChange={(event) => { const status = event.target.value || null; setValue("membership_status_id", status); if (!status || !terminalMemberStatuses.has(status)) { setValue("termination_date", null); setValue("termination_reason", null); } }}>{memberStatuses.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></Field>
+            <Field label="Membership type"><SearchableSelect className={inputClass} onCustomValue={(text) => setDraft((current) => ({ ...current, import_attention: { ...current.import_attention, [attentionHeaderForField["membership_type_id"]]: text } }))} attentionValue={draft.import_attention?.[attentionHeaderForField["membership_type_id"]]} value={draft.membership_type_id ?? ""} onChange={(event) => setValue("membership_type_id", event.target.value || null)}>{memberTypes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</SearchableSelect></Field>
+            <Field label="Membership status"><SearchableSelect className={inputClass} onCustomValue={(text) => setDraft((current) => ({ ...current, import_attention: { ...current.import_attention, [attentionHeaderForField["membership_status_id"]]: text } }))} attentionValue={draft.import_attention?.[attentionHeaderForField["membership_status_id"]]} value={draft.membership_status_id ?? ""} onChange={(event) => { const status = event.target.value || null; setValue("membership_status_id", status); if (!status || !terminalMemberStatuses.has(status)) { setValue("termination_date", null); setValue("termination_reason", null); } }}>{memberStatuses.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</SearchableSelect></Field>
             {membershipEnded ? (
               <>
                 <Field label="Resignation / termination date" error={errors.termination_date}><input type="date" className={inputClass} value={draft.termination_date ?? ""} onChange={(event) => setValue("termination_date", event.target.value || null)} /></Field>
@@ -349,7 +354,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
               </>
             ) : null}
             <Field label="Member category"><input className={inputClass} value={draft.member_category ?? ""} onChange={(event) => setValue("member_category", event.target.value || null)} placeholder="Community, Manpower" /></Field>
-            <Field label="Religion / social affiliation"><select className={inputClass} value={draft.religion_affiliation_id ?? ""} onChange={(event) => setValue("religion_affiliation_id", event.target.value || null)}><option value="">Not set</option>{religionAffiliations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
+            <ReligionAffiliationField attention={Boolean(draft.import_attention?.["RELIGION / SOCIAL AFFILIATION"])} value={draft} onChange={(value) => setDraft((current) => ({ ...current, ...value, import_attention: value.religion_affiliation && !value.religion_affiliation_id ? { ...current.import_attention, "RELIGION / SOCIAL AFFILIATION": value.religion_affiliation } : clearImportAttention(current.import_attention, "RELIGION / SOCIAL AFFILIATION") }))} />
+            <EmploymentClassificationFields value={draft} onChange={(value) => setDraft((current) => ({ ...current, ...value, import_attention: clearImportAttention(current.import_attention, ...(!value.pending_department_name ? ["DEPARTMENT"] : []), ...(!value.pending_position_name ? ["POSITION"] : [])) }))} />
           </Section></> : null}
 
           {tab === "background" ? <><Section title="Background" description="Optional details from the cooperative registration record; financial ledger entries are excluded.">

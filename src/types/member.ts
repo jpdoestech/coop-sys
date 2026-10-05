@@ -6,6 +6,7 @@ export type BodApprovalStatus = "pending" | "approved";
 export type Member = BaseRecord &
   PersonName & {
     membership_number: string;
+    import_attention?: Record<string, string> | null;
     date_of_birth: string | null;
     sex: string | null;
     civil_status: string | null;
@@ -22,6 +23,10 @@ export type Member = BaseRecord &
     member_category: string | null;
     proposed_branch_id: string | null;
     proposed_client_id: string | null;
+    department_id?: string | null;
+    position_id?: string | null;
+    pending_department_name?: string | null;
+    pending_position_name?: string | null;
     religion_affiliation_id: string | null;
     sss_number: string | null;
     pagibig_number: string | null;

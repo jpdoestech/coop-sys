@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import {
   AlertTriangle,
@@ -376,7 +377,7 @@ export function RefundPanel({
         >
           <label className="field-label lg:col-span-3">
             Branch
-            <select
+            <SearchableSelect
               className="control mt-1 w-full"
               required
               value={branchId}
@@ -392,11 +393,11 @@ export function RefundPanel({
                   {branch.label}
                 </option>
               ))}
-            </select>
+            </SearchableSelect>
           </label>
           <label className="field-label lg:col-span-3">
             Client
-            <select
+            <SearchableSelect
               className="control mt-1 w-full"
               value={clientId}
               onChange={(event) => {
@@ -412,7 +413,7 @@ export function RefundPanel({
                     {client.label}
                   </option>
                 ))}
-            </select>
+            </SearchableSelect>
           </label>
           <div className="lg:col-span-4">
             <EmployeeSearchField
@@ -499,7 +500,7 @@ export function RefundPanel({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="field-label">
               Branch
-              <select
+              <SearchableSelect
                 className="control mt-1 w-full"
                 disabled={fixedBranch}
                 value={branchId}
@@ -511,11 +512,11 @@ export function RefundPanel({
                     {branch.label}
                   </option>
                 ))}
-              </select>
+              </SearchableSelect>
             </label>
             <label className="field-label">
               Client
-              <select
+              <SearchableSelect
                 className="control mt-1 w-full"
                 disabled={fixedClient}
                 value={clientId}
@@ -529,7 +530,7 @@ export function RefundPanel({
                       {client.label}
                     </option>
                   ))}
-              </select>
+              </SearchableSelect>
             </label>
             <label className="field-label">
               Refund date

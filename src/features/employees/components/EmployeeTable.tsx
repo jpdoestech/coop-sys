@@ -1,3 +1,4 @@
+import { hasImportAttention } from "../../../services/imports/importAttention";
 import { Archive, Pencil, UserRoundCog } from "lucide-react";
 import type { Employee } from "../../../types/employee";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
@@ -39,8 +40,8 @@ export function EmployeeTable({ employees, loading, onEdit, onArchive, canEdit, 
           {employees.map((employee) => {
             const placement = placementFor(employee, branches, clients);
             return <tr key={employee.id} className="transition-colors hover:bg-[#f8faf8]">
-              <td className="px-5 py-2.5"><p className="font-semibold">{employee.last_name}, {employee.first_name}</p><p className="mt-0.5 font-mono text-[11px] text-ink/45">{employee.employee_number}</p></td>
-              <td className="px-4 py-2.5"><p>{labelFor(positions, employee.position_id)}</p><p className="mt-0.5 text-xs text-ink/55">{labelFor(departments, employee.department_id)}</p></td>
+              <td className="px-5 py-2.5"><p className="font-semibold">{employee.last_name}, {employee.first_name}</p><p className="mt-0.5 font-mono text-[11px] text-ink/45">{employee.employee_number}</p>{hasImportAttention(employee) ? <span className="mt-1 inline-block text-[10px] font-medium text-amber-800">Needs attention</span> : null}</td>
+              <td className="px-4 py-2.5"><p>{employee.pending_position_name || labelFor(positions, employee.position_id)}</p><p className="mt-0.5 text-xs text-ink/55">{employee.pending_department_name || labelFor(departments, employee.department_id)}</p></td>
               <td className="px-4 py-2.5"><span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${employee.employment_status_id === employmentStatuses[0].id ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}><span className={`h-1.5 w-1.5 rounded-full ${employee.employment_status_id === employmentStatuses[0].id ? "bg-emerald-500" : "bg-amber-500"}`} />{labelFor(employmentStatuses, employee.employment_status_id)}</span></td>
               <td className="px-4 py-2.5"><p>{placement.primary}</p><p className="mt-0.5 text-xs text-ink/55">{placement.secondary}</p></td>
               <td className="px-4 py-2.5"><span className="font-semibold">{activeBeneficiaryCount(employee.beneficiaries)}</span><span className="text-ink/35"> / 3</span></td>

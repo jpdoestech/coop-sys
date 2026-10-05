@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, AlertTriangle, DatabaseZap, LoaderCircle, Search, ShieldCheck, Trash2, X } from "lucide-react";
@@ -29,9 +30,9 @@ export function DataMaintenance() {
   return <section className="overflow-hidden rounded-md border border-line bg-white">
     <header className="flex items-center gap-2 border-b border-line px-4 py-3"><ShieldCheck className="h-4 w-4 text-moss" /><h2 className="text-sm font-semibold">Data maintenance</h2><span className="ml-auto text-[10px] font-semibold uppercase text-ink/45">Super Admin</span></header>
     <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-      <select aria-label="Record type" className="compact-control" value={kind} disabled={mutation.isPending} onChange={(e) => { setKind(e.target.value as CleanupKind); resetSelection(); }}><option value="employee">Employees</option><option value="member">Members</option></select>
+      <SearchableSelect aria-label="Record type" className="compact-control" value={kind} disabled={mutation.isPending} onChange={(e) => { setKind(e.target.value as CleanupKind); resetSelection(); }}><option value="employee">Employees</option><option value="member">Members</option></SearchableSelect>
       <label className="relative min-w-0 flex-1"><Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" /><input aria-label="Search cleanup records" className="compact-control w-full pl-8" placeholder="Search ID or name" value={search} onChange={(e) => { setSearch(e.target.value); resetSelection(); }} /></label>
-      <select aria-label="Archive state" className="compact-control" value={state} onChange={(e) => { setState(e.target.value as typeof state); resetSelection(); }}><option value="active">Not archived</option><option value="archived">Archived</option><option value="all">All records</option></select>
+      <SearchableSelect aria-label="Archive state" className="compact-control" value={state} onChange={(e) => { setState(e.target.value as typeof state); resetSelection(); }}><option value="active">Not archived</option><option value="archived">Archived</option><option value="all">All records</option></SearchableSelect>
       <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={unassigned} onChange={(e) => { setUnassigned(e.target.checked); resetSelection(); }} />No branch assigned</label>
     </div>
     <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2"><span className="mr-auto text-xs text-ink/55">{selected.length} selected / {query.data?.total || 0} matching</span><button className="secondary-button" disabled={!selected.length || mutation.isPending} onClick={() => choose("soft", "selected")}><Archive className="h-4 w-4" />Archive selected</button><button className="secondary-button text-red-700" disabled={!selected.length || mutation.isPending} onClick={() => choose("hard", "selected")}><Trash2 className="h-4 w-4" />Delete selected</button>{unassigned ? <button className="secondary-button" disabled={mutation.isPending} onClick={() => choose("soft", "unassigned")}><Archive className="h-4 w-4" />Archive all unassigned</button> : null}</div>

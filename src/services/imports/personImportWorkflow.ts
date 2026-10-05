@@ -11,6 +11,7 @@ import { employeeProfileFromMember } from "../identity/personProfileSync";
 import { employeeInputSchema } from "../validation/employeeSchema";
 import { memberInputSchema } from "../validation/memberSchema";
 import { createUuid } from "../../utils/createUuid";
+import { normalizeIdentityName } from "./identityMatching";
 
 export type PersonImportRequest = { rows: PersonImportRow[]; branchId: string; clientId: string };
 
@@ -59,6 +60,15 @@ export async function importPersonRows(kind: "member" | "employee", repositories
       if (kind === "member" && (members.some((item) => item.membership_number === number) || linkedEmployee?.member_id)) throw new Error("ID already exists as a member.");
       if (linkedEmployee && !employeeIsInScope(linkedEmployee, profile)) throw new Error("The linked employee is outside your scope.");
       const fields = kind === "employee" ? row.employeeFields : row.memberFields;
+      const fullName = normalizeIdentityName([fields.first_name, fields.middle_name, fields.last_name, fields.suffix].filter(Boolean).join(" "));
+      const otherPeople = [...members, ...employees].filter((item) => item.id !== linkedMember?.id && item.id !== linkedEmployee?.id);
+      for (const person of otherPeople) {
+        if (fullName && normalizeIdentityName([person.first_name, person.middle_name, person.last_name, person.suffix].filter(Boolean).join(" ")) === fullName) throw new Error("Full name already exists. Link the existing person instead of creating a duplicate.");
+        if (fields.email && person.email?.trim().toLowerCase() === fields.email.trim().toLowerCase()) throw new Error("Email address already exists on another person.");
+        for (const key of ["sss_number", "pagibig_number", "philhealth_number", "tax_identification_number"] as const) {
+          if (fields[key] && person[key] && fields[key]?.replace(/\D/g, "") === person[key]?.replace(/\D/g, "")) throw new Error(`${key.replaceAll("_", " ").toUpperCase()} already exists on another person.`);
+        }
+      }
       if ([fields.sss_number, fields.pagibig_number, fields.philhealth_number, fields.tax_identification_number].some(Boolean)) assertPermission(profile, `${kind === "employee" ? "employees" : "members"}.sensitive.update`);
       const assignment = { id: createUuid(), branch_id: branch.id, client_id: request.clientId || null, assignment_code: null, start_date: row.dateHired || new Date().toISOString().slice(0, 10), end_date: null, work_location: branch.label, transfer_reason: "Initial Excel import", notes: null, ...row.assignmentFields };
       if (!assignment.work_location) assignment.work_location = branch.label;
@@ -69,7 +79,7 @@ export async function importPersonRows(kind: "member" | "employee", repositories
           if (!supervisor) throw new Error("Supervisor ID was not found within your scope.");
           input = { ...input, supervisor_id: supervisor.id };
         }
-        const validated = employeeInputSchema.parse(linkedMember ? { ...input, ...employeeProfileFromMember(linkedMember) } : input) as EmployeeInput;
+        const validated = employeeInputSchema.parse(linkedMember ? { ...input, ...employeeProfileFromMember(linkedMember), ...((row.source?.DEPARTMENT || row.source?.POSITION) ? { department_id: input.department_id, position_id: input.position_id, pending_department_name: input.pending_department_name, pending_position_name: input.pending_position_name } : {}), import_attention: input.import_attention } : input) as EmployeeInput;
         stage = "save";
         const saved = await repositories.employees.create(validated);
         employees.push(saved); used.add(number);

@@ -1,3 +1,4 @@
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { ArrowRightLeft, Building2, MapPin, X } from "lucide-react";
 import type { EmploymentAssignmentInput } from "../../../types/assignment";
 import { HEAD_OFFICE_ID, labelFor } from "../data/employeeOptions";
@@ -46,21 +47,21 @@ export function AssignmentEditor({ value, history, existingActive, transferring,
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-xs font-semibold text-ink/75">
             Office / branch
-            <select className={inputClass} value={value.branch_id ?? ""} onChange={(event) => {
+            <SearchableSelect className={inputClass} value={value.branch_id ?? ""} onChange={(event) => {
               const branchId = event.target.value || null;
               const branch = branches.find((item) => item.id === branchId);
               onChange({ ...value, branch_id: branchId, client_id: null, work_location: branch?.label ?? null });
             }}>
               <option value="">Not assigned</option>
               {branches.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.type === "head_office" ? item.label : `Branch: ${item.label}`}</option>)}
-            </select>
+            </SearchableSelect>
           </label>
           <label className="block text-xs font-semibold text-ink/75">
             Branch client
-            <select className={inputClass} disabled={!value.branch_id || value.branch_id === HEAD_OFFICE_ID} value={value.client_id ?? ""} onChange={(event) => onChange({ ...value, client_id: event.target.value || null })}>
+            <SearchableSelect className={inputClass} disabled={!value.branch_id || value.branch_id === HEAD_OFFICE_ID} value={value.client_id ?? ""} onChange={(event) => onChange({ ...value, client_id: event.target.value || null })}>
               <option value="">Direct office / branch employee</option>
               {availableClients.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-            </select>
+            </SearchableSelect>
           </label>
           <label className="block text-xs font-semibold text-ink/75">
             Assignment code

@@ -9,12 +9,34 @@ import { personRowsFromSpreadsheet } from "./personImport";
 import { assertImportPlacement, importPersonRows } from "./personImportWorkflow";
 import { applyMemberPlacement } from "../identity/memberPlacement";
 import type { MemberInput } from "../../types/member";
+import type { SpreadsheetRow } from "./excelWorkbook";
 
 const directory: OrganizationDirectory = { branches, clients, departments: departments.map((item) => ({ ...item, code: "", description: "", isActive: true })), positions: positions.map((item) => ({ ...item, code: "", description: "", isActive: true })) };
 const admin: AccessProfile = { userId: "admin", displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" };
 afterEach(() => localStorage.clear());
 
 describe("person import workflow", () => {
+  it("filters persisted attention flags before pagination", async () => {
+    const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "Review", "LAST NAME": "Unmapped", DEPARTMENT: "Custom division" }, { "FIRST NAME": "Clean", "LAST NAME": "Import" }]);
+    const results = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "" });
+    expect(results.map((item) => item.status)).toEqual(["imported", "imported"]);
+    const page = await repositories.employees.listPage({ attentionOnly: true, limit: 1, offset: 0 });
+    expect(page.total).toBe(1);
+    expect(page.items[0]).toMatchObject({ pending_department_name: "Custom division", import_attention: { DEPARTMENT: "Custom division" } });
+    expect((await repositories.employees.listPage({ attentionOnly: true, limit: 1, offset: 1 })).items).toEqual([]);
+  });
+  it("rejects existing-name, email and government-ID duplicates before creating a person", async () => {
+    const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
+    const [original] = await personRowsFromSpreadsheet([{ "FIRST NAME": "Existing", "LAST NAME": "Identity", EMAIL: "existing@example.test", "SSS NUMBER": "987654321" }]);
+    await importPersonRows("employee", repositories, admin, directory, { rows: [original], branchId: branches[0].id, clientId: "" });
+    const duplicates: SpreadsheetRow[] = [{ "FIRST NAME": "Existing", "LAST NAME": "Identity" }, { "FIRST NAME": "Email", "LAST NAME": "Duplicate", EMAIL: "EXISTING@example.test" }, { "FIRST NAME": "Government", "LAST NAME": "Duplicate", "SSS NUMBER": "98-765432-1" }];
+    for (const fields of duplicates) {
+      const rows = await personRowsFromSpreadsheet([fields]);
+      const [result] = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "" });
+      expect(result).toMatchObject({ status: "error", errorType: "duplicate" });
+    }
+  });
   it("creates the missing initial assignment when intended placement is saved from a member", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
     const [memberRow] = await personRowsFromSpreadsheet([{ "FIRST NAME": "Initial", "LAST NAME": "Placement" }], "member");

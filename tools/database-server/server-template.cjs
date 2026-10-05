@@ -537,6 +537,19 @@ async function api(req, res, url) {
     const existing = getStorage.get(key);
     const timestamp = now();
     const merged = mergeStorageValueDetailed(key, existing && existing.value, input.value, existing && existing.modified_at, timestamp).value;
+    if (key === "coop_sys_organization_directory") {
+      const before = existing ? JSON.parse(existing.value) : {};
+      const after = JSON.parse(merged);
+      for (const section of ["branches", "clients", "departments", "positions"]) {
+        const current = new Map((before[section] || []).map((record) => [record.id, record]));
+        for (const record of after[section] || []) {
+          const previous = current.get(record.id);
+          const comparable = (value) => JSON.stringify(value, Object.keys(value).sort());
+          if (previous && comparable(previous) === comparable(record)) continue;
+          if (!hasPermission(user, previous ? "organization.update" : "organization.create")) return json(res, 403, { error: "Your effective access does not permit this organization change." });
+        }
+      }
+    }
     saveStorage.run(key, merged, timestamp, user.id);
     const saved = getStorage.get(key);
     return json(res, 200, { ok: true, revision: saved.revision, value: filteredStorageValue(user, key, saved.value) });
