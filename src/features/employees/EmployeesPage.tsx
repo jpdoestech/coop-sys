@@ -10,9 +10,9 @@ import { useAccess } from "../../services/access/useAccess";
 import { useOrganization } from "../../services/organization/useOrganization";
 import { employmentStatuses } from "./data/employeeOptions";
 import { PaginationControls } from "../../components/ui/PaginationControls";
-import { FilterMenu } from "../../components/ui/FilterMenu";
+import { PlacementSelectors } from "../../components/forms/PlacementSelectors";
 import { PersonImportDialog } from "../../components/forms/PersonImportDialog";
-import { branchIsInScope } from "../../services/access/accessControl";
+import { placementOptions } from "../../services/access/placementOptions";
 import { MEMBER_STATUS } from "../../services/lookups/statuses";
 import { useAliasManagement } from "../payments/hooks/useAliasManagement";
 import { AliasEditor } from "../../components/forms/AliasEditor";
@@ -29,17 +29,14 @@ export function EmployeesPage() {
   const canEdit = can("employees.update");
   const canDelete = can("employees.delete");
   const { branches, clients, departments } = useOrganization();
-  const scopedBranches = branches.filter((branch) => branchIsInScope(branch.id, profile));
-  const scopedBranchIds = new Set(scopedBranches.map((branch) => branch.id));
-  const scopedClients = clients.filter((client) => scopedBranchIds.has(client.branchId));
+  const { branches: scopedBranches, clients: scopedClients } = placementOptions(profile, branches, clients);
   const [statusFilter, setStatusFilter] = useState("");
-  const [branchFilter, setBranchFilter] = useState(() => profile.branchIds[0] ?? "");
+  const [branchFilter, setBranchFilter] = useState("");
   const [clientFilter, setClientFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const activeFilterCount = [branchFilter, clientFilter].filter(Boolean).length;
   const { query, members, formerEmployees, personNumber, saveEmployee, archiveEmployee, importEmployees } = useEmployees({ search: deferredSearch, statusId: statusFilter, branchId: branchFilter, clientId: clientFilter, departmentId: departmentFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
   const aliasManagement = useAliasManagement("employees.update");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, branchFilter, clientFilter, departmentFilter, sort, pageSize]);
@@ -60,11 +57,8 @@ export function EmployeesPage() {
           <div className="relative w-full sm:w-56 lg:w-64"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" /><input className="compact-control w-full pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employees" aria-label="Search employees" /></div>
           <div className="relative min-w-[140px] flex-1 sm:flex-none"><CircleDotDashed className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter employment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-36"><option value="">All statuses</option>{employmentStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><BriefcaseBusiness className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter department" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
-          <div className="flex items-center gap-2">
-            <FilterMenu label="More filters" activeCount={activeFilterCount} onClear={() => { setBranchFilter(""); setClientFilter(""); }}>
-              <label className="block text-xs font-semibold text-ink/60">Office or branch<select aria-label="Filter employee branch" value={branchFilter} onChange={(event) => { setBranchFilter(event.target.value); setClientFilter(""); }} className="control mt-1.5 w-full font-normal"><option value="">All offices and branches</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-              <label className="block text-xs font-semibold text-ink/60">Client<select aria-label="Filter employee client" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All clients</option>{clients.filter((item) => !branchFilter || item.branchId === branchFilter).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-            </FilterMenu>
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            <PlacementSelectors branchId={branchFilter} clientId={clientFilter} onBranchChange={(value) => { setBranchFilter(value); setClientFilter(""); }} onClientChange={setClientFilter} />
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Sort employees" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Employee number</option><option value="hired-desc">Newest hire</option></select></div>
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>

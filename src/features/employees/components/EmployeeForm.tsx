@@ -27,7 +27,7 @@ import {
   HEAD_OFFICE_ID,
 } from "../data/employeeOptions";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
-import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeSentenceCase, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import { MemberSearchField } from "./MemberSearchField";
 import { createUuid } from "../../../utils/createUuid";
@@ -178,7 +178,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     setDraft((current) => ({
       ...current,
       ...employeeProfileFromMember(member),
-      active_assignment: member.proposed_branch_id ? {
+      active_assignment: !employee?.active_assignment && member.proposed_branch_id ? {
         id: createUuid(),
         branch_id: member.proposed_branch_id,
         client_id: member.proposed_client_id,
@@ -189,7 +189,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
         transfer_reason: "Initial placement from membership application",
         notes: null,
       } : current.active_assignment,
-      work_location: member.proposed_branch_id ? branch?.label ?? null : current.work_location,
+      work_location: !employee?.active_assignment && member.proposed_branch_id ? branch?.label ?? null : current.work_location,
     }));
   }
 
@@ -381,9 +381,9 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             ) : null}
             <Field label="Person number"><input className={`${inputClass} bg-paper font-mono`} value={draft.employee_number} readOnly aria-readonly="true" /></Field>
             <Field label="Religion / social affiliation"><select className={inputClass} value={draft.religion_affiliation_id ?? ""} onChange={(event) => setValue("religion_affiliation_id", event.target.value || null)}><option value="">Not set</option>{religionAffiliations.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></Field>
-            <Field label="First name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} /></Field>
-            <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} /></Field>
-            <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} /></Field>
+            <Field label="First name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeSentenceCase(event.target.value))} /></Field>
+            <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeSentenceCase(event.target.value))} /></Field>
+            <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeSentenceCase(event.target.value) || null)} /></Field>
             <Field label="Date of birth"><input type="date" disabled={Boolean(linkedMember)} className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} /></Field>
             <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>

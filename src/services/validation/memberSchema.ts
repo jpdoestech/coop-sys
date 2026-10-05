@@ -1,17 +1,18 @@
 import { z } from "zod";
 import { terminalMemberStatuses } from "../lookups/statuses";
 import { governmentId } from "./governmentIdSchema";
-import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeWhitespace } from "../../utils/inputSanitizers";
+import { optionalPersonName, requiredPersonName } from "./personNameSchema";
 import { beneficiariesSchema } from "./beneficiarySchema";
 
-const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
+const nullableText = z.string().transform(normalizeWhitespace).pipe(z.string().max(CHARACTER_LIMITS.address, "Value is too long.")).nullable().optional();
 const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
 
 export const memberInputSchema = z.object({
   membership_number: z.string().regex(/^\d{6}$/, "Membership number must contain exactly six digits."),
-  first_name: z.string().trim().min(1, "First name is required.").max(CHARACTER_LIMITS.name),
-  middle_name: nullableText,
-  last_name: z.string().trim().min(1, "Last name is required.").max(CHARACTER_LIMITS.name),
+  first_name: requiredPersonName("First name"),
+  middle_name: optionalPersonName,
+  last_name: requiredPersonName("Last name"),
   suffix: nullableText,
   date_of_birth: nullableText,
   sex: nullableText,

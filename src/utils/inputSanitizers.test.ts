@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeGovernmentId, sanitizePhoneNumber } from "./inputSanitizers";
+import { normalizeSentenceCase, normalizeWhitespace, sanitizeGovernmentId, sanitizePhoneNumber } from "./inputSanitizers";
 
 describe("input sanitizers", () => {
+  it("trims repeated whitespace and normalizes sentence capitalization", () => {
+    expect(normalizeSentenceCase("  JUAN   DELA\tCRUZ ")).toBe("Juan dela cruz");
+    expect(normalizeSentenceCase(" élENA ")).toBe("Élena");
+    expect(normalizeWhitespace("  III ")).toBe("III");
+  });
   it("formats SSS digits and inserts hyphens automatically", () => {
     expect(sanitizeGovernmentId("12A3456789-extra", "sss")).toBe("12-345678-9");
   });

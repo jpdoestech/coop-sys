@@ -38,6 +38,7 @@ import {
 } from "../../../services/payments/paymentMath";
 import { EmployeeSearchField } from "./EmployeeSearchField";
 import { PaginationControls } from "../../../components/ui/PaginationControls";
+import { usePlacementSelection } from "../../../components/forms/usePlacementSelection";
 
 type View = "records" | "manual" | "import";
 type Props = {
@@ -62,8 +63,7 @@ export function RefundPanel({
 }: Props) {
   const [view, setView] = useState<View>("records");
   const [editing, setEditing] = useState<OverDeductionRefund | null>(null);
-  const [branchId, setBranchId] = useState("");
-  const [clientId, setClientId] = useState("");
+  const { branchId, clientId, setBranchId, setClientId, fixedBranch, fixedClient } = usePlacementSelection(branches, clients);
   const [employeeId, setEmployeeId] = useState("");
   const [amount, setAmount] = useState("");
   const [refundDate, setRefundDate] = useState(today());
@@ -496,10 +496,10 @@ export function RefundPanel({
               Branch
               <select
                 className="control mt-1 w-full"
+                disabled={fixedBranch}
                 value={branchId}
                 onChange={(event) => {
                   setBranchId(event.target.value);
-                  setClientId("");
                   setMatches([]);
                 }}
               >
@@ -515,6 +515,7 @@ export function RefundPanel({
               Client
               <select
                 className="control mt-1 w-full"
+                disabled={fixedClient}
                 value={clientId}
                 onChange={(event) => {
                   setClientId(event.target.value);

@@ -7,7 +7,7 @@ import type { ListOptions } from "../Repository";
 
 type EmployeeRow = Omit<Employee, "beneficiaries" | "active_assignment" | "assignment_history"> & {
   beneficiaries?: Beneficiary[];
-  employment_assignments?: EmploymentAssignment[];
+  employment_assignments?: Array<EmploymentAssignment & { deleted_at?: string | null }>;
   member?: { beneficiaries?: Beneficiary[] } | null;
 };
 
@@ -18,6 +18,7 @@ function client() {
 
 function normalize(row: EmployeeRow): Employee {
   const assignmentHistory = (row.employment_assignments ?? [])
+    .filter((assignment) => !assignment.deleted_at)
     .sort((a, b) => b.start_date.localeCompare(a.start_date));
   return {
     ...row,
@@ -81,20 +82,23 @@ async function saveRelations(employeeId: string, input: Partial<EmployeeInput>) 
 export class SupabaseEmployeeRepository implements EmployeeRepository {
   async listPage(options: ListOptions = {}) {
     const placement = Boolean(options.branchId || options.clientId);
-    const assignmentRelation = placement ? "employment_assignments!inner(*)" : "employment_assignments(*)";
-    let query = client().from("employees").select(`*, beneficiaries(*), ${assignmentRelation}, member:members(beneficiaries(*))`, { count: "exact" });
+    const selection = placement
+      ? "*, beneficiaries(*), employment_assignments(*), current_placement:employment_assignments!inner(id), member:members(beneficiaries(*))"
+      : "*, beneficiaries(*), employment_assignments(*), member:members(beneficiaries(*))";
+    let query = client().from("employees").select(selection, { count: "exact" });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
     if (options.search) { const term = `%${options.search}%`; query = query.or(`employee_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`); }
     if (options.statusId) query = query.eq("employment_status_id", options.statusId);
     if (options.departmentId) query = query.eq("department_id", options.departmentId);
-    if (options.branchId) query = query.eq("employment_assignments.branch_id", options.branchId).is("employment_assignments.end_date", null);
-    if (options.clientId) query = query.eq("employment_assignments.client_id", options.clientId).is("employment_assignments.end_date", null);
+    if (placement) query = query.is("current_placement.end_date", null).is("current_placement.deleted_at", null);
+    if (options.branchId) query = query.eq("current_placement.branch_id", options.branchId);
+    if (options.clientId) query = query.eq("current_placement.client_id", options.clientId);
     const [column, ascending] = options.sort === "name-desc" ? ["last_name", false] : options.sort === "number-asc" ? ["employee_number", true] : options.sort === "hired-desc" ? ["date_hired", false] : ["last_name", true];
     query = query.order(column, { ascending });
     if (options.limit) query = query.range(options.offset ?? 0, (options.offset ?? 0) + options.limit - 1);
     const { data, error, count } = await query;
     if (error) throw error;
-    return { items: (data as EmployeeRow[]).map(normalize), total: count ?? 0 };
+    return { items: (data as unknown as EmployeeRow[]).map(normalize), total: count ?? 0 };
   }
 
   async list(options: ListOptions = {}) {
@@ -131,6 +135,16 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
     return (data as EmployeeRow[]).map(normalize);
   }
 
+  async transfer(id: string, assignment: EmploymentAssignment, source: "employee" | "member" | "system" = "employee") {
+    const { error } = await client().rpc("transfer_employee", {
+      p_employee_id: id,
+      p_assignment: assignment,
+      p_source: source,
+    });
+    if (error) throw error;
+    return (await this.getById(id))!;
+  }
+
   async create(input: EmployeeInput) {
     const db = client();
     const { data, error } = await db.from("employees").insert({ ...employeeFields(input), sync_status: "synced" }).select("*").single();
@@ -151,8 +165,22 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
   }
 
   async update(id: string, input: Partial<EmployeeInput>) {
+    const current = Object.prototype.hasOwnProperty.call(input, "active_assignment")
+      ? await this.getById(id)
+      : null;
+    const isTransfer = Boolean(
+      input.active_assignment &&
+      current?.active_assignment &&
+      input.active_assignment.id !== current.active_assignment.id,
+    );
     const { error } = await client().from("employees").update({ ...employeeFields(input), updated_at: new Date().toISOString(), sync_status: "synced" }).eq("id", id);
     if (error) throw error;
+    if (isTransfer && input.active_assignment) {
+      const remainingInput = { ...input };
+      delete remainingInput.active_assignment;
+      await saveRelations(id, remainingInput);
+      return this.transfer(id, input.active_assignment, "employee");
+    }
     await saveRelations(id, input);
     return (await this.getById(id))!;
   }

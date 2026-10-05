@@ -1,5 +1,6 @@
 import { cities, provinces, barangaysForCity } from "../../address/addressService";
 import type { SpreadsheetRow } from "./excelWorkbook";
+import { normalizeSentenceCase, normalizeWhitespace } from "../../utils/inputSanitizers";
 
 export type PersonImportRow = {
   rowNumber: number; personNumber: string; firstName: string; middleName: string; lastName: string; suffix: string;
@@ -13,7 +14,11 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[]): Promise
   const required = ["FIRST NAME", "LAST NAME"];
   const missing = required.filter((header) => !(header in rows[0]));
   if (missing.length) throw new Error(`Missing required headers: ${missing.join(", ")}.`);
-  return Promise.all(rows.map(async (row, index) => {
+  return Promise.all(rows.map(async (originalRow, index) => {
+    const row = Object.fromEntries(Object.entries(originalRow).map(([key, value]) => [key, normalizeWhitespace(value)])) as SpreadsheetRow;
+    for (const field of ["FIRST NAME", "MIDDLE NAME", "LAST NAME"]) {
+      if (row[field]) row[field] = normalizeSentenceCase(row[field]);
+    }
     const errors: string[] = [];
     const number = (row.ID || row["MEMBER ID"] || row["EMPLOYEE ID"] || "").replace(/\D/g, "");
     if (number && number.length > 6) errors.push("ID must contain at most 6 digits.");

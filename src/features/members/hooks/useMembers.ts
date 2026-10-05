@@ -4,7 +4,7 @@ import { createRepositories } from "../../../services/repositories/repositoryFac
 import type { Member, MemberInput } from "../../../types/member";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
 import { useAccess } from "../../../services/access/useAccess";
-import { assertPermission, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
+import { assertPermission, branchIsInScope, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
 import { nextPersonNumber } from "../../../services/identity/personNumber";
 import { nextBodResolutionNumber } from "../../../services/members/membershipApproval";
 import { MEMBER_STATUS } from "../../../services/lookups/statuses";
@@ -12,8 +12,10 @@ import type { PersonImportRow } from "../../../services/imports/personImport";
 import { memberInputSchema } from "../../../services/validation/memberSchema";
 import { memberTypes } from "../data/memberOptions";
 import type { ListOptions } from "../../../services/repositories/Repository";
+import type { MemberSubmission } from "../types/memberWorkflow";
+import { createUuid } from "../../../utils/createUuid";
 
-export function useMembers(options: ListOptions) {
+export function useMembers(options: ListOptions, editingMemberId?: string | null) {
   const repositories = useMemo(() => createRepositories(), []);
   const queryClient = useQueryClient();
   const { profile } = useAccess();
@@ -21,6 +23,7 @@ export function useMembers(options: ListOptions) {
 
   const query = useQuery({
     queryKey,
+    refetchInterval: 30000,
     queryFn: async () => {
       return repositories.members.listPage(options);
     }
@@ -28,6 +31,11 @@ export function useMembers(options: ListOptions) {
   const placementEmployees = useQuery({
     queryKey: ["member-placement-employees"],
     queryFn: async () => (await repositories.employees.list({ limit: 1000 })).filter((employee) => employeeIsInScope(employee, profile)),
+  });
+  const linkedEmployee = useQuery({
+    queryKey: ["member-linked-employee", profile.userId, editingMemberId],
+    enabled: Boolean(editingMemberId),
+    queryFn: async () => (await repositories.employees.listByMemberId(editingMemberId!)).find((employee) => !employee.deleted_at && employeeIsInScope(employee, profile)) ?? null,
   });
   const personNumber = useQuery({
     queryKey: ["next-person-number"],
@@ -42,19 +50,45 @@ export function useMembers(options: ListOptions) {
   });
 
   const saveMember = useMutation({
-    mutationFn: async ({ member, input }: { member: Member | null; input: MemberInput }) => {
+    mutationFn: async ({ member, submission }: { member: Member | null; submission: MemberSubmission }) => {
+      const { input, transfer } = submission;
       assertPermission(profile, member ? "members.update" : "members.create");
       if (!member && isBranchScoped(profile)) throw new Error("Create branch members from the employee workflow so their branch scope is recorded.");
       if (member && isBranchScoped(profile)) {
         const linked = await repositories.employees.listByMemberId(member.id);
         if (!linked.some((employee) => employeeIsInScope(employee, profile))) throw new Error("This member is outside your assigned branches.");
       }
+      const linkedEmployees = member
+        ? (await repositories.employees.listByMemberId(member.id)).filter((employee) => !employee.deleted_at)
+        : [];
+      const employeesNeedingTransfer = linkedEmployees.filter((employee) =>
+        employee.active_assignment &&
+        (employee.active_assignment.branch_id !== input.proposed_branch_id || employee.active_assignment.client_id !== input.proposed_client_id),
+      );
+      if (employeesNeedingTransfer.length) {
+        assertPermission(profile, "employees.update");
+        if (!transfer) throw new Error("Enter an effective date and reason for the employee transfer.");
+        if (!branchIsInScope(input.proposed_branch_id, profile)) throw new Error("The destination branch is outside your assigned scope.");
+        await Promise.all(employeesNeedingTransfer.map((employee) => repositories.employees.transfer(employee.id, {
+          id: createUuid(),
+          branch_id: input.proposed_branch_id,
+          client_id: input.proposed_client_id,
+          assignment_code: employee.active_assignment?.assignment_code ?? null,
+          start_date: transfer.effectiveDate,
+          end_date: null,
+          work_location: transfer.workLocation,
+          transfer_reason: transfer.reason,
+          notes: "Transfer initiated from the linked member record",
+        }, "member")));
+      }
       const saved = member
         ? await repositories.members.update(member.id, input)
         : await repositories.members.create({ ...input, membership_number: personNumber.data ?? input.membership_number });
-      const linkedEmployees = await repositories.employees.listByMemberId(saved.id);
+      const employeesToSynchronize = member
+        ? linkedEmployees
+        : await repositories.employees.listByMemberId(saved.id);
       await Promise.all(
-        linkedEmployees.map((linkedEmployee) =>
+        employeesToSynchronize.map((linkedEmployee) =>
           repositories.employees.update(linkedEmployee.id, employeeProfileFromMember(saved)),
         ),
       );
@@ -66,6 +100,10 @@ export function useMembers(options: ListOptions) {
       queryClient.invalidateQueries({ queryKey: ["member-options"] });
       queryClient.invalidateQueries({ queryKey: ["next-bod-resolution"] });
       queryClient.invalidateQueries({ queryKey: ["next-person-number"] });
+      queryClient.invalidateQueries({ queryKey: ["member-placement-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["member-linked-employee"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-ledger"] });
     }
   });
 
@@ -138,5 +176,5 @@ export function useMembers(options: ListOptions) {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["members"] }); queryClient.invalidateQueries({ queryKey: ["next-person-number"] }); },
   });
 
-  return { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers };
+  return { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers };
 }

@@ -9,13 +9,14 @@ import type { AliasInput, PaymentBatchInput, PaymentLineInput } from "../../../s
 import { EMPLOYMENT_STATUS } from "../../../services/lookups/statuses";
 import { detailedPeriod } from "../paymentFilters";
 import { PaymentImportValidationDialog } from "./PaymentImportValidationDialog";
+import { usePlacementSelection } from "../../../components/forms/usePlacementSelection";
 
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthFromDate = (value: string) => value ? value.slice(5, 7).replace(/^0/, "") : String(new Date().getMonth() + 1);
 type Props = { employees: Employee[]; aliases: MemberAlias[]; branches: OrganizationBranch[]; clients: OrganizationClient[]; userId: string; saving: boolean; onSaveAlias: (input: AliasInput) => Promise<MemberAlias>; onPost: (batch: PaymentBatchInput, lines: PaymentLineInput[]) => void };
 
 export function PaymentImportPanel({ employees, aliases, branches, clients, userId, saving, onSaveAlias, onPost }: Props) {
-  const [branchId, setBranchId] = useState(""); const [clientId, setClientId] = useState("");
+  const { branchId, clientId, setBranchId, setClientId, availableClients, fixedBranch, fixedClient } = usePlacementSelection(branches, clients);
   const [periodMode, setPeriodMode] = useState<"cutoff" | "date">("cutoff");
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); const [month, setMonth] = useState(String(new Date().getMonth() + 1)); const [fileName, setFileName] = useState("");
@@ -78,8 +79,8 @@ export function PaymentImportPanel({ employees, aliases, branches, clients, user
   return <div className="space-y-3 p-3 sm:p-4">
     <div className="grid gap-4 lg:grid-cols-[minmax(18rem,0.85fr)_minmax(30rem,1.35fr)] lg:gap-0">
       <fieldset className="min-w-0 lg:pr-4"><legend className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-ink/50"><Building2 className="h-3.5 w-3.5 text-moss" /> Import scope</legend><div className="grid gap-2 sm:grid-cols-2">
-        <label className="field-label">Branch<select className="compact-control mt-1 w-full" value={branchId} onChange={(event) => { setBranchId(event.target.value); setClientId(""); resetImport(); }}><option value="">Select branch</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-        <label className="field-label">Client<select className="compact-control mt-1 w-full disabled:cursor-not-allowed disabled:bg-paper disabled:text-ink/35" disabled={!branchId} value={clientId} onChange={(event) => { setClientId(event.target.value); resetImport(); }}><option value="">Select client</option>{clients.filter((item) => item.branchId === branchId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+        <label className="field-label">Branch<select className="compact-control mt-1 w-full disabled:bg-paper disabled:text-ink/75" disabled={fixedBranch} value={branchId} onChange={(event) => { setBranchId(event.target.value); resetImport(); }}><option value="">Select branch</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+        <label className="field-label">Client<select className="compact-control mt-1 w-full disabled:bg-paper disabled:text-ink/75" disabled={!branchId || fixedClient} value={clientId} onChange={(event) => { setClientId(event.target.value); resetImport(); }}><option value="">Select client</option>{availableClients.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       </div></fieldset>
       <fieldset className="min-w-0 border-t border-line pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><legend className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-ink/50 lg:px-1"><CalendarRange className="h-3.5 w-3.5 text-moss" /> Payroll period</legend><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         <label className="field-label">Import basis<select className="compact-control mt-1 w-full" value={periodMode} onChange={(event) => { const nextMode = event.target.value as "cutoff" | "date"; setPeriodMode(nextMode); setMonth(monthFromDate(nextMode === "cutoff" && from ? from : date)); resetImport(); }}><option value="cutoff">Cut-off</option><option value="date">Date only</option></select></label>

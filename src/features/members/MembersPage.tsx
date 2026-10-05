@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import { ArrowUpDown, CheckCheck, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
+import { ArrowUpDown, CheckCheck, CircleDotDashed, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
-import type { Member, MemberInput } from "../../types/member";
+import type { Member } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
 import { MemberTable } from "./components/MemberTable";
 import { useMembers } from "./hooks/useMembers";
@@ -10,12 +10,13 @@ import { isBranchScoped } from "../../services/access/accessControl";
 import { memberStatuses, memberTypes } from "./data/memberOptions";
 import { useOrganization } from "../../services/organization/useOrganization";
 import { PaginationControls } from "../../components/ui/PaginationControls";
-import { FilterMenu } from "../../components/ui/FilterMenu";
+import { PlacementSelectors } from "../../components/forms/PlacementSelectors";
 import { MemberApprovalDialog } from "./components/MemberApprovalDialog";
 import { PersonImportDialog } from "../../components/forms/PersonImportDialog";
 import { EMPLOYMENT_STATUS } from "../../services/lookups/statuses";
 import { useAliasManagement } from "../payments/hooks/useAliasManagement";
 import { AliasEditor } from "../../components/forms/AliasEditor";
+import type { MemberSubmission } from "./types/memberWorkflow";
 
 export function MembersPage() {
   const [search, setSearch] = useState("");
@@ -25,7 +26,7 @@ export function MembersPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const deferredSearch = useDeferredValue(search);
-  const { branches, clients } = useOrganization();
+  const { clients } = useOrganization();
   const { profile, can } = useAccess();
   const canCreate = can("members.create") && !isBranchScoped(profile);
   const canImport = can("members.import") && !isBranchScoped(profile);
@@ -35,26 +36,26 @@ export function MembersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [approvalFilter, setApprovalFilter] = useState("");
-  const [branchFilter, setBranchFilter] = useState(() => isBranchScoped(profile) ? profile.branchIds[0] ?? "" : "");
+  const [branchFilter, setBranchFilter] = useState("");
   const [clientFilter, setClientFilter] = useState("");
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const activeFilterCount = [statusFilter, branchFilter, clientFilter].filter(Boolean).length;
-  const { query, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
+  const { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers } = useMembers({ search: deferredSearch, statusId: statusFilter, typeId: typeFilter, approvalStatus: approvalFilter, branchId: branchFilter, clientId: clientFilter, sort, limit: pageSize, offset: (page - 1) * pageSize }, formOpen ? editingMember?.id : null);
   const aliasManagement = useAliasManagement("members.update");
   useEffect(() => setPage(1), [deferredSearch, statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter, sort, pageSize]);
   const pageMembers = query.data?.items ?? [];
-  const editingEmployee = (placementEmployees.data ?? []).find((employee) => employee.member_id === editingMember?.id) ?? null;
+  const editingEmployee = linkedEmployee.data ?? null;
 
   function openCreate() {
+    saveMember.reset();
     setEditingMember(null);
     setFormOpen(true);
   }
 
-  function save(input: MemberInput) {
+  function save(submission: MemberSubmission) {
     saveMember.mutate(
-      { member: editingMember, input },
+      { member: editingMember, submission },
       { onSuccess: () => setFormOpen(false) }
     );
   }
@@ -93,12 +94,9 @@ export function MembersPage() {
           </div>
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter BOD approval" value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All approvals</option><option value="pending">Pending approval</option><option value="approved">Approved</option></select></div>
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><UsersRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
-          <div className="flex items-center gap-2">
-            <FilterMenu label="More filters" activeCount={activeFilterCount} onClear={() => { setStatusFilter(""); setBranchFilter(""); setClientFilter(""); }}>
-              <label className="block text-xs font-semibold text-ink/60">Membership status<select aria-label="Filter member status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-              <label className="block text-xs font-semibold text-ink/60">Office or branch<select aria-label="Filter member branch" value={branchFilter} onChange={(event) => { setBranchFilter(event.target.value); setClientFilter(""); }} className="control mt-1.5 w-full font-normal"><option value="">All offices and branches</option>{branches.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-              <label className="block text-xs font-semibold text-ink/60">Client<select aria-label="Filter member client" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="control mt-1.5 w-full font-normal"><option value="">All clients</option>{clients.filter((item) => !branchFilter || item.branchId === branchFilter).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-            </FilterMenu>
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            <div className="relative"><CircleDotDashed className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Membership status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="compact-control w-36 pl-8"><option value="">All statuses</option>{memberStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></div>
+            <PlacementSelectors branchId={branchFilter} clientId={clientFilter} onBranchChange={(value) => { setBranchFilter(value); setClientFilter(""); }} onClientChange={setClientFilter} />
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><select aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></select></div>
           </div>
           <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
@@ -113,7 +111,19 @@ export function MembersPage() {
       </section>
 
       {formOpen ? (
-        <MemberForm member={editingMember} suggestedNumber={personNumber.data ?? ""} saving={saveMember.isPending} canViewSensitive={can("members.sensitive.view")} canEditSensitive={can("members.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editingEmployee?.id ?? null} clientId={editingEmployee?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={clients.filter((client) => !isBranchScoped(profile) || profile.branchIds.includes(client.branchId))} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} />
+        <MemberForm
+          member={editingMember}
+          linkedEmployee={editingEmployee}
+          placementLoading={Boolean(editingMember) && (linkedEmployee.isLoading || linkedEmployee.isError)}
+          saveError={linkedEmployee.error?.message ?? saveMember.error?.message}
+          suggestedNumber={personNumber.data ?? ""}
+          saving={saveMember.isPending}
+          canViewSensitive={can("members.sensitive.view")}
+          canEditSensitive={can("members.sensitive.update")}
+          aliasEditor={canEdit ? <AliasEditor employeeId={editingEmployee?.id ?? null} clientId={editingEmployee?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={clients.filter((client) => !isBranchScoped(profile) || profile.branchIds.includes(client.branchId))} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined}
+          onCancel={() => setFormOpen(false)}
+          onSubmit={save}
+        />
       ) : null}
       {importOpen ? <PersonImportDialog kind="member" linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows) => importMembers.mutate(rows, { onSuccess: () => setImportOpen(false) })} /> : null}
       {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}

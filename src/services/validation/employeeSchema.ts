@@ -2,10 +2,11 @@ import { z } from "zod";
 import { terminalEmploymentStatuses } from "../lookups/statuses";
 import { governmentId } from "./governmentIdSchema";
 import { isValidPlacement } from "../lookups/organization";
-import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeWhitespace } from "../../utils/inputSanitizers";
+import { optionalPersonName, requiredPersonName } from "./personNameSchema";
 import { beneficiariesSchema } from "./beneficiarySchema";
 
-const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
+const nullableText = z.string().transform(normalizeWhitespace).pipe(z.string().max(CHARACTER_LIMITS.address, "Value is too long.")).nullable().optional();
 const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
 
 export const employeeInputSchema = z
@@ -17,9 +18,9 @@ export const employeeInputSchema = z
     pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),
     philhealth_number: governmentId([12], "PhilHealth number", 14, [/^\d{2}-\d{9}-\d$/]),
     tax_identification_number: governmentId([9, 12], "TIN", 15, [/^\d{3}-\d{3}-\d{3}$/, /^\d{3}-\d{3}-\d{3}-\d{3}$/]),
-    first_name: z.string().trim().min(1, "First name is required.").max(CHARACTER_LIMITS.name),
-    middle_name: nullableText,
-    last_name: z.string().trim().min(1, "Last name is required.").max(CHARACTER_LIMITS.name),
+    first_name: requiredPersonName("First name"),
+    middle_name: optionalPersonName,
+    last_name: requiredPersonName("Last name"),
     suffix: nullableText,
     date_of_birth: nullableText,
     sex: nullableText,

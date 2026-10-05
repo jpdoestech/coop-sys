@@ -7,6 +7,8 @@ export type EmploymentAssignment = {
   end_date: string | null;
   work_location: string | null;
   transfer_reason: string | null;
+  transfer_source?: "employee" | "member" | "system" | null;
+  transferred_by?: string | null;
   notes: string | null;
 };
 

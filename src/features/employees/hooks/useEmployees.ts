@@ -21,6 +21,7 @@ export function useEmployees(options: ListOptions) {
   const { profile } = useAccess();
   const query = useQuery({
     queryKey: ["employees", "page", options],
+    refetchInterval: 30000,
     queryFn: async () => repositories.employees.listPage(options)
   });
   const members = useQuery({
@@ -94,6 +95,10 @@ export function useEmployees(options: ListOptions) {
       queryClient.invalidateQueries({ queryKey: ["members"] });
       queryClient.invalidateQueries({ queryKey: ["member-options"] });
       queryClient.invalidateQueries({ queryKey: ["next-person-number"] });
+      queryClient.invalidateQueries({ queryKey: ["member-placement-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["member-linked-employee"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-ledger"] });
     }
   });
   const archiveEmployee = useMutation({

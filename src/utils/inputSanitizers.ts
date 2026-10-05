@@ -6,6 +6,14 @@ export const CHARACTER_LIMITS = {
   notes: 2000,
 } as const;
 
+export function normalizeWhitespace(value: string) {
+  return value.trim().replace(/\s+/gu, " ");
+}
+
+export function normalizeSentenceCase(value: string) {
+  return normalizeWhitespace(value).toLocaleLowerCase("en-PH").replace(/(^|[.!?]\s+)\p{L}/gu, (text) => text.toLocaleUpperCase("en-PH"));
+}
+
 export function sanitizePhoneNumber(value: string) {
   const cleaned = value.replace(/[^0-9+() -]/g, "");
   const firstPlus = cleaned.indexOf("+");

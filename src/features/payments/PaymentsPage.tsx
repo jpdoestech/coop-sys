@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { useAccess } from "../../services/access/useAccess";
-import { branchIsInScope } from "../../services/access/accessControl";
+import { placementOptions } from "../../services/access/placementOptions";
 import { useOrganization } from "../../services/organization/useOrganization";
 import {
   effectiveSettings,
@@ -104,13 +104,8 @@ export function PaymentsPage() {
   const payments = usePayments(page, pageSize, deferredSearch, queryFilters);
   const ledger = payments.ledger.data ?? emptyLedger;
   const employees = payments.employees.data ?? [];
-  const allowedBranches = branches.filter((branch) =>
-    branchIsInScope(branch.id, profile),
-  );
-  const allowedBranchIds = new Set(allowedBranches.map((item) => item.id));
-  const allowedClients = clients.filter((client) =>
-    allowedBranchIds.has(client.branchId),
-  );
+  const { branches: allowedBranches, clients: allowedClients } = placementOptions(profile, branches, clients);
+  const allowedBranchIds = new Set(allowedBranches.map((branch) => branch.id));
   const currentSettings = effectiveSettings(
     ledger.settings,
     new Date().toISOString().slice(0, 10),

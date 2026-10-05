@@ -3,6 +3,7 @@ import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { EmployeeRepository } from "../EmployeeRepository";
 import type { ListOptions } from "../Repository";
 import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
+import type { EmploymentAssignmentInput } from "../../../types/assignment";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { normalizePersonNumber } from "../../identity/personNumber";
 import { createUuid } from "../../../utils/createUuid";
@@ -109,6 +110,17 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     return readEmployees().filter((employee) => employee.member_id === memberId);
   }
 
+  async transfer(id: string, assignment: EmploymentAssignmentInput, source: "employee" | "member" | "system" = "employee") {
+    return this.update(id, {
+      work_location: assignment.work_location,
+      active_assignment: {
+        ...assignment,
+        transfer_source: source,
+        transferred_by: null,
+      },
+    });
+  }
+
   async create(input: EmployeeInput) {
     const timestamp = now();
     const beneficiaries = input.member_id
@@ -142,6 +154,9 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     if (Object.prototype.hasOwnProperty.call(input, "active_assignment")) {
       const nextAssignment = input.active_assignment ?? null;
       if (nextAssignment && activeAssignment && nextAssignment.id !== activeAssignment.id) {
+        if (!nextAssignment.transfer_reason?.trim()) throw new Error("A transfer reason is required.");
+        if (nextAssignment.start_date < activeAssignment.start_date) throw new Error("Transfer date cannot be earlier than the current assignment.");
+        if (nextAssignment.branch_id === activeAssignment.branch_id && nextAssignment.client_id === activeAssignment.client_id) throw new Error("The destination must differ from the current placement.");
         assignmentHistory = [
           ...assignmentHistory.map((assignment) =>
             assignment.id === activeAssignment?.id
@@ -151,9 +166,12 @@ export class LocalEmployeeRepository implements EmployeeRepository {
           nextAssignment,
         ];
       } else if (nextAssignment) {
+        if (activeAssignment?.id === nextAssignment.id && (activeAssignment.branch_id !== nextAssignment.branch_id || activeAssignment.client_id !== nextAssignment.client_id)) {
+          throw new Error("Existing placements cannot be overwritten. Record an employee transfer.");
+        }
         const found = assignmentHistory.some((assignment) => assignment.id === nextAssignment.id);
         assignmentHistory = found
-          ? assignmentHistory.map((assignment) => assignment.id === nextAssignment.id ? nextAssignment : assignment)
+          ? assignmentHistory.map((assignment) => assignment.id === nextAssignment.id ? { ...assignment, ...nextAssignment } : assignment)
           : [...assignmentHistory, nextAssignment];
       }
       activeAssignment = nextAssignment?.end_date ? null : nextAssignment;
@@ -172,6 +190,20 @@ export class LocalEmployeeRepository implements EmployeeRepository {
       sync_status: employees[index].sync_status === "pending_create" ? "pending_create" : "pending_update"
     };
     employees[index] = employee;
+    if (memberId && activeAssignment) {
+      const members = readStoredMembers();
+      const memberIndex = members.findIndex((member) => member.id === memberId);
+      if (memberIndex !== -1) {
+        members[memberIndex] = {
+          ...members[memberIndex],
+          proposed_branch_id: activeAssignment.branch_id,
+          proposed_client_id: activeAssignment.client_id,
+          updated_at: timestamp,
+          sync_status: members[memberIndex].sync_status === "pending_create" ? "pending_create" : "pending_update",
+        };
+        writeStoredMembers(members);
+      }
+    }
     writeEmployees(employees);
     await flushDatabaseStorage();
     return employee;

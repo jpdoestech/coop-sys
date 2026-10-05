@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { BriefcaseBusiness, Contact, MapPinned, Save, UserRound, UsersRound, X } from "lucide-react";
+import { ArrowRightLeft, BriefcaseBusiness, Contact, History, MapPinned, Save, UserRound, UsersRound, X } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
 import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/forms/GovernmentIdFields";
 import { educationalAttainments } from "../../../services/lookups/educationalAttainments";
@@ -7,11 +7,13 @@ import { terminalMemberStatuses } from "../../../services/lookups/statuses";
 import { memberInputSchema } from "../../../services/validation/memberSchema";
 import { religionAffiliations } from "../../../services/lookups/religionAffiliations";
 import type { Member, MemberInput } from "../../../types/member";
+import type { Employee } from "../../../types/employee";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
-import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeSentenceCase, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
 import { BeneficiaryEditor } from "../../../components/forms/BeneficiaryEditor";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
 import { useOrganization } from "../../../services/organization/useOrganization";
+import type { MemberSubmission } from "../types/memberWorkflow";
 
 type Draft = Omit<MemberInput, "annual_income" | "number_of_dependents"> & {
   annual_income: string;
@@ -22,13 +24,16 @@ type MemberTab = "personal" | "contact" | "membership" | "background" | "benefic
 
 type MemberFormProps = {
   member: Member | null;
+  linkedEmployee: Employee | null;
+  placementLoading?: boolean;
+  saveError?: string;
   suggestedNumber: string;
   saving: boolean;
   aliasEditor?: ReactNode;
   canViewSensitive?: boolean;
   canEditSensitive?: boolean;
   onCancel: () => void;
-  onSubmit: (input: MemberInput) => void;
+  onSubmit: (submission: MemberSubmission) => void;
 };
 
 const inputClass =
@@ -115,10 +120,13 @@ function Section({ title, description, children }: { title: string; description:
   );
 }
 
-export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: MemberFormProps) {
+export function MemberForm({ member, linkedEmployee, placementLoading = false, saveError, suggestedNumber, saving, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: MemberFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<MemberTab>("personal");
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
+  const [transferReason, setTransferReason] = useState("");
+  const [transferring, setTransferring] = useState(false);
   const { branches, clients } = useOrganization();
   const availableClients = clients.filter((client) => client.branchId === draft.proposed_branch_id && client.isActive);
   const addressValue: AddressValue = {
@@ -137,11 +145,19 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
   const membershipEnded = Boolean(
     draft.membership_status_id && terminalMemberStatuses.has(draft.membership_status_id),
   );
+  const activeAssignment = linkedEmployee?.active_assignment ?? null;
+  const placementChanged = Boolean(
+    activeAssignment &&
+    (activeAssignment.branch_id !== draft.proposed_branch_id || activeAssignment.client_id !== draft.proposed_client_id),
+  );
 
   useEffect(() => {
     setDraft(toDraft(member, suggestedNumber));
     setErrors({});
     setTab("personal");
+    setTransferDate(new Date().toISOString().slice(0, 10));
+    setTransferReason("");
+    setTransferring(false);
   }, [member, suggestedNumber]);
 
   function setValue<K extends keyof Draft>(field: K, value: Draft[K]) {
@@ -153,6 +169,21 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
     event.preventDefault();
     if (!draft.proposed_branch_id) {
       setErrors((current) => ({ ...current, proposed_branch_id: "Select the intended office or branch before saving." }));
+      setTab("membership");
+      return;
+    }
+    if (placementChanged && !transferDate) {
+      setErrors((current) => ({ ...current, transferDate: "Enter the transfer effective date." }));
+      setTab("membership");
+      return;
+    }
+    if (placementChanged && !transferReason.trim()) {
+      setErrors((current) => ({ ...current, transferReason: "Enter the reason for this transfer." }));
+      setTab("membership");
+      return;
+    }
+    if (placementChanged && activeAssignment && transferDate < activeAssignment.start_date) {
+      setErrors((current) => ({ ...current, transferDate: "Transfer date cannot be earlier than the current assignment." }));
       setTab("membership");
       return;
     }
@@ -178,7 +209,15 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
       return;
     }
 
-    onSubmit(result.data as MemberInput);
+    const selectedBranch = branches.find((branch) => branch.id === result.data.proposed_branch_id);
+    onSubmit({
+      input: result.data as MemberInput,
+      transfer: placementChanged ? {
+        effectiveDate: transferDate,
+        reason: transferReason.trim(),
+        workLocation: selectedBranch?.label ?? null,
+      } : null,
+    });
   }
 
   return (
@@ -207,18 +246,20 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
             ] as const).map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined} className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-xs font-semibold ${tab === id ? "border-moss text-moss" : "border-transparent text-ink/50 hover:text-ink"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
           </nav>
 
+          {saveError ? <p role="alert" className="mx-6 mt-4 border-l-4 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-800 sm:mx-8">{saveError}</p> : null}
+
           {tab === "personal" ? <><Section title="Identity" description="Core details shared with an employee profile when this person has both roles.">
             <Field label="Membership number" error={errors.membership_number}>
               <input className={`${inputClass} bg-paper font-mono`} value={draft.membership_number} readOnly aria-readonly="true" />
             </Field>
             <Field label="First name" error={errors.first_name}>
-              <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} />
+              <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeSentenceCase(event.target.value))} />
             </Field>
             <Field label="Last name" error={errors.last_name}>
-              <input className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} />
+              <input className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeSentenceCase(event.target.value))} />
             </Field>
             <Field label="Middle name">
-              <input className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} />
+              <input className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeSentenceCase(event.target.value) || null)} />
             </Field>
             <Field label="Suffix">
               <input className={inputClass} value={draft.suffix ?? ""} onChange={(event) => setValue("suffix", event.target.value || null)} placeholder="Jr., III" />
@@ -256,8 +297,22 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
           </Section> : null}
 
           {tab === "membership" ? <><Section title="Intended placement" description="Set the branch and client before BOD approval so the application is visible to the correct operational scope.">
-            <Field label="Office / branch" error={errors.proposed_branch_id}><select className={inputClass} value={draft.proposed_branch_id ?? ""} onChange={(event) => { const branchId = event.target.value || null; setDraft((current) => ({ ...current, proposed_branch_id: branchId, proposed_client_id: null })); setErrors((current) => ({ ...current, proposed_branch_id: "", proposed_client_id: "" })); }}><option value="">Select office or branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.type === "head_office" ? branch.label : `Branch: ${branch.label}`}</option>)}</select></Field>
-            <Field label="Branch client" error={errors.proposed_client_id}><select className={inputClass} disabled={!draft.proposed_branch_id || !availableClients.length} value={draft.proposed_client_id ?? ""} onChange={(event) => setValue("proposed_client_id", event.target.value || null)}><option value="">Direct office / branch employee</option>{availableClients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></Field>
+            <Field label="Office / branch" error={errors.proposed_branch_id}><select className={inputClass} disabled={Boolean(activeAssignment) && !transferring} value={draft.proposed_branch_id ?? ""} onChange={(event) => { const branchId = event.target.value || null; setDraft((current) => ({ ...current, proposed_branch_id: branchId, proposed_client_id: null })); setErrors((current) => ({ ...current, proposed_branch_id: "", proposed_client_id: "" })); }}><option value="">Select office or branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch.id} value={branch.id}>{branch.type === "head_office" ? branch.label : `Branch: ${branch.label}`}</option>)}</select></Field>
+            <Field label="Branch client" error={errors.proposed_client_id}><select className={inputClass} disabled={(Boolean(activeAssignment) && !transferring) || !draft.proposed_branch_id || !availableClients.length} value={draft.proposed_client_id ?? ""} onChange={(event) => setValue("proposed_client_id", event.target.value || null)}><option value="">Direct office / branch employee</option>{availableClients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></Field>
+            {activeAssignment ? <div className="sm:col-span-2 flex justify-end"><button type="button" className="secondary-button" onClick={() => {
+              if (transferring) {
+                setDraft((current) => ({ ...current, proposed_branch_id: activeAssignment.branch_id, proposed_client_id: activeAssignment.client_id }));
+                setTransferReason("");
+              }
+              setTransferring((current) => !current);
+            }}>{transferring ? <X className="h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}{transferring ? "Cancel transfer" : "Transfer employee"}</button></div> : null}
+            {activeAssignment ? <div className="sm:col-span-2 border-l-4 border-moss bg-paper px-4 py-3 text-xs text-ink/65"><p className="font-semibold text-ink">Current employee placement</p><p className="mt-1">{branches.find((branch) => branch.id === activeAssignment.branch_id)?.label ?? "Unknown branch"}{activeAssignment.client_id ? ` / ${clients.find((client) => client.id === activeAssignment.client_id)?.label ?? "Unknown client"}` : " / Direct employee"} since {activeAssignment.start_date}</p></div> : null}
+            {placementChanged ? <div className="sm:col-span-2 grid gap-4 border border-amber-200 bg-amber-50/60 p-4 sm:grid-cols-2">
+              <div className="sm:col-span-2 flex items-start gap-2 text-xs text-amber-900"><ArrowRightLeft className="mt-0.5 h-4 w-4 shrink-0" /><p><span className="font-semibold">Employee transfer required.</span> Saving will close the current assignment and create a new historical placement.</p></div>
+              <Field label="Transfer effective date" error={errors.transferDate}><input type="date" className={inputClass} value={transferDate} onChange={(event) => { setTransferDate(event.target.value); setErrors((current) => ({ ...current, transferDate: "" })); }} /></Field>
+              <Field label="Transfer reason" error={errors.transferReason}><input className={inputClass} value={transferReason} onChange={(event) => { setTransferReason(event.target.value); setErrors((current) => ({ ...current, transferReason: "" })); }} placeholder="Operational transfer, reassignment..." /></Field>
+            </div> : null}
+            {linkedEmployee?.assignment_history.length ? <div className="sm:col-span-2 border-t border-line pt-4"><p className="flex items-center gap-2 text-xs font-semibold uppercase text-ink/45"><History className="h-3.5 w-3.5" /> Placement history</p><div className="mt-2 divide-y divide-line border-y border-line">{linkedEmployee.assignment_history.map((assignment) => <div key={assignment.id} className="grid gap-1 py-2.5 text-xs sm:grid-cols-[1fr_auto]"><p className="font-semibold text-ink/75">{branches.find((branch) => branch.id === assignment.branch_id)?.label ?? "Unknown branch"}{assignment.client_id ? ` / ${clients.find((client) => client.id === assignment.client_id)?.label ?? "Unknown client"}` : " / Direct employee"}{assignment.transfer_reason ? <span className="font-normal text-ink/50"> - {assignment.transfer_reason}</span> : null}</p><p className="font-mono text-ink/45">{assignment.start_date} to {assignment.end_date ?? "Present"}</p></div>)}</div></div> : null}
           </Section>
           <Section title="Membership" description="Cooperative registration and board acceptance details.">
             <Field label="Membership date"><input type="date" className={inputClass} value={draft.membership_date ?? ""} onChange={(event) => setValue("membership_date", event.target.value || null)} /></Field>
@@ -289,8 +344,8 @@ export function MemberForm({ member, suggestedNumber, saving, aliasEditor, canVi
 
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper/95 px-6 py-4 backdrop-blur sm:px-8">
             <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={onCancel}><X className="h-4 w-4" /> Cancel</button>
-            <button type="submit" disabled={saving} className="primary-button">
-              <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save member"}
+            <button type="submit" disabled={saving || placementLoading} className="primary-button">
+              <Save className="h-4 w-4" /> {saving ? "Saving..." : placementLoading ? "Loading placement..." : "Save member"}
             </button>
           </footer>
         </form>
