@@ -21,7 +21,7 @@ function member(
     date_of_birth: `199${index}-0${Math.min(index, 9)}-15`,
     sex: index % 2 === 0 ? "Female" : "Male",
     civil_status: index % 3 === 0 ? "Married" : "Single",
-    mobile_number: `+63917000${sequence}`,
+    mobile_number: `0917${String(index).padStart(7, "0")}`,
     email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.test`,
     address: `${index} Mabini Street`,
     barangay: "San Roque",

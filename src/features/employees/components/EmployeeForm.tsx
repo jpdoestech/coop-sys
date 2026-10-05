@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
+import { addressValidationError } from "../../../address/addressService";
 import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/forms/GovernmentIdFields";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
 import { terminalEmploymentStatuses } from "../../../services/lookups/statuses";
@@ -27,7 +28,7 @@ import {
   HEAD_OFFICE_ID,
 } from "../data/employeeOptions";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
-import { CHARACTER_LIMITS, normalizeSentenceCase, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeSentenceCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import { MemberSearchField } from "./MemberSearchField";
 import { createUuid } from "../../../utils/createUuid";
@@ -131,15 +132,18 @@ function emptyInput(suggestedNumber = ""): EmployeeInput {
 function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput {
   if (!employee) return emptyInput(suggestedNumber);
   const omitted = new Set(["id", "created_at", "updated_at", "deleted_at", "sync_status", "assignment_history"]);
-  return Object.fromEntries(
+  const input = Object.fromEntries(
     Object.entries(employee).filter(([key]) => !omitted.has(key)),
   ) as unknown as EmployeeInput;
+  return { ...input, mobile_number: normalizeStoredMobileNumber(input.mobile_number) };
 }
 
 export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
   const { branches, departments, positions } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
+  const [addressValid, setAddressValid] = useState(true);
+  const [validatingAddress, setValidatingAddress] = useState(false);
   const [membershipMode, setMembershipMode] = useState<MembershipMode>(employee?.member_id ? "existing" : "none");
   const [rehireSourceId, setRehireSourceId] = useState("");
   const [transferring, setTransferring] = useState(false);
@@ -162,6 +166,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     setTransferring(false);
     setTab("personal");
     setError("");
+    setAddressValid(true);
   }, [employee, suggestedNumber]);
 
   function setValue<K extends keyof EmployeeInput>(field: K, value: EmployeeInput[K]) {
@@ -178,6 +183,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     setDraft((current) => ({
       ...current,
       ...employeeProfileFromMember(member),
+      mobile_number: normalizeStoredMobileNumber(member.mobile_number),
       active_assignment: !employee?.active_assignment && member.proposed_branch_id ? {
         id: createUuid(),
         branch_id: member.proposed_branch_id,
@@ -232,8 +238,17 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     setTransferring(false);
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (saving || validatingAddress) return;
+    if (!addressValid) { setTab("personal"); setError("Select matching locations from the official address list."); return; }
+    setValidatingAddress(true);
+    try {
+      const addressChanged = !employee || draft.province !== employee.province || draft.city_municipality !== employee.city_municipality || draft.barangay !== employee.barangay;
+      const addressError = addressChanged ? await addressValidationError(draft) : null;
+      if (addressError) { setTab("personal"); setError(addressError); return; }
+    } catch { setTab("personal"); setError("Unable to validate address reference data. Please retry."); return; }
+    finally { setValidatingAddress(false); }
     if (membershipMode === "existing" && !draft.member_id) {
       setTab("personal");
       setError("Select the existing member ID to link.");
@@ -385,7 +400,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeSentenceCase(event.target.value))} /></Field>
             <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeSentenceCase(event.target.value) || null)} /></Field>
             <Field label="Date of birth"><input type="date" disabled={Boolean(linkedMember)} className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} /></Field>
-            <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
+            <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="numeric" maxLength={CHARACTER_LIMITS.mobile} pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizeMobileNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
           </Section> : null}
 
@@ -398,7 +413,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
           {tab === "government" && !canViewSensitive ? <div className="px-6 py-12 text-center text-sm text-ink/55 sm:px-8">You do not have permission to view government identifiers.</div> : null}
 
           {tab === "personal" ? <Section title="Home address" description="Type to search, then choose a valid Philippine region, province, city, and barangay.">
-            <AddressFields value={addressValue} disabled={Boolean(linkedMember)} onChange={(value) => setDraft((current) => ({ ...current, ...value }))} />
+            <AddressFields value={addressValue} disabled={Boolean(linkedMember)} onValidityChange={setAddressValid} onChange={(value) => setDraft((current) => ({ ...current, ...value }))} />
           </Section> : null}
 
           {tab === "employment" ? <Section title="Employment" description="Current status and work details.">
@@ -437,7 +452,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
           </Section> : null}
 
           {tab === "additional" ? <Section title="Notes" description="Optional internal context for authorized staff."><div className="sm:col-span-2"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></div></Section> : null}
-          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={onCancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : "Save employee"}</button></footer>
+          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={onCancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving || validatingAddress} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : validatingAddress ? "Validating..." : "Save employee"}</button></footer>
         </form>
       </div>
     </div>

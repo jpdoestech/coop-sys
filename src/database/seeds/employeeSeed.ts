@@ -49,7 +49,7 @@ function employee(
     date_of_birth: `199${index}-0${Math.min(index, 9)}-10`,
     sex: index % 2 === 0 ? "Female" : "Male",
     civil_status: index % 3 === 0 ? "Married" : "Single",
-    mobile_number: `+63918000${sequence}`,
+    mobile_number: `0918${String(index).padStart(7, "0")}`,
     email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.test`,
     address: `${index} Bonifacio Street`,
     barangay: "Poblacion",

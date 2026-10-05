@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRightLeft, BriefcaseBusiness, Contact, History, MapPinned, Save, UserRound, UsersRound, X } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
+import { addressValidationError } from "../../../address/addressService";
 import { GovernmentIdFields, type GovernmentIdValue } from "../../../components/forms/GovernmentIdFields";
 import { educationalAttainments } from "../../../services/lookups/educationalAttainments";
 import { terminalMemberStatuses } from "../../../services/lookups/statuses";
@@ -9,7 +10,7 @@ import { religionAffiliations } from "../../../services/lookups/religionAffiliat
 import type { Member, MemberInput } from "../../../types/member";
 import type { Employee } from "../../../types/employee";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
-import { CHARACTER_LIMITS, normalizeSentenceCase, sanitizePhoneNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeSentenceCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
 import { BeneficiaryEditor } from "../../../components/forms/BeneficiaryEditor";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
 import { useOrganization } from "../../../services/organization/useOrganization";
@@ -93,6 +94,7 @@ function toDraft(member: Member | null, suggestedNumber = ""): Draft {
   ) as unknown as MemberInput;
   return {
     ...input,
+    mobile_number: normalizeStoredMobileNumber(input.mobile_number),
     annual_income: input.annual_income?.toString() ?? "",
     number_of_dependents: input.number_of_dependents?.toString() ?? ""
   };
@@ -123,6 +125,8 @@ function Section({ title, description, children }: { title: string; description:
 export function MemberForm({ member, linkedEmployee, placementLoading = false, saveError, suggestedNumber, saving, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: MemberFormProps) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [addressValid, setAddressValid] = useState(true);
+  const [validatingAddress, setValidatingAddress] = useState(false);
   const [tab, setTab] = useState<MemberTab>("personal");
   const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
   const [transferReason, setTransferReason] = useState("");
@@ -154,6 +158,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
   useEffect(() => {
     setDraft(toDraft(member, suggestedNumber));
     setErrors({});
+    setAddressValid(true);
     setTab("personal");
     setTransferDate(new Date().toISOString().slice(0, 10));
     setTransferReason("");
@@ -165,8 +170,17 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
     setErrors((current) => ({ ...current, [field]: "" }));
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving || validatingAddress) return;
+    if (!addressValid) { setTab("contact"); setErrors((current) => ({ ...current, address: "Select matching locations from the official address list." })); return; }
+    setValidatingAddress(true);
+    try {
+      const addressChanged = !member || draft.province !== member.province || draft.city_municipality !== member.city_municipality || draft.barangay !== member.barangay;
+      const addressError = addressChanged ? await addressValidationError(draft) : null;
+      if (addressError) { setTab("contact"); setErrors((current) => ({ ...current, address: addressError })); return; }
+    } catch { setTab("contact"); setErrors((current) => ({ ...current, address: "Unable to validate address reference data. Please retry." })); return; }
+    finally { setValidatingAddress(false); }
     if (!draft.proposed_branch_id) {
       setErrors((current) => ({ ...current, proposed_branch_id: "Select the intended office or branch before saving." }));
       setTab("membership");
@@ -290,9 +304,10 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
           </Section> : null}</> : null}
 
           {tab === "contact" ? <Section title="Contact" description="Current contact and residential information.">
-            <Field label="Mobile number"><input className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizePhoneNumber(event.target.value) || null)} /></Field>
+            <Field label="Mobile number" error={errors.mobile_number}><input className={inputClass} inputMode="numeric" maxLength={CHARACTER_LIMITS.mobile} pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizeMobileNumber(event.target.value) || null)} /></Field>
             <Field label="Email" error={errors.email}><input type="email" className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
-            <AddressFields value={addressValue} onChange={(address) => setDraft((current) => ({ ...current, ...address }))} />
+            <AddressFields value={addressValue} onValidityChange={setAddressValid} onChange={(address) => setDraft((current) => ({ ...current, ...address }))} />
+            {errors.address ? <p className="text-xs text-red-700 sm:col-span-2">{errors.address}</p> : null}
             <div className="sm:col-span-2"><Field label="Emergency contact"><input className={inputClass} value={draft.emergency_contact ?? ""} onChange={(event) => setValue("emergency_contact", event.target.value || null)} /></Field></div>
           </Section> : null}
 
@@ -344,8 +359,8 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
 
           <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-paper/95 px-6 py-4 backdrop-blur sm:px-8">
             <button type="button" className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper" onClick={onCancel}><X className="h-4 w-4" /> Cancel</button>
-            <button type="submit" disabled={saving || placementLoading} className="primary-button">
-              <Save className="h-4 w-4" /> {saving ? "Saving..." : placementLoading ? "Loading placement..." : "Save member"}
+            <button type="submit" disabled={saving || validatingAddress || placementLoading} className="primary-button">
+              <Save className="h-4 w-4" /> {saving ? "Saving..." : validatingAddress ? "Validating..." : placementLoading ? "Loading placement..." : "Save member"}
             </button>
           </footer>
         </form>

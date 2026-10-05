@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { DropdownSurface } from "./DropdownSurface";
 
 type FilterMenuProps = {
   activeCount: number;
@@ -28,7 +29,7 @@ export function FilterMenu({ activeCount, children, onClear, label = "Filters" }
         {activeCount ? <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-moss px-1 text-[10px] text-white">{activeCount}</span> : null}
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-30 w-[min(340px,calc(100vw-2rem))] rounded-md border border-line bg-white p-4 shadow-panel">
+        <DropdownSurface className="p-4" preferredWidth={340}>
           <div className="mb-4 flex items-center justify-between">
             <div><p className="text-sm font-semibold text-ink">Filter records</p><p className="mt-0.5 text-xs text-ink/50">Selections update the table instantly.</p></div>
             <button type="button" className="icon-button h-8 w-8" onClick={() => setOpen(false)} title="Close filters" aria-label="Close filters"><X className="h-4 w-4" /></button>
@@ -38,7 +39,7 @@ export function FilterMenu({ activeCount, children, onClear, label = "Filters" }
             <button type="button" onClick={onClear} disabled={!activeCount} className="focus-ring inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-ink/55 hover:bg-paper disabled:opacity-35"><RotateCcw className="h-3.5 w-3.5" /> Clear all</button>
             <button type="button" onClick={() => setOpen(false)} className="focus-ring inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink/90"><Check className="h-3.5 w-3.5" /> Done</button>
           </div>
-        </div>
+        </DropdownSurface>
       ) : null}
     </div>
   );

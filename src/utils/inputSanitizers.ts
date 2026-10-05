@@ -1,5 +1,6 @@
 export const CHARACTER_LIMITS = {
   phone: 20,
+  mobile: 11,
   name: 100,
   identifier: 50,
   address: 200,
@@ -21,6 +22,18 @@ export function sanitizePhoneNumber(value: string) {
     ? cleaned
     : cleaned.slice(0, firstPlus + 1) + cleaned.slice(firstPlus + 1).replace(/\+/g, "");
   return normalized.slice(0, CHARACTER_LIMITS.phone);
+}
+
+export function sanitizeMobileNumber(value: string) {
+  return value.replace(/\D/g, "").slice(0, CHARACTER_LIMITS.mobile);
+}
+
+export const MOBILE_NUMBER_PATTERN = /^09\d{9}$/;
+
+export function normalizeStoredMobileNumber(value: string | null | undefined) {
+  if (!value) return value ?? null;
+  const digits = value.replace(/\D/g, "");
+  return /^639\d{9}$/.test(digits) ? `0${digits.slice(2)}` : value;
 }
 
 export type GovernmentIdKind = "sss" | "pagibig" | "philhealth" | "tin";

@@ -1,3 +1,4 @@
+import { DropdownSurface } from "../../../components/ui/DropdownSurface";
 import { Check, Search, UserRoundSearch } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Employee } from "../../../types/employee";
@@ -45,9 +46,9 @@ export function EmployeeSearchField({ employees, value, onChange, label, placeho
       />
       {selected && !query ? <Check className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" /> : null}
     </div>
-    {open ? <div id="employee-search-results" role="listbox" className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-line bg-white p-1 text-xs shadow-xl">
+    {open ? <DropdownSurface id="employee-search-results" role="listbox" className="text-xs">
       {matches.map((employee) => <button key={employee.id} type="button" role="option" aria-selected={employee.id === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(employee)} className="flex w-full items-center gap-3 rounded px-3 py-2 text-left hover:bg-[#f1f7f3]"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#e4efe9] text-moss"><UserRoundSearch className="h-3.5 w-3.5" /></span><span className="min-w-0 flex-1"><span className="block truncate font-semibold text-ink">{employeeFullName(employee)}</span><span className="block font-mono text-[10px] text-ink/45">{employee.employee_number}</span></span>{employee.id === value ? <Check className="h-4 w-4 text-emerald-600" /> : null}</button>)}
       {!matches.length ? <p className="px-3 py-5 text-center text-xs text-ink/45">{emptyMessage}</p> : null}
-    </div> : null}
+    </DropdownSurface> : null}
   </label>;
 }
