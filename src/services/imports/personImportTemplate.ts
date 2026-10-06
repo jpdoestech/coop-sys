@@ -47,7 +47,7 @@ export async function createPersonImportTemplate(kind: "member" | "employee", lo
       : header === "SUPERVISOR ID" ? "Optional existing six-digit employee ID within your permitted scope."
       : header === "ID" ? "Optional shared member/employee ID: up to six digits. Leave blank to generate a new ID."
       : header === "MOBILE" ? "Optional 11-digit mobile number starting with 09. Keep it as text to preserve the leading zero."
-      : "FIRST NAME LAST NAME".includes(header) ? "Required. Extra spaces are trimmed and names use sentence case."
+      : "FIRST NAME LAST NAME".includes(header) ? "Required. Extra spaces are trimmed and names use proper case (each word capitalized)."
       : "Optional. Blank fields use the system default where applicable.";
     const listIndex = Object.keys(options).indexOf(header);
     if (listIndex >= 0 && options[header].length) for (let row = 2; row <= 501; row += 1) sheet.getCell(row, index + 1).dataValidation = { type: "list", allowBlank: true, formulae: [`ImportList${listIndex}`], showErrorMessage: false, showInputMessage: true, promptTitle: "Suggested values", prompt: "Choose a suggestion or type another value. Unmatched values are accepted and marked Needs attention." };

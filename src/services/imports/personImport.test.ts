@@ -20,9 +20,11 @@ describe("person import validation", () => {
   it("maps the complete employee record, government IDs and three beneficiaries", async () => {
     const [row] = await personRowsFromSpreadsheet([{ ID: "19", "FIRST NAME": "  JUAN   CARLOS ", "LAST NAME": "DELA CRUZ", SUFFIX: "III", "BIRTH DATE": "6/15/1990", "DATE HIRED": "45292", MOBILE: "09171234567", ADDRESS: "Full free-text address", "SEX": "Male", "CIVIL STATUS": "Single", "SSS NUMBER": "123456789", "PAG-IBIG NUMBER": "123456789012", "TIN": "123456789", "RELIGION / SOCIAL AFFILIATION": "Roman Catholic", DEPARTMENT: departments[0].label, POSITION: positions[0].label, "WORK LOCATION": "Test site", "ASSIGNMENT CODE": "A-1", "ASSIGNMENT START DATE": "1/2/2024", "BENEFICIARY 1 NAME": "JANE CRUZ", "BENEFICIARY 1 RELATIONSHIP": "Spouse", "BENEFICIARY 1 BIRTH DATE": "1990-01-01", "BENEFICIARY 2 NAME": "JOHN CRUZ", "BENEFICIARY 2 RELATIONSHIP": "Child", "BENEFICIARY 3 NAME": "JUNE CRUZ", "BENEFICIARY 3 RELATIONSHIP": "Child" }]);
     expect(row.errors).toEqual([]);
-    expect(row).toMatchObject({ personNumber: "000019", firstName: "Juan carlos", suffix: "III", birthDate: "1990-06-15", dateHired: "2024-01-01" });
+    expect(row).toMatchObject({ personNumber: "000019", firstName: "Juan Carlos", lastName: "Dela Cruz", suffix: "III", birthDate: "1990-06-15", dateHired: "2024-01-01" });
     expect(row.employeeFields).toMatchObject({ sss_number: "12-345678-9", pagibig_number: "1234-5678-9012", tax_identification_number: "123-456-789", department_id: departments[0].id, position_id: positions[0].id, address: "Full free-text address" });
     expect(row.employeeFields.beneficiaries).toHaveLength(3);
+    expect(row.employeeFields.beneficiaries?.map((beneficiary) => beneficiary.full_name)).toEqual(["Jane Cruz", "John Cruz", "June Cruz"]);
+    expect(row.memberFields).toMatchObject({ first_name: "Juan Carlos", last_name: "Dela Cruz", suffix: "III" });
     expect(row.assignmentFields).toMatchObject({ start_date: "2024-01-02", assignment_code: "A-1" });
   });
   it("categorizes invalid dates, contact, duplicates and overlong IDs without silently truncating", async () => {

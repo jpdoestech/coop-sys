@@ -15,7 +15,7 @@ import { clearImportAttention, attentionHeaderForField } from "../../../services
 import type { Member, MemberInput } from "../../../types/member";
 import type { Employee } from "../../../types/employee";
 import { memberStatuses, memberTypes } from "../data/memberOptions";
-import { CHARACTER_LIMITS, normalizeSentenceCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeProperCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
 import { BeneficiaryEditor } from "../../../components/forms/BeneficiaryEditor";
 import { activeBeneficiaryCount } from "../../../types/beneficiary";
 import { useOrganization } from "../../../services/organization/useOrganization";
@@ -275,13 +275,13 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
               <input className={`${inputClass} bg-paper font-mono`} value={draft.membership_number} readOnly aria-readonly="true" />
             </Field>
             <Field label="First name" error={errors.first_name}>
-              <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeSentenceCase(event.target.value))} />
+              <input className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeProperCase(event.target.value))} />
             </Field>
             <Field label="Last name" error={errors.last_name}>
-              <input className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeSentenceCase(event.target.value))} />
+              <input className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeProperCase(event.target.value))} />
             </Field>
             <Field label="Middle name">
-              <input className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeSentenceCase(event.target.value) || null)} />
+              <input className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeProperCase(event.target.value) || null)} />
             </Field>
             <Field label="Suffix">
               <input className={inputClass} value={draft.suffix ?? ""} onChange={(event) => setValue("suffix", event.target.value || null)} placeholder="Jr., III" />

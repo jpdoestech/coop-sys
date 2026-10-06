@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSentenceCase, normalizeWhitespace, sanitizeGovernmentId, sanitizePhoneNumber } from "./inputSanitizers";
+import { normalizeProperCase, normalizeWhitespace, sanitizeGovernmentId, sanitizePhoneNumber } from "./inputSanitizers";
 
 describe("input sanitizers", () => {
-  it("trims repeated whitespace and normalizes sentence capitalization", () => {
-    expect(normalizeSentenceCase("  JUAN   DELA\tCRUZ ")).toBe("Juan dela cruz");
-    expect(normalizeSentenceCase(" élENA ")).toBe("Élena");
+  it("trims repeated whitespace and capitalizes each word", () => {
+    expect(normalizeProperCase("  JUAN   DELA\tCRUZ ")).toBe("Juan Dela Cruz");
+    expect(normalizeProperCase(" élENA ")).toBe("Élena");
     expect(normalizeWhitespace("  III ")).toBe("III");
+  });
+  it("handles hyphenated names, apostrophes and trailing Roman numeral suffixes", () => {
+    expect(normalizeProperCase("MARIA-ELENA O'NEIL")).toBe("Maria-Elena O'Neil");
+    expect(normalizeProperCase("juan dela cruz iii")).toBe("Juan Dela Cruz III");
+    expect(normalizeProperCase("juan dela cruz jr.")).toBe("Juan Dela Cruz Jr.");
+    expect(normalizeProperCase("   ")).toBe("");
   });
   it("formats SSS digits and inserts hyphens automatically", () => {
     expect(sanitizeGovernmentId("12A3456789-extra", "sss")).toBe("12-345678-9");

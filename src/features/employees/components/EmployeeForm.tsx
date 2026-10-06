@@ -33,7 +33,7 @@ import {
   HEAD_OFFICE_ID,
 } from "../data/employeeOptions";
 import type { EmployeeSubmission } from "../types/employeeWorkflow";
-import { CHARACTER_LIMITS, normalizeSentenceCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeProperCase, normalizeStoredMobileNumber, sanitizeMobileNumber } from "../../../utils/inputSanitizers";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import { MemberSearchField } from "./MemberSearchField";
 import { createUuid } from "../../../utils/createUuid";
@@ -401,9 +401,9 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             ) : null}
             <Field label="Person number"><input className={`${inputClass} bg-paper font-mono`} value={draft.employee_number} readOnly aria-readonly="true" /></Field>
             <ReligionAffiliationField attention={Boolean(draft.import_attention?.["RELIGION / SOCIAL AFFILIATION"])} value={draft} onChange={(value) => setDraft((current) => ({ ...current, ...value, import_attention: value.religion_affiliation && !value.religion_affiliation_id ? { ...current.import_attention, "RELIGION / SOCIAL AFFILIATION": value.religion_affiliation } : clearImportAttention(current.import_attention, "RELIGION / SOCIAL AFFILIATION") }))} />
-            <Field label="First name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeSentenceCase(event.target.value))} /></Field>
-            <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeSentenceCase(event.target.value))} /></Field>
-            <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeSentenceCase(event.target.value) || null)} /></Field>
+            <Field label="First name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.first_name} onChange={(event) => setValue("first_name", event.target.value)} onBlur={(event) => setValue("first_name", normalizeProperCase(event.target.value))} /></Field>
+            <Field label="Last name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.last_name} onChange={(event) => setValue("last_name", event.target.value)} onBlur={(event) => setValue("last_name", normalizeProperCase(event.target.value))} /></Field>
+            <Field label="Middle name"><input disabled={Boolean(linkedMember)} className={inputClass} value={draft.middle_name ?? ""} onChange={(event) => setValue("middle_name", event.target.value || null)} onBlur={(event) => setValue("middle_name", normalizeProperCase(event.target.value) || null)} /></Field>
             <Field label="Date of birth"><input type="date" disabled={Boolean(linkedMember)} className={inputClass} value={draft.date_of_birth ?? ""} onChange={(event) => setValue("date_of_birth", event.target.value || null)} /></Field>
             <Field label="Mobile number"><input disabled={Boolean(linkedMember)} className={inputClass} inputMode="numeric" maxLength={CHARACTER_LIMITS.mobile} pattern="09[0-9]{9}" placeholder="09XXXXXXXXX" value={draft.mobile_number ?? ""} onChange={(event) => setValue("mobile_number", sanitizeMobileNumber(event.target.value) || null)} /></Field>
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>

@@ -1,7 +1,7 @@
 import { Plus, RotateCcw, UserMinus } from "lucide-react";
 import type { BeneficiaryInput } from "../../types/beneficiary";
 import { activeBeneficiaryCount } from "../../types/beneficiary";
-import { CHARACTER_LIMITS, sanitizePhoneNumber } from "../../utils/inputSanitizers";
+import { CHARACTER_LIMITS, normalizeProperCase, sanitizePhoneNumber } from "../../utils/inputSanitizers";
 import { createUuid } from "../../utils/createUuid";
 
 type BeneficiaryEditorProps = {
@@ -41,7 +41,7 @@ export function BeneficiaryEditor({ value, onChange }: BeneficiaryEditorProps) {
               {beneficiary.is_active ? <button type="button" onClick={() => update(beneficiary.id, { is_active: false })} className="focus-ring inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"><UserMinus className="h-3.5 w-3.5" /> Deactivate</button> : <button type="button" disabled={activeCount >= 3} onClick={() => update(beneficiary.id, { is_active: true, deactivation_reason: null })} className="focus-ring inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-moss hover:bg-emerald-50 disabled:opacity-45"><RotateCcw className="h-3.5 w-3.5" /> Reactivate</button>}
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.full_name} onChange={(event) => update(beneficiary.id, { full_name: event.target.value })} placeholder="Full name" aria-label={`Beneficiary ${index + 1} full name`} />
+              <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.full_name} onChange={(event) => update(beneficiary.id, { full_name: event.target.value })} onBlur={(event) => update(beneficiary.id, { full_name: normalizeProperCase(event.target.value) })} placeholder="Full name" aria-label={`Beneficiary ${index + 1} full name`} />
               <input className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.relationship} onChange={(event) => update(beneficiary.id, { relationship: event.target.value })} placeholder="Relationship" aria-label={`Beneficiary ${index + 1} relationship`} />
               <input type="date" className={inputClass} disabled={!beneficiary.is_active} value={beneficiary.date_of_birth ?? ""} onChange={(event) => update(beneficiary.id, { date_of_birth: event.target.value || null })} aria-label={`Beneficiary ${index + 1} date of birth`} />
               <input className={inputClass} inputMode="tel" maxLength={CHARACTER_LIMITS.phone} disabled={!beneficiary.is_active} value={beneficiary.contact_number ?? ""} onChange={(event) => update(beneficiary.id, { contact_number: sanitizePhoneNumber(event.target.value) || null })} placeholder="Contact number" aria-label={`Beneficiary ${index + 1} contact number`} />

@@ -11,8 +11,11 @@ export function normalizeWhitespace(value: string) {
   return value.trim().replace(/\s+/gu, " ");
 }
 
-export function normalizeSentenceCase(value: string) {
-  return normalizeWhitespace(value).toLocaleLowerCase("en-PH").replace(/(^|[.!?]\s+)\p{L}/gu, (text) => text.toLocaleUpperCase("en-PH"));
+export function normalizeProperCase(value: string) {
+  return normalizeWhitespace(value)
+    .toLocaleLowerCase("en-PH")
+    .replace(/(^|[^\p{L}\p{M}\p{N}])\p{L}/gu, (text) => text.toLocaleUpperCase("en-PH"))
+    .replace(/(?:^|\s)(?:ii|iii|iv|vi|vii|viii|ix)$/iu, (text) => text.toLocaleUpperCase("en-PH"));
 }
 
 export function sanitizePhoneNumber(value: string) {

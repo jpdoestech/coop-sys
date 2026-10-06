@@ -45,6 +45,9 @@ const validMember = {
 };
 
 describe("memberInputSchema", () => {
+  it("normalizes every personal name without changing suffixes or email", () => {
+    expect(memberInputSchema.parse({ ...validMember, first_name: "JUAN CARLOS", middle_name: "DELA", last_name: "DE LA CRUZ", suffix: "III" })).toMatchObject({ first_name: "Juan Carlos", middle_name: "Dela", last_name: "De La Cruz", suffix: "III", email: validMember.email });
+  });
   it("accepts extended member registration details", () => {
     expect(memberInputSchema.safeParse(validMember).success).toBe(true);
   });

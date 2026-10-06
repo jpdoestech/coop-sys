@@ -40,6 +40,10 @@ const baseEmployee = {
 };
 
 describe("employeeInputSchema", () => {
+  it("proper-cases employee and beneficiary names consistently", () => {
+    const result = employeeInputSchema.parse({ ...baseEmployee, first_name: "JUAN CARLOS", middle_name: "DELA", last_name: "DE LA CRUZ", suffix: "III", beneficiaries: [{ id: "00000000-0000-4000-8000-000000000001", full_name: "  MARIA   DELA CRUZ III ", relationship: "Child", is_active: true }] });
+    expect(result).toMatchObject({ first_name: "Juan Carlos", middle_name: "Dela", last_name: "De La Cruz", suffix: "III", email: baseEmployee.email, beneficiaries: [{ full_name: "Maria Dela Cruz III" }] });
+  });
   it("accepts a valid employee", () => {
     expect(employeeInputSchema.safeParse(baseEmployee).success).toBe(true);
   });

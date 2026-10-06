@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CHARACTER_LIMITS } from "../../utils/inputSanitizers";
+import { requiredPersonName } from "./personNameSchema";
 
 const nullableText = z.string().trim().max(CHARACTER_LIMITS.address, "Value is too long.").nullable().optional();
 const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact number is too long.").regex(/^[0-9+() -]*$/, "Contact number contains invalid characters.").nullable().optional();
@@ -7,7 +8,7 @@ const contactNumber = z.string().trim().max(CHARACTER_LIMITS.phone, "Contact num
 export const beneficiaryInputSchema = z
   .object({
     id: z.string().uuid(),
-    full_name: z.string().trim().min(1, "Beneficiary name is required.").max(CHARACTER_LIMITS.name),
+    full_name: requiredPersonName("Beneficiary name"),
     relationship: z.string().trim().min(1, "Relationship is required.").max(CHARACTER_LIMITS.name),
     date_of_birth: nullableText,
     contact_number: contactNumber,

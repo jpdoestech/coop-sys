@@ -1,6 +1,6 @@
 import { cities, provinces, barangaysForCity } from "../../address/addressService";
 import type { SpreadsheetRow } from "./excelWorkbook";
-import { normalizeSentenceCase, normalizeWhitespace, sanitizeGovernmentId } from "../../utils/inputSanitizers";
+import { normalizeProperCase, normalizeWhitespace, sanitizeGovernmentId } from "../../utils/inputSanitizers";
 import type { EmployeeInput } from "../../types/employee";
 import type { MemberInput } from "../../types/member";
 import type { EmploymentAssignmentInput } from "../../types/assignment";
@@ -77,8 +77,8 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
     };
     const birthDate = date("BIRTH DATE"), dateHired = date("DATE HIRED"), membershipDate = date("MEMBERSHIP DATE");
     const common = {
-      first_name: normalizeSentenceCase(row["FIRST NAME"] ?? ""), middle_name: normalizeSentenceCase(row["MIDDLE NAME"] ?? "") || null,
-      last_name: normalizeSentenceCase(row["LAST NAME"] ?? ""), suffix: row.SUFFIX || null,
+      first_name: normalizeProperCase(row["FIRST NAME"] ?? ""), middle_name: normalizeProperCase(row["MIDDLE NAME"] ?? "") || null,
+      last_name: normalizeProperCase(row["LAST NAME"] ?? ""), suffix: row.SUFFIX || null,
       date_of_birth: birthDate || null, sex: row.SEX || null, civil_status: row["CIVIL STATUS"] || null,
       mobile_number: row.MOBILE || null, email: row.EMAIL || null, address: row.ADDRESS || null,
       barangay: row.BARANGAY || null, city_municipality: row.CITY || row.MUNICIPALITY || null, province: row.PROVINCE || null, postal_code: row["POSTAL CODE"] || null,
@@ -92,7 +92,7 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
       if (!["NAME", "RELATIONSHIP", "BIRTH DATE", "CONTACT NUMBER", "ACTIVE", "DEACTIVATION REASON"].some((field) => row[prefix + field])) return [];
       const active = (row[prefix + "ACTIVE"] || "YES").toUpperCase();
       if (!["YES", "NO", "TRUE", "FALSE", "1", "0"].includes(active)) review(prefix + "ACTIVE", "Needs attention: unrecognized active status.");
-      return [{ id: createUuid(), full_name: normalizeSentenceCase(row[prefix + "NAME"] || ""), relationship: row[prefix + "RELATIONSHIP"] || "", date_of_birth: date(prefix + "BIRTH DATE") || null, contact_number: row[prefix + "CONTACT NUMBER"] || null, is_active: ["YES", "TRUE", "1"].includes(active), deactivation_reason: row[prefix + "DEACTIVATION REASON"] || null }];
+      return [{ id: createUuid(), full_name: normalizeProperCase(row[prefix + "NAME"] || ""), relationship: row[prefix + "RELATIONSHIP"] || "", date_of_birth: date(prefix + "BIRTH DATE") || null, contact_number: row[prefix + "CONTACT NUMBER"] || null, is_active: ["YES", "TRUE", "1"].includes(active), deactivation_reason: row[prefix + "DEACTIVATION REASON"] || null }];
     });
     const classification = resolveEmploymentClassification(row.DEPARTMENT || "", row.POSITION || "", lookups.departments, lookups.positions);
     if (classification.pending_department_name) review("DEPARTMENT", "Needs attention: department mapping is pending.");
