@@ -7,6 +7,7 @@ const { DatabaseSync } = require("node:sqlite");
 
 const ASSETS = __COOP_EMBEDDED_ASSETS__;
 const maintenance = __COOP_MAINTENANCE__;
+const reports = __COOP_REPORTS__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -528,6 +529,15 @@ async function api(req, res, url) {
   }
   if (req.method === "GET" && url.pathname === "/api/storage") {
     return json(res, 200, Object.fromEntries(readStorage.all().map((row) => [row.storage_key, filteredStorageValue(user, row.storage_key, row.value)]).filter((entry) => entry[1] !== undefined)));
+  }
+  if (req.method === "GET" && url.pathname === "/api/reports") {
+    const input = Object.fromEntries(url.searchParams);
+    const module = input.kind === "members" ? "members" : "employees";
+    if (!hasPermission(user, "reports.view") || !hasPermission(user, `${module}.view`)) return json(res, 403, { error: "Your effective access does not permit this report." });
+    if (input.exporting === "true" && (!hasPermission(user, "reports.export") || !hasPermission(user, `${module}.export`))) return json(res, 403, { error: "Your effective access does not permit this export." });
+    try {
+      return json(res, 200, reports.sqliteReportPage(db, { ...input, attentionOnly: input.attentionOnly === "true" }, { scopeType: user.scope_type || "self", branchIds: parseArray(user.branch_ids), clientIds: parseArray(user.client_ids), linkedEmployeeId: user.linked_employee_id }));
+    } catch (error) { return json(res, 400, { error: error.message }); }
   }
   if (req.method === "PUT" && url.pathname.startsWith("/api/storage/")) {
     const key = decodeURIComponent(url.pathname.slice("/api/storage/".length));

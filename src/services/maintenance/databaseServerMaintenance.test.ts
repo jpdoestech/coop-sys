@@ -16,7 +16,9 @@ describe("SQLite server maintenance", () => {
     directory = mkdtempSync(join(tmpdir(), "coop-maintenance-test-"));
     const source = readFileSync(resolve("src/services/maintenance/cleanupCore.ts"), "utf8");
     const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`);
+    const reportsSource = readFileSync(resolve("src/services/reports/sqliteReports.ts"), "utf8");
+    const reportsCode = ts.transpileModule(reportsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`);
     const serverPath = join(directory, "test-server.cjs");
     writeFileSync(serverPath, template.replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
     child = spawn(process.execPath, [serverPath, `--data-dir=${directory}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
@@ -37,6 +39,10 @@ describe("SQLite server maintenance", () => {
     if (directory && resolve(directory).startsWith(resolve(tmpdir()) + sep)) rmSync(directory, { recursive: true, force: true });
   });
   it("paginates on the server and rejects invalid confirmations without changes", async () => {
+    const reports = await api("/reports?kind=employees&limit=1&offset=1&sort=number");
+    expect(reports.status).toBe(200);
+    expect(await reports.json()).toMatchObject({ total: 2, records: 2, items: [{ id: "e2" }] });
+    expect((await api("/reports?kind=employees", "GET", undefined, "")).status).toBe(401);
     const list = await api("/maintenance/people?kind=employee&limit=1&offset=1&state=active");
     expect(await list.json()).toMatchObject({ total: 2, items: [{ id: "e2" }] });
     const result = await api("/maintenance/people", "POST", { kind: "employee", action: "hard", target: "selected", ids: ["e1"], confirmation: "wrong" });
@@ -45,10 +51,13 @@ describe("SQLite server maintenance", () => {
     expect((await unchanged.json()).total).toBe(2);
   });
   it("rejects non-super-admin API calls even with settings permissions", async () => {
-    const created = await api("/users", "POST", { display_name: "Limited test", email: "limited@example.test", role: "branch_user", role_ids: ["70000000-0000-4000-8000-000000000007"], branch_ids: [], client_ids: [], scope_type: "organization", direct_grants: ["settings.manage"], temporary_password: "TestPassword2026!", is_active: true });
+    const created = await api("/users", "POST", { display_name: "Limited test", email: "limited@example.test", role: "branch_user", role_ids: ["70000000-0000-4000-8000-000000000007"], branch_ids: [], client_ids: [], scope_type: "organization", direct_grants: ["settings.manage", "reports.view", "employees.view"], direct_denies: ["reports.export", "members.view"], temporary_password: "TestPassword2026!", is_active: true });
     expect(created.status).toBe(201);
     const login = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, "");
     const limitedCookie = login.headers.get("set-cookie")!.split(";")[0];
+    expect((await api("/reports?kind=employees", "GET", undefined, limitedCookie)).status).toBe(200);
+    expect((await api("/reports?kind=employees&exporting=true", "GET", undefined, limitedCookie)).status).toBe(403);
+    expect((await api("/reports?kind=members", "GET", undefined, limitedCookie)).status).toBe(403);
     expect((await api("/maintenance/people?kind=employee", "GET", undefined, limitedCookie)).status).toBe(403);
     expect((await api("/maintenance/people", "POST", { kind: "employee", action: "reset", target: "all", ids: [], confirmation: "RESET" }, limitedCookie)).status).toBe(403);
   });

@@ -83,7 +83,7 @@ describe("person import workflow", () => {
     expect(assigned.member_id).toBe(results[0].recordId);
     expect(assigned.active_assignment).toMatchObject({ branch_id: branches[1].id, client_id: clients[0].id });
     const member = (await repositories.members.getById(results[0].recordId!))!;
-    await applyMemberPlacement(repositories.employees, assigned, { ...member, proposed_branch_id: branches[0].id, proposed_client_id: null } as MemberInput, { effectiveDate: "2026-10-05", reason: "Move to head office", workLocation: "Head Office" });
+    await applyMemberPlacement(repositories.employees, assigned, { ...member, proposed_branch_id: branches[0].id, proposed_client_id: null } as MemberInput, { effectiveDate: assigned.active_assignment!.start_date, reason: "Move to head office", workLocation: "Head Office" });
     const transferred = (await repositories.employees.getById(employee.id))!;
     expect(transferred.assignment_history).toHaveLength(2);
     expect(transferred.active_assignment).toMatchObject({ branch_id: branches[0].id, client_id: null, transfer_source: "member" });
