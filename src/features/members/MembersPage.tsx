@@ -33,8 +33,8 @@ export function MembersPage() {
   const { branches, clients, departments, positions } = useOrganization();
   const { profile, can } = useAccess();
   const { branches: scopedBranches, clients: scopedClients } = placementOptions(profile, branches, clients);
-  const canCreate = can("members.create") && !isBranchScoped(profile);
-  const canImport = can("members.import") && !isBranchScoped(profile);
+  const canCreate = can("members.create");
+  const canImport = can("members.import");
   const canEdit = can("members.update");
   const canDelete = can("members.delete");
   const canApprove = can("members.approve");
@@ -131,7 +131,7 @@ export function MembersPage() {
         />
       ) : null}
       {importOpen ? <PersonImportDialog kind="member" branches={scopedBranches} clients={scopedClients} lookups={{ departments, positions }} requireClient={profile.scopeType === "assigned_clients"} linkOptions={(placementEmployees.data ?? []).filter((employee) => !employee.member_id).map((employee) => ({ id: employee.id, number: employee.employee_number, name: `${employee.last_name}, ${employee.first_name}`, isActive: employee.employment_status_id === EMPLOYMENT_STATUS.active }))} importing={importMembers.isPending} importError={importMembers.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId) => importMembers.mutateAsync({ rows, branchId, clientId })} /> : null}
-      {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}
+      {approvalOpen ? <MemberApprovalDialog count={selectedIds.size} resolutionNumber={approvalSequence.data ?? ""} saving={approveMembers.isPending} error={approveMembers.error?.message || approvalSequence.error?.message} onCancel={() => setApprovalOpen(false)} onApprove={(approvalDate) => approveMembers.mutate({ ids: [...selectedIds], approvalDate }, { onSuccess: () => { setApprovalOpen(false); setSelectedIds(new Set()); } })} /> : null}
     </>
   );
 }

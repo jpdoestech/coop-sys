@@ -4,12 +4,55 @@ import type { MemberRepository } from "../MemberRepository";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { createUuid } from "../../../utils/createUuid";
 import { flushDatabaseStorage, readPersistentItem } from "../../server/databaseStorage";
+import { hydrateDatabaseStorage, writePersistentItem } from "../../server/databaseStorage";
+import { serverRequest, usesServerBackend } from "../../server/serverApi";
+import { nextBodResolutionNumber } from "../../members/membershipApproval";
+import { MEMBER_STATUS } from "../../lookups/statuses";
+import { employeeProfileFromMember } from "../../identity/personProfileSync";
+
+const APPROVAL_SEQUENCE_KEY = "coop_sys_bod_approval_sequence";
+let approvalQueue: Promise<unknown> = Promise.resolve();
 
 function now() {
   return new Date().toISOString();
 }
 
 export class LocalMemberRepository implements MemberRepository {
+  async nextApprovalNumber() {
+    if (usesServerBackend()) return (await serverRequest<{ number: string }>("/members/approval-number")).number;
+    const highest = Math.max(Number(nextBodResolutionNumber(readStoredMembers())) - 1, Number(readPersistentItem(APPROVAL_SEQUENCE_KEY)) || 0);
+    if (highest >= 999999) throw new Error("The six-digit BOD resolution sequence is exhausted.");
+    return String(highest + 1).padStart(6, "0");
+  }
+
+  async approve(ids: string[], approvalDate: string) {
+    if (usesServerBackend()) {
+      await flushDatabaseStorage();
+      const result = await serverRequest<{ number: string }>("/members/approve", { method: "POST", body: JSON.stringify({ ids, approvalDate }) });
+      await hydrateDatabaseStorage();
+      return result.number;
+    }
+    const run = async () => {
+      const members = readStoredMembers(), selected = new Set(ids);
+      if (!selected.size || selected.size !== ids.length || members.filter((member) => selected.has(member.id) && !member.deleted_at && member.bod_approval_status === "pending").length !== selected.size) throw new Error("Only pending membership applications can be approved.");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(approvalDate) || !Number.isFinite(Date.parse(approvalDate)) || new Date(approvalDate).toISOString().slice(0, 10) !== approvalDate) throw new Error("Enter a valid approval date.");
+      const number = await this.nextApprovalNumber(), timestamp = now();
+      const approved = members.map((member) => selected.has(member.id) ? { ...member, bod_approval_status: "approved" as const, acceptance_date: approvalDate, acceptance_resolution_number: number, membership_status_id: MEMBER_STATUS.active, updated_at: timestamp, sync_status: member.sync_status === "pending_create" ? "pending_create" as const : "pending_update" as const } : member);
+      writePersistentItem(APPROVAL_SEQUENCE_KEY, number);
+      writeStoredMembers(approved);
+      const employees = JSON.parse(readPersistentItem("coop_sys_employees") || "[]") as Array<Record<string, unknown>>;
+      writePersistentItem("coop_sys_employees", JSON.stringify(employees.map((employee) => {
+        const member = approved.find((item) => selected.has(item.id) && item.id === employee.member_id);
+        return member ? { ...employee, ...employeeProfileFromMember(member), updated_at: timestamp, sync_status: employee.sync_status === "pending_create" ? "pending_create" : "pending_update" } : employee;
+      })));
+      await flushDatabaseStorage();
+      return number;
+    };
+    if (typeof navigator !== "undefined" && navigator.locks) return navigator.locks.request("coop-bod-approval", run);
+    const result = approvalQueue.then(run, run);
+    approvalQueue = result.catch(() => undefined);
+    return result;
+  }
   private filtered(options: ListOptions = {}) {
     let members = readStoredMembers();
     if (!options.includeDeleted) members = members.filter((member) => !member.deleted_at);

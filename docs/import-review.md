@@ -41,6 +41,24 @@ the database-server storage API also checks organization changes by action.
 
 ## Deployment
 
+Assigned member entries and member imports now create or link an employee immediately,
+including pending BOD applications. Both records use the same six-digit person ID.
+Employee imports create a linked Associate membership when none exists; the new
+membership remains pending approval, with no acceptance date or resolution number.
+Initial employment placement is recorded, and subsequent placement changes still
+require a recorded transfer. Import requires permission to create the counterpart
+record; government-ID copying also respects the counterpart's sensitive-update permission.
+
+Apply `0028_atomic_bod_approval.sql` and `0029_atomic_employee_deployment.sql` before
+deploying this registration update to Supabase. The first migration reserves one
+resolution number per approval batch across all scopes, preserves a counter after
+record deletion, and updates linked employment status atomically. The second creates
+an employee together with its first deployment before returning a scoped record.
+The database-server uses a SQLite transaction for BOD approval; rebuild its EXE to
+include these server endpoints. Independent offline databases have independent counters.
+Existing unlinked, assigned pending members are linked when saved or approved; this
+update does not bulk rewrite existing records or deploy migrations automatically.
+
 Apply `supabase/migrations/0026_import_review_and_classification.sql` before deploying
 the updated cloud application. This migration adds review metadata, pending labels,
 member classification fields, linked classification synchronization, and separate

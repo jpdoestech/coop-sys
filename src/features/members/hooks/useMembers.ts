@@ -4,15 +4,14 @@ import { createRepositories } from "../../../services/repositories/repositoryFac
 import type { Member } from "../../../types/member";
 import { employeeProfileFromMember } from "../../../services/identity/personProfileSync";
 import { useAccess } from "../../../services/access/useAccess";
-import { assertPermission, employeeIsInScope, isBranchScoped } from "../../../services/access/accessControl";
+import { assertPermission, employeeIsInScope, hasPermission, isBranchScoped } from "../../../services/access/accessControl";
 import { nextPersonNumber } from "../../../services/identity/personNumber";
-import { nextBodResolutionNumber } from "../../../services/members/membershipApproval";
-import { MEMBER_STATUS } from "../../../services/lookups/statuses";
 import { assertImportPlacement, importPersonRows, type PersonImportRequest } from "../../../services/imports/personImportWorkflow";
 import { useOrganization } from "../../../services/organization/useOrganization";
 import type { ListOptions } from "../../../services/repositories/Repository";
 import type { MemberSubmission } from "../types/memberWorkflow";
 import { applyMemberPlacement } from "../../../services/identity/memberPlacement";
+import { ensureMemberEmployee } from "../../../services/identity/personRegistration";
 
 export function useMembers(options: ListOptions, editingMemberId?: string | null) {
   const repositories = useMemo(() => createRepositories(), []);
@@ -45,22 +44,29 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
     ),
   });
   const approvalSequence = useQuery({
-    queryKey: ["next-bod-resolution"],
-    queryFn: async () => nextBodResolutionNumber(await repositories.members.list({ limit: 10000 })),
+    queryKey: ["next-bod-resolution", profile.userId],
+    enabled: hasPermission(profile, "members.approve"),
+    queryFn: () => repositories.members.nextApprovalNumber(),
   });
 
   const saveMember = useMutation({
     mutationFn: async ({ member, submission }: { member: Member | null; submission: MemberSubmission }) => {
       const { input, transfer } = submission;
       assertPermission(profile, member ? "members.update" : "members.create");
-      if (!member && isBranchScoped(profile)) throw new Error("Create branch members from the employee workflow so their branch scope is recorded.");
       if (member && isBranchScoped(profile)) {
         const linked = await repositories.employees.listByMemberId(member.id);
-        if (!linked.some((employee) => employeeIsInScope(employee, profile))) throw new Error("This member is outside your assigned branches.");
+        if (linked.length ? !linked.some((employee) => employeeIsInScope(employee, profile)) : !member.proposed_branch_id) throw new Error("This member is outside your assigned branches.");
+        if (!linked.length) assertImportPlacement(profile, directory, member.proposed_branch_id || "", member.proposed_client_id || "");
       }
       const linkedEmployees = member
         ? (await repositories.employees.listByMemberId(member.id)).filter((employee) => !employee.deleted_at)
         : [];
+      if (input.proposed_branch_id) {
+        assertImportPlacement(profile, directory, input.proposed_branch_id, input.proposed_client_id || "");
+        if (!linkedEmployees.length) assertPermission(profile, "employees.create");
+        if ([input.sss_number, input.pagibig_number, input.philhealth_number, input.tax_identification_number].some(Boolean)) assertPermission(profile, "employees.sensitive.update");
+      }
+      if (!member && isBranchScoped(profile) && !input.proposed_branch_id) throw new Error("Select a deployment within your assigned scope.");
       const employeesNeedingTransfer = linkedEmployees.filter((employee) =>
         (!employee.active_assignment && !employee.assignment_history.length) || employee.active_assignment &&
         (employee.active_assignment.branch_id !== input.proposed_branch_id || employee.active_assignment.client_id !== input.proposed_client_id),
@@ -81,6 +87,7 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
           repositories.employees.update(linkedEmployee.id, employeeProfileFromMember(saved)),
         ),
       );
+      if (!employeesToSynchronize.length) await ensureMemberEmployee(repositories, profile, saved);
       return saved;
     },
     onSuccess: () => {
@@ -111,35 +118,29 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
   const approveMembers = useMutation({
     mutationFn: async ({ ids, approvalDate }: { ids: string[]; approvalDate: string }) => {
       assertPermission(profile, "members.approve");
-      if (!ids.length) throw new Error("Select at least one pending member.");
-      const allMembers = await repositories.members.list({ limit: 10000 });
-      const selected = allMembers.filter((member) => ids.includes(member.id));
-      if (selected.length !== ids.length || selected.some((member) => member.bod_approval_status !== "pending")) {
-        throw new Error("Only pending membership applications can be approved.");
+      for (const id of ids) {
+        const member = await repositories.members.getById(id);
+        if (member?.bod_approval_status === "pending" && member.proposed_branch_id && !(await repositories.employees.listByMemberId(id)).some((employee) => !employee.deleted_at)) {
+          assertImportPlacement(profile, directory, member.proposed_branch_id, member.proposed_client_id || "");
+          await ensureMemberEmployee(repositories, profile, member);
+        }
       }
-      const resolutionNumber = nextBodResolutionNumber(allMembers);
-      await Promise.all(selected.map(async (member) => {
-        const saved = await repositories.members.update(member.id, {
-          bod_approval_status: "approved",
-          acceptance_date: approvalDate,
-          acceptance_resolution_number: resolutionNumber,
-          membership_status_id: MEMBER_STATUS.active,
-        });
-        const linkedEmployees = await repositories.employees.listByMemberId(saved.id);
-        await Promise.all(linkedEmployees.map((employee) => repositories.employees.update(employee.id, employeeProfileFromMember(saved))));
-      }));
-      return resolutionNumber;
+      return repositories.members.approve(ids, approvalDate);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["members"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["member-options"] });
+      queryClient.invalidateQueries({ queryKey: ["next-bod-resolution"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["member-linked-employee"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-employees"] });
     },
   });
 
   const importMembers = useMutation({
     mutationFn: (request: PersonImportRequest) => importPersonRows("member", repositories, profile, directory, request),
-    onSuccess: () => { for (const key of ["members", "employees", "member-options", "next-person-number", "member-placement-employees", "member-linked-employee", "payment-employees"]) queryClient.invalidateQueries({ queryKey: [key] }); },
+    onSuccess: () => { for (const key of ["members", "employees", "member-options", "next-person-number", "next-bod-resolution", "reports", "member-placement-employees", "member-linked-employee", "payment-employees"]) queryClient.invalidateQueries({ queryKey: [key] }); },
   });
 
   return { query, linkedEmployee, placementEmployees, personNumber, approvalSequence, saveMember, archiveMember, approveMembers, importMembers };

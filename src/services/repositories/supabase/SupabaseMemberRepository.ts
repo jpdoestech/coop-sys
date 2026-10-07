@@ -36,6 +36,17 @@ function requireSupabase() {
 }
 
 export class SupabaseMemberRepository implements MemberRepository {
+  async nextApprovalNumber() {
+    const { data, error } = await requireSupabase().rpc("next_bod_resolution_number");
+    if (error) throw error;
+    return data as string;
+  }
+
+  async approve(ids: string[], approvalDate: string) {
+    const { data, error } = await requireSupabase().rpc("approve_members", { p_member_ids: ids, p_approval_date: approvalDate });
+    if (error) throw error;
+    return data as string;
+  }
   async listPage(options: ListOptions = {}) {
     const client = requireSupabase();
     let query = client.from("members").select("*, beneficiaries(*)", { count: "exact" });

@@ -10,12 +10,49 @@ import { assertImportPlacement, importPersonRows } from "./personImportWorkflow"
 import { applyMemberPlacement } from "../identity/memberPlacement";
 import type { MemberInput } from "../../types/member";
 import type { SpreadsheetRow } from "./excelWorkbook";
+import { ensureMemberEmployee } from "../identity/personRegistration";
+import { EMPLOYMENT_STATUS } from "../lookups/statuses";
 
 const directory: OrganizationDirectory = { branches, clients, departments: departments.map((item) => ({ ...item, code: "", description: "", isActive: true })), positions: positions.map((item) => ({ ...item, code: "", description: "", isActive: true })) };
 const admin: AccessProfile = { userId: "admin", displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" };
 afterEach(() => localStorage.clear());
 
 describe("person import workflow", () => {
+  it("immediately creates assigned employees for pending member imports with the same ID", async () => {
+    localStorage.setItem("coop_sys_members", "[]");
+    localStorage.setItem("coop_sys_employees", "[]");
+    const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "Pending", "LAST NAME": "Deployment", "DATE HIRED": "2025-01-15", "SSS NUMBER": "1234567890" }], "member");
+    const [result] = await importPersonRows("member", repositories, admin, directory, { rows, branchId: branches[1].id, clientId: clients[0].id });
+    expect(result.status).toBe("imported");
+    const member = (await repositories.members.getById(result.recordId!))!;
+    const [employee] = await repositories.employees.listByMemberId(member.id);
+    expect(member).toMatchObject({ bod_approval_status: "pending", acceptance_resolution_number: null });
+    expect(employee).toMatchObject({ employee_number: member.membership_number, employment_status_id: EMPLOYMENT_STATUS.active, sss_number: "12-3456789-0", date_hired: "2025-01-15", active_assignment: { branch_id: branches[1].id, client_id: clients[0].id } });
+    await ensureMemberEmployee(repositories, admin, member);
+    expect(await repositories.employees.listByMemberId(member.id)).toHaveLength(1);
+    expect((await repositories.employees.getById(employee.id))!.assignment_history).toHaveLength(1);
+  });
+  it("creates a pending linked membership when importing an employee", async () => {
+    const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "Employee", "LAST NAME": "Membership" }]);
+    const [result] = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "" });
+    expect(result.status).toBe("imported");
+    const employee = (await repositories.employees.getById(result.recordId!))!;
+    expect(employee.member_id).toBeTruthy();
+    expect(await repositories.members.getById(employee.member_id!)).toMatchObject({ membership_number: employee.employee_number, bod_approval_status: "pending", acceptance_resolution_number: null, acceptance_date: null, membership_type_id: "30000000-0000-4000-8000-000000000002", proposed_branch_id: branches[0].id, proposed_client_id: null });
+  });
+  it("fails before creating a member when employee creation is denied", async () => {
+    localStorage.setItem("coop_sys_members", "[]");
+    localStorage.setItem("coop_sys_employees", "[]");
+    const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "Denied", "LAST NAME": "Deployment" }], "member");
+    const profile: AccessProfile = { ...admin, role: "custom", effectivePermissions: ["members.import", "members.create" ] };
+    const [result] = await importPersonRows("member", repositories, profile, directory, { rows, branchId: branches[0].id, clientId: "" });
+    expect(result.status).toBe("error");
+    expect(await repositories.members.list()).toEqual([]);
+    expect(await repositories.employees.list()).toEqual([]);
+  });
   it("filters persisted attention flags before pagination", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
     const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "Review", "LAST NAME": "Unmapped", DEPARTMENT: "Custom division" }, { "FIRST NAME": "Clean", "LAST NAME": "Import" }]);

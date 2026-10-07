@@ -8,6 +8,21 @@ vi.mock("../../../database/supabase/client", () => ({ supabase: db }));
 beforeEach(() => vi.resetAllMocks());
 
 describe("SupabaseEmployeeRepository transfer and placement reads", () => {
+  it("creates the employee and its initial deployment through one atomic RPC", async () => {
+    const repository = new SupabaseEmployeeRepository(), employee = developmentEmployees[0];
+    const input = { ...employee, beneficiaries: [] };
+    db.rpc.mockResolvedValue({ error: null, data: employee.id });
+    db.from.mockReturnValue({ delete: vi.fn().mockReturnThis(), eq: vi.fn().mockResolvedValue({ error: null }) });
+    vi.spyOn(repository, "getById").mockResolvedValue(employee);
+    await repository.create(input);
+    expect(db.rpc).toHaveBeenCalledExactlyOnceWith("create_employee_with_assignment", {
+      p_employee: expect.objectContaining({ employee_number: employee.employee_number, member_id: employee.member_id }),
+      p_assignment: employee.active_assignment,
+    });
+    const payload = db.rpc.mock.calls[0][1].p_employee;
+    expect(payload).not.toHaveProperty("active_assignment");
+    expect(payload).not.toHaveProperty("beneficiaries");
+  });
   it("filters by current placement while preserving full assignment history", async () => {
     const employee = developmentEmployees[1];
     const historical = { ...employee.active_assignment!, end_date: "2026-10-05" };

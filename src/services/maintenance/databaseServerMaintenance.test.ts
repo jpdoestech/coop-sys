@@ -60,6 +60,26 @@ describe("SQLite server maintenance", () => {
     expect((await api("/reports?kind=members", "GET", undefined, limitedCookie)).status).toBe(403);
     expect((await api("/maintenance/people?kind=employee", "GET", undefined, limitedCookie)).status).toBe(403);
     expect((await api("/maintenance/people", "POST", { kind: "employee", action: "reset", target: "all", ids: [], confirmation: "RESET" }, limitedCookie)).status).toBe(403);
+    expect((await api("/members/approval-number", "GET", undefined, limitedCookie)).status).toBe(403);
+    expect((await api("/members/approve", "POST", { ids: ["m1"], approvalDate: "2026-10-07" }, limitedCookie)).status).toBe(403);
+  });
+  it("allocates SQLite BOD numbers atomically and rejects repeated approvals", async () => {
+    const storage = await (await api("/storage")).json();
+    const members = JSON.parse(storage.coop_sys_members);
+    members[0].bod_approval_status = "pending";
+    members[0].updated_at = new Date().toISOString();
+    expect((await api("/storage/coop_sys_members", "PUT", { value: JSON.stringify(members) })).status).toBe(200);
+    expect(await (await api("/members/approval-number")).json()).toEqual({ number: "000001" });
+    expect((await api("/members/approve", "POST", { ids: ["m1"], approvalDate: "2026-02-30" })).status).toBe(400);
+    const result = await api("/members/approve", "POST", { ids: ["m1"], approvalDate: "2026-10-07" });
+    const approval = await result.json();
+    expect(approval).toEqual({ number: "000001" });
+    expect(result.status).toBe(200);
+    expect((await api("/members/approve", "POST", { ids: ["m1"], approvalDate: "2026-10-07" })).status).toBe(400);
+    expect(await (await api("/members/approval-number")).json()).toEqual({ number: "000002" });
+    const approved = await (await api("/storage")).json();
+    expect(JSON.parse(approved.coop_sys_members)[0]).toMatchObject({ bod_approval_status: "approved", acceptance_resolution_number: "000001", acceptance_date: "2026-10-07" });
+    expect(JSON.parse(approved.coop_sys_employees)[0].employment_status_id).toBe("33000000-0000-4000-8000-000000000001");
   });
   it("removes linked records and payments atomically while keeping users and settings", async () => {
     const result = await api("/maintenance/people", "POST", { kind: "employee", action: "hard", target: "unassigned", ids: [], confirmation: "DELETE" });

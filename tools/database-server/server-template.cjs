@@ -345,6 +345,12 @@ function recordInScope(record, user) {
 function redactIdentifiers(record) {
   return { ...record, sss_number: null, pagibig_number: null, philhealth_number: null, tax_identification_number: null };
 }
+function nextBodNumber(members) {
+  const previous = Number(getStorage.get("coop_sys_bod_approval_sequence")?.value) || 0;
+  const highest = members.reduce((value, member) => Math.max(value, /^\d{6}$/.test(member.acceptance_resolution_number || "") ? Number(member.acceptance_resolution_number) : 0), previous);
+  if (highest >= 999999) throw new Error("The six-digit BOD resolution sequence is exhausted.");
+  return String(highest + 1).padStart(6, "0");
+}
 function filteredStorageValue(user, key, rawValue) {
   const module = storageModules[key];
   if (module && !hasPermission(user, `${module}.view`)) return undefined;
@@ -529,6 +535,33 @@ async function api(req, res, url) {
   }
   if (req.method === "GET" && url.pathname === "/api/storage") {
     return json(res, 200, Object.fromEntries(readStorage.all().map((row) => [row.storage_key, filteredStorageValue(user, row.storage_key, row.value)]).filter((entry) => entry[1] !== undefined)));
+  }
+  if (url.pathname === "/api/members/approval-number" || url.pathname === "/api/members/approve") {
+    if (!hasPermission(user, "members.approve")) return json(res, 403, { error: "Your effective access does not permit membership approval." });
+    if (req.method === "GET" && url.pathname.endsWith("approval-number")) {
+      try { return json(res, 200, { number: nextBodNumber(JSON.parse(getStorage.get("coop_sys_members")?.value || "[]")) }); }
+      catch (error) { return json(res, 400, { error: error.message }); }
+    }
+    if (req.method !== "POST" || !url.pathname.endsWith("approve")) return json(res, 405, { error: "Method not allowed." });
+    const input = await body(req);
+    const ids = Array.isArray(input.ids) && input.ids.every((value) => typeof value === "string") ? new Set(input.ids) : new Set();
+    const date = input.approvalDate;
+    if (!ids.size || ids.size !== input.ids.length || ids.size > 5000 || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0,10) !== date) return json(res, 400, { error: "Select pending members and a valid approval date (maximum 5,000 per batch)." });
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const members = JSON.parse(getStorage.get("coop_sys_members")?.value || "[]");
+      const visible = JSON.parse(filteredStorageValue(user, "coop_sys_members", JSON.stringify(members)) || "[]");
+      if (visible.filter((member) => ids.has(member.id) && !member.deleted_at && member.bod_approval_status === "pending").length !== ids.size) throw new Error("Only pending membership applications within your scope can be approved.");
+      const number = nextBodNumber(members), timestamp = now();
+      const approved = members.map((member) => ids.has(member.id) ? { ...member, bod_approval_status: "approved", acceptance_date: date, acceptance_resolution_number: number, membership_status_id: "31000000-0000-4000-8000-000000000001", updated_at: timestamp, sync_status: member.sync_status === "pending_create" ? "pending_create" : "pending_update" } : member);
+      const employees = JSON.parse(getStorage.get("coop_sys_employees")?.value || "[]");
+      const updated = employees.map((employee) => ids.has(employee.member_id) && !employee.deleted_at ? { ...employee, employment_status_id: "33000000-0000-4000-8000-000000000001", date_separated: null, updated_at: timestamp, sync_status: employee.sync_status === "pending_create" ? "pending_create" : "pending_update" } : employee);
+      saveStorage.run("coop_sys_members", JSON.stringify(approved), timestamp, user.id);
+      saveStorage.run("coop_sys_employees", JSON.stringify(updated), timestamp, user.id);
+      saveStorage.run("coop_sys_bod_approval_sequence", number, timestamp, user.id);
+      db.exec("COMMIT");
+      return json(res, 200, { number });
+    } catch (error) { db.exec("ROLLBACK"); return json(res, 400, { error: error.message }); }
   }
   if (req.method === "GET" && url.pathname === "/api/reports") {
     const input = Object.fromEntries(url.searchParams);

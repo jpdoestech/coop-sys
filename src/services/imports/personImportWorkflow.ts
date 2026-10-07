@@ -7,7 +7,8 @@ import type { PersonImportOutcome, PersonImportRow } from "./personImport";
 import type { Employee, EmployeeInput } from "../../types/employee";
 import type { Member, MemberInput } from "../../types/member";
 import { nextPersonNumber } from "../identity/personNumber";
-import { employeeProfileFromMember } from "../identity/personProfileSync";
+import { employeeProfileFromMember, newMemberFromEmployee } from "../identity/personProfileSync";
+import { ensureMemberEmployee } from "../identity/personRegistration";
 import { employeeInputSchema } from "../validation/employeeSchema";
 import { memberInputSchema } from "../validation/memberSchema";
 import { createUuid } from "../../utils/createUuid";
@@ -79,12 +80,29 @@ export async function importPersonRows(kind: "member" | "employee", repositories
           if (!supervisor) throw new Error("Supervisor ID was not found within your scope.");
           input = { ...input, supervisor_id: supervisor.id };
         }
-        const validated = employeeInputSchema.parse(linkedMember ? { ...input, ...employeeProfileFromMember(linkedMember), ...((row.source?.DEPARTMENT || row.source?.POSITION) ? { department_id: input.department_id, position_id: input.position_id, pending_department_name: input.pending_department_name, pending_position_name: input.pending_position_name } : {}), import_attention: input.import_attention } : input) as EmployeeInput;
+        let validated = employeeInputSchema.parse(linkedMember ? { ...input, ...employeeProfileFromMember(linkedMember), ...((row.source?.DEPARTMENT || row.source?.POSITION) ? { department_id: input.department_id, position_id: input.position_id, pending_department_name: input.pending_department_name, pending_position_name: input.pending_position_name } : {}), import_attention: input.import_attention } : input) as EmployeeInput;
+        if (linkedMember?.bod_approval_status === "pending" && !linkedMember.termination_date) validated.employment_status_id = input.employment_status_id || validated.employment_status_id;
+        if (!linkedMember) {
+          assertPermission(profile, "members.create");
+          if ([validated.sss_number, validated.pagibig_number, validated.philhealth_number, validated.tax_identification_number].some(Boolean)) assertPermission(profile, "members.sensitive.update");
+          const membership = memberInputSchema.parse({ ...newMemberFromEmployee(validated, number), ...row.memberFields,
+            membership_number: number, proposed_branch_id: branch.id, proposed_client_id: request.clientId || null,
+            membership_date: row.membershipDate || new Date().toISOString().slice(0, 10),
+            bod_approval_status: "pending", acceptance_date: null, acceptance_resolution_number: null,
+          }) as MemberInput;
+          stage = "save";
+          const member = await repositories.members.create(membership);
+          savedRecordId = member.id;
+          members.push(member);
+          validated = { ...validated, member_id: member.id };
+        }
         stage = "save";
         const saved = await repositories.employees.create(validated);
         employees.push(saved); used.add(number);
         outcomes.push({ rowNumber: row.rowNumber, status: "imported", message: `Imported ${number}`, recordId: saved.id });
       } else {
+        if (!linkedEmployee) assertPermission(profile, "employees.create");
+        if ([fields.sss_number, fields.pagibig_number, fields.philhealth_number, fields.tax_identification_number].some(Boolean)) assertPermission(profile, "employees.sensitive.update");
         if (row.memberFields.bod_approval_status === "approved") assertPermission(profile, "members.approve");
         if (linkedEmployee) {
           assertPermission(profile, "employees.update");
@@ -95,9 +113,10 @@ export async function importPersonRows(kind: "member" | "employee", repositories
         const saved = await repositories.members.create(input);
         savedRecordId = saved.id;
         members.push(saved); used.add(number);
-        if (linkedEmployee) {
-          await repositories.employees.update(linkedEmployee.id, { ...employeeProfileFromMember(saved), ...(!linkedEmployee.active_assignment ? { active_assignment: assignment, work_location: assignment.work_location } : {}) });
-          linkedEmployee.member_id = saved.id;
+        const employee = await ensureMemberEmployee(repositories, profile, saved, { ...row.employeeFields, active_assignment: assignment, work_location: assignment.work_location });
+        if (employee) {
+          const index = employees.findIndex((item) => item.id === employee.id);
+          if (index < 0) employees.push(employee); else employees[index] = employee;
         }
         outcomes.push({ rowNumber: row.rowNumber, status: "imported", message: `Imported ${number}`, recordId: saved.id });
       }
