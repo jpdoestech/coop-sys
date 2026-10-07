@@ -13,8 +13,9 @@ import { employeeInputSchema } from "../validation/employeeSchema";
 import { memberInputSchema } from "../validation/memberSchema";
 import { createUuid } from "../../utils/createUuid";
 import { normalizeIdentityName } from "./identityMatching";
+import type { ProgressReporter } from "../activity/activityStore";
 
-export type PersonImportRequest = { rows: PersonImportRow[]; branchId: string; clientId: string };
+export type PersonImportRequest = { rows: PersonImportRow[]; branchId: string; clientId: string; onProgress?: ProgressReporter };
 
 export function assertImportPlacement(profile: AccessProfile, directory: Pick<OrganizationDirectory, "branches" | "clients">, branchId: string, clientId: string) {
   const scoped = placementOptions(profile, directory.branches.filter((item) => item.isActive), directory.clients.filter((item) => item.isActive));
@@ -44,7 +45,8 @@ export async function importPersonRows(kind: "member" | "employee", repositories
   for (const [index, row] of request.rows.entries()) {
     // Let pending-state rendering and navigation guards run during large local batches.
     if (index % 25 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
-    if (row.errors.length) { outcomes.push({ rowNumber: row.rowNumber, status: "error", message: row.errors.join(" "), errorType: row.errorTypes[0] || "validation" }); continue; }
+    request.onProgress?.(index, request.rows.length);
+    if (row.errors.length) { outcomes.push({ rowNumber: row.rowNumber, status: "error", message: row.errors.join(" "), errorType: row.errorTypes[0] || "validation" }); request.onProgress?.(index + 1, request.rows.length); continue; }
     let stage: "validation" | "save" = "validation";
     let savedRecordId: string | undefined;
     try {
@@ -124,6 +126,7 @@ export async function importPersonRows(kind: "member" | "employee", repositories
       const message = reason instanceof Error ? reason.message : String((reason as { message?: string })?.message || "Record could not be saved.");
       outcomes.push({ rowNumber: row.rowNumber, status: "error", message: savedRecordId ? `Member created, but employee linking failed: ${message}. Complete the link from the employee entry; do not re-import this row.` : message, recordId: savedRecordId, errorType: /already exists/.test(message) ? "duplicate" : /scope|permit|assigned/.test(message) ? "scope" : stage });
     }
+    request.onProgress?.(index + 1, request.rows.length);
   }
   return outcomes;
 }

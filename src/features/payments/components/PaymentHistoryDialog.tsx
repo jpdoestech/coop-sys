@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import { History, Printer, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PaginationControls } from "../../../components/ui/PaginationControls";
@@ -281,7 +282,7 @@ export function PaymentHistoryDialog({
                     colSpan={8}
                     className="px-4 py-10 text-center text-sm text-ink/45"
                   >
-                    Loading payment history...
+                    <LoadingProgress label="Loading payment history..." />
                   </td>
                 </tr>
               ) : !payments.length ? (

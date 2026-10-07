@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../components/ui/LoadingProgress";
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
@@ -20,7 +21,7 @@ const PaymentsPage = lazy(() => import("../features/payments/PaymentsPage").then
 export function App() {
   return (
     <AppShell>
-      <Suspense fallback={<div className="py-16 text-center text-sm text-ink/55">Loading workspace...</div>}>
+      <Suspense fallback={<div className="py-16 text-ink/55"><LoadingProgress label="Loading workspace..." /></div>}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/members" element={<RequirePermission permission="members.view"><MembersPage /></RequirePermission>} />

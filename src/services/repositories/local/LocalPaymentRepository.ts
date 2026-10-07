@@ -396,7 +396,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     await flushDatabaseStorage();
   }
 
-  async postBatch(input: PaymentBatchInput, lines: PaymentLineInput[]) {
+  async postBatch(input: PaymentBatchInput, lines: PaymentLineInput[], onProgress?: import("../../activity/activityStore").ProgressReporter) {
     if (!lines.length) throw new Error("Add at least one valid payment.");
     const ledger = readLedger();
     const settings = effectiveSettings(ledger.settings, input.payment_date);
@@ -432,6 +432,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     ledger.batches.push(batch);
     writeLedger(ledger);
     await flushDatabaseStorage();
+    onProgress?.(lines.length, lines.length);
     return { batch, payments };
   }
 

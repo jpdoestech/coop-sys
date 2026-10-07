@@ -8,6 +8,8 @@ import {
 } from "../../../services/access/accessControl";
 import { createRepositories } from "../../../services/repositories/repositoryFactory";
 import { createPaymentRepository } from "../../../services/repositories/paymentRepositoryFactory";
+import { withActivity } from "../../../services/activity/activityStore";
+import { showTransactionSuccess } from "../../../services/activity/transactionNotifications";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -108,9 +110,12 @@ export function usePayments(
       lines: PaymentLineInput[];
     }) => {
       assertPermission(profile, batch.method === "payroll_deduction" ? "payments.import" : "payments.create");
-      return paymentRepository.postBatch(batch, lines);
+      return withActivity(`Posting ${lines.length} payment transactions...`, (report) => paymentRepository.postBatch(batch, lines, report));
     },
-    onSuccess: refresh,
+    onSuccess: async (_result, { batch, lines }) => {
+      await showTransactionSuccess(batch.method === "payroll_deduction" ? "Payroll import completed" : "Payment saved", `${lines.length} payment transactions posted successfully.`);
+      await refresh();
+    },
   });
   const correctPayment = useMutation({
     mutationFn: (input: PaymentCorrectionInput) => {
@@ -169,12 +174,12 @@ export function usePayments(
   const loadRefunds = useCallback(
     (options: RefundQueryOptions) => {
       assertPermission(profile, "payments.view");
-      return paymentRepository.getRefundPage({
+      return withActivity("Loading refunds...", () => paymentRepository.getRefundPage({
         ...options,
         branchIds:
           options.branchIds ??
           (isBranchScoped(profile) ? profile.branchIds : undefined),
-      });
+      }));
     },
     [paymentRepository, profile],
   );

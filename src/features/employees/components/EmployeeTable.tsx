@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import { hasImportAttention } from "../../../services/imports/importAttention";
 import { Archive, Pencil, UserRoundCog } from "lucide-react";
 import type { Employee } from "../../../types/employee";
@@ -27,7 +28,7 @@ type Props = {
 
 export function EmployeeTable({ employees, loading, onEdit, onArchive, canEdit, canDelete }: Props) {
   const { branches, clients, departments, positions } = useOrganization();
-  if (loading) return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60">Loading employee records...</div>;
+  if (loading) return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60"><LoadingProgress label="Loading employee records..." /></div>;
   if (!employees.length) return <div className="border-t border-line px-5 py-14 text-center"><UserRoundCog className="mx-auto h-7 w-7 text-moss" /><p className="mt-3 text-sm font-semibold">No matching employees</p></div>;
 
   return (

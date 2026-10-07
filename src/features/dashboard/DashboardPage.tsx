@@ -7,6 +7,7 @@ import {
   Users,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { LoadingProgress } from "../../components/ui/LoadingProgress";
 import { roleLabel } from "../../services/access/accessControl";
 import { useAccess } from "../../services/access/useAccess";
 import type { DashboardMembershipStatus } from "../../types/dashboard";
@@ -47,6 +48,7 @@ function Metric({
 function LoadingState() {
   return (
     <div className="space-y-4" aria-label="Loading dashboard">
+      <LoadingProgress label="Loading dashboard..." />
       <div className="grid overflow-hidden rounded-md border border-line bg-white sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
           <div key={item} className="h-[82px] animate-pulse border-line bg-ink/[0.035] sm:border-r" />

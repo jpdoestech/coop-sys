@@ -15,6 +15,7 @@ import { createUuid } from "../../utils/createUuid";
 import { EMPLOYMENT_STATUS, MEMBER_STATUS } from "../lookups/statuses";
 import { resolveEmploymentClassification } from "../organization/employmentClassification";
 import { normalizeIdentityName, nameSimilarity } from "./identityMatching";
+import type { ProgressReporter } from "../activity/activityStore";
 
 export type ImportErrorType = "identity" | "date" | "contact" | "address" | "government_id" | "lookup" | "beneficiary" | "validation" | "scope" | "duplicate" | "save";
 export type PersonImportRow = {
@@ -27,7 +28,7 @@ export type PersonImportOutcome = { rowNumber: number; status: "imported" | "err
 type Lookup = { id: string; label: string };
 export type PersonImportLookups = { departments: readonly Lookup[]; positions: readonly (Lookup & { departmentId: string })[] };
 
-export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "employee" | "member" = "employee", lookups: PersonImportLookups = { departments, positions }): Promise<PersonImportRow[]> {
+export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "employee" | "member" = "employee", lookups: PersonImportLookups = { departments, positions }, onProgress?: ProgressReporter): Promise<PersonImportRow[]> {
   if (!rows.length) throw new Error("The worksheet does not contain data rows.");
   const missing = ["FIRST NAME", "LAST NAME"].filter((header) => !(header in rows[0]));
   if (missing.length) throw new Error(`Missing required headers: ${missing.join(", ")}.`);
@@ -42,7 +43,10 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
   rows.forEach((row, index) => { const key = normalizeIdentityName(row["LAST NAME"] || ""); const bucket = nameBuckets.get(key) || new Set<string>(); bucket.add(names[index]); nameBuckets.set(key, bucket); });
   rows.forEach((row) => ["SSS NUMBER", "PAG-IBIG NUMBER", "PHILHEALTH NUMBER", "TIN"].forEach((header) => { const digits = (row[header] || "").replace(/\D/g, ""); if (digits) { const key = `${header}:${digits}`; governmentCounts.set(key, (governmentCounts.get(key) || 0) + 1); } }));
   rows.forEach((row) => { const id = (row.ID || row["MEMBER ID"] || row["EMPLOYEE ID"] || "").trim().padStart(6, "0"); if (id !== "000000") idCounts.set(id, (idCounts.get(id) ?? 0) + 1); });
+  let completed = 0;
+  onProgress?.(0, rows.length);
   return Promise.all(rows.map(async (originalRow, index) => {
+    if (index % 25 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
     const row = Object.fromEntries(Object.entries(originalRow).map(([key, value]) => [key, normalizeWhitespace(value)])) as SpreadsheetRow;
     const errors: string[] = []; const errorTypes: ImportErrorType[] = [];
     const warnings: string[] = [];
@@ -129,6 +133,7 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
     const today = new Date().toISOString().slice(0, 10);
     if (birthDate && birthDate > today) fail("date", "Birth date cannot be later than today.");
     if (assignmentFields.start_date && assignmentFields.end_date && assignmentFields.end_date < assignmentFields.start_date) fail("date", "Assignment end date cannot precede its start date.");
+    onProgress?.(++completed, rows.length);
     return { rowNumber: index + 2, personNumber: number, firstName: common.first_name, middleName: common.middle_name || "", lastName: common.last_name, suffix: common.suffix || "", birthDate, mobile: row.MOBILE || "", email: row.EMAIL || "", address: row.ADDRESS || "", barangay: row.BARANGAY || "", city: row.CITY || row.MUNICIPALITY || "", province: row.PROVINCE || "", postalCode: row["POSTAL CODE"] || "", dateHired, membershipDate, errors, errorTypes, employeeFields, memberFields, assignmentFields, warnings, source: { ...originalRow } };
   }));
 }

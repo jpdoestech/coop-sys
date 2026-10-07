@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../ui/LoadingProgress";
 import { useEffect, useId, useRef, useState } from "react";
 import { Search, MapPin } from "lucide-react";
 import { cities, provinces, regions, searchBarangays } from "../../address/addressService";
@@ -44,7 +45,7 @@ function LocationSearch({ label, value, options, disabled, loading, error, onSea
     </div>
     {invalid ? <p className="mt-1 text-xs text-red-700">Choose a {label.toLowerCase()} from the official list.</p> : null}
     {open && !disabled ? <DropdownSurface id={`${id}-options`} role="listbox">
-      {error || loading || !matches.length ? <p className="p-3 text-xs text-ink/60">{error || (loading ? "Loading locations..." : query ? "No matching locations." : "Search locations")}</p> : matches.map((option) => <button key={option.code} type="button" role="option" aria-selected={option.name === value} className="flex w-full min-w-0 items-start gap-2 rounded px-2 py-2 text-left hover:bg-emerald-50 focus:bg-emerald-50" onMouseDown={(event) => event.preventDefault()} onClick={() => select(option)}>
+      {error || loading || !matches.length ? <div className="p-3 text-xs text-ink/60">{error || (loading ? <LoadingProgress label="Loading locations..." /> : query ? "No matching locations." : "Search locations")}</div> : matches.map((option) => <button key={option.code} type="button" role="option" aria-selected={option.name === value} className="flex w-full min-w-0 items-start gap-2 rounded px-2 py-2 text-left hover:bg-emerald-50 focus:bg-emerald-50" onMouseDown={(event) => event.preventDefault()} onClick={() => select(option)}>
         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-moss" /><span className="min-w-0 break-words text-xs"><span className="block font-semibold">{option.name}</span>{option.detail ? <span className="block text-ink/55">{option.detail}</span> : null}</span>
       </button>)}
     </DropdownSurface> : null}

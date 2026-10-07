@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import { hasImportAttention } from "../../../services/imports/importAttention";
 import { Archive, Building2, Pencil, Users } from "lucide-react";
 import type { Member } from "../../../types/member";
@@ -27,7 +28,7 @@ function displayName(member: Member) {
 export function MemberTable({ members, loading, onEdit, onArchive, canEdit, canDelete, canApprove, selectedIds, onToggle, onTogglePage }: MemberTableProps) {
   const { branches, clients } = useOrganization();
   if (loading) {
-    return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60">Loading member records...</div>;
+    return <div className="border-t border-line px-5 py-12 text-center text-sm text-ink/60"><LoadingProgress label="Loading member records..." /></div>;
   }
 
   const pendingIds = members.filter((member) => member.bod_approval_status === "pending").map((member) => member.id);

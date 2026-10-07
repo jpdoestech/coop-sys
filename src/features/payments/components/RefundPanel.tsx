@@ -41,6 +41,8 @@ import {
 import { EmployeeSearchField } from "./EmployeeSearchField";
 import { PaginationControls } from "../../../components/ui/PaginationControls";
 import { usePlacementSelection } from "../../../components/forms/usePlacementSelection";
+import { withActivity } from "../../../services/activity/activityStore";
+import { showTransactionSuccess } from "../../../services/activity/transactionNotifications";
 
 type View = "records" | "manual" | "import";
 type Props = {
@@ -64,6 +66,8 @@ export function RefundPanel({
   onSave,
 }: Props) {
   const [view, setView] = useState<View>("records");
+  const [processing, setProcessing] = useState(false);
+  const busy = saving || processing;
   const [editing, setEditing] = useState<OverDeductionRefund | null>(null);
   const { branchId, clientId, setBranchId, setClientId, fixedBranch, fixedClient } = usePlacementSelection(branches, clients);
   const [employeeId, setEmployeeId] = useState("");
@@ -84,7 +88,7 @@ export function RefundPanel({
   const [pageSize, setPageSize] = useState(10);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const baseline = editing ? { employeeId: editing.employee_id, amount: (editing.amount_centavos / 100).toFixed(2), refundDate: editing.refund_date, from: editing.cutoff_from ?? "", to: editing.cutoff_to ?? "", remarks: editing.remarks ?? "" } : { employeeId: "", amount: "", refundDate: today(), from: "", to: "", remarks: "" };
-  const { confirmDiscard } = useUnsavedChanges(matches.length > 0 || draftChanged({ employeeId, amount, refundDate, from, to, remarks }, baseline), saving);
+  const { confirmDiscard } = useUnsavedChanges(matches.length > 0 || draftChanged({ employeeId, amount, refundDate, from, to, remarks }, baseline), busy);
   useEffect(() => {
     let active = true;
     void onLoadRefunds({ limit: pageSize, offset: (page - 1) * pageSize })
@@ -192,32 +196,39 @@ export function RefundPanel({
     }
   }
   async function importRows() {
+    if (busy) return;
+    setProcessing(true);
     try {
       if (!matches.length) throw new Error("Choose a refund workbook first.");
       if ((from || to) && (!from || !to || from > to))
         throw new Error("Enter both valid cut-off dates, or leave both blank.");
-      for (const row of matches) {
-        const id = row.employeeId ?? overrides[row.rowNumber];
-        const employee = scoped.find((item) => item.id === id);
-        if (!employee?.member_id)
-          throw new Error(
-            `Row ${row.rowNumber}: link a member/employee before importing.`,
-          );
-        await onSave({
-          employee_id: employee.id,
-          member_id: employee.member_id,
-          branch_id: branchId,
-          client_id: clientId || null,
-          amount_centavos: row.amountCentavos,
-          refund_date: refundDate,
-          cutoff_from: from || null,
-          cutoff_to: to || null,
-          method: "import",
-          source_file_name: fileName,
-          remarks: row.remarks || null,
-          created_by: userId,
-        });
-      }
+      await withActivity("Importing refunds...", async (report) => {
+        let completed = 0; report(0, matches.length);
+        for (const row of matches) {
+          const id = row.employeeId ?? overrides[row.rowNumber];
+          const employee = scoped.find((item) => item.id === id);
+          if (!employee?.member_id)
+            throw new Error(
+              `Row ${row.rowNumber}: link a member/employee before importing.`,
+            );
+          await onSave({
+            employee_id: employee.id,
+            member_id: employee.member_id,
+            branch_id: branchId,
+            client_id: clientId || null,
+            amount_centavos: row.amountCentavos,
+            refund_date: refundDate,
+            cutoff_from: from || null,
+            cutoff_to: to || null,
+            method: "import",
+            source_file_name: fileName,
+            remarks: row.remarks || null,
+            created_by: userId,
+          });
+          report(++completed, matches.length);
+        }
+      });
+      await showTransactionSuccess("Refund import completed", `${matches.length} refunds saved successfully.`);
       setMatches([]);
       setFileName("");
       setError("");
@@ -229,7 +240,7 @@ export function RefundPanel({
           ? reason.message
           : "Refunds could not be imported.",
       );
-    }
+    } finally { setProcessing(false); }
   }
 
   const tabs: Array<{ id: View; label: string; icon: typeof List }> = [
@@ -655,7 +666,7 @@ export function RefundPanel({
                   type="button"
                   className="primary-button"
                   disabled={
-                    saving ||
+                    busy ||
                     matches.some(
                       (row) =>
                         !scoped.find(
@@ -668,7 +679,7 @@ export function RefundPanel({
                   onClick={() => void importRows()}
                 >
                   <Upload className="h-4 w-4" />
-                  {saving ? "Importing..." : `Import ${matches.length} refunds`}
+                  {busy ? "Importing..." : `Import ${matches.length} refunds`}
                 </button>
               </div>
             </>

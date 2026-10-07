@@ -6,6 +6,7 @@ import { readSpreadsheet } from "../../services/imports/excelWorkbook";
 import type { PersonImportRow } from "../../services/imports/personImport";
 
 vi.mock("../../services/imports/excelWorkbook", () => ({ readSpreadsheet: vi.fn() }));
+vi.mock("../../services/activity/transactionNotifications", () => ({ showTransactionSuccess: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../../services/organization/useOrganization", () => ({ useOrganization: () => ({ branches: [], clients: [], departments: [], positions: [] }) }));
 vi.mock("../../services/access/useAccess", () => ({ useAccess: () => ({ can: () => false }) }));
 vi.mock("../../services/imports/personImportTemplate", async (importOriginal) => ({ ...await importOriginal<typeof import("../../services/imports/personImportTemplate")>(), downloadPersonImportTemplate: vi.fn() }));
@@ -55,7 +56,7 @@ describe("PersonImportDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import 11 ready" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Import 0 ready" })).toBeDisabled());
     expect(onImport).toHaveBeenCalledTimes(1);
-    expect(onImport).toHaveBeenCalledWith(expect.any(Array), branches[1].id, clients[0].id);
+    expect(onImport).toHaveBeenCalledWith(expect.any(Array), branches[1].id, clients[0].id, expect.any(Function));
     fireEvent.click(screen.getByRole("button", { name: /Imported$/ }));
     expect(screen.getByText("Imported 2")).toBeInTheDocument();
     expect(screen.getByLabelText("Link row 2")).toBeDisabled();

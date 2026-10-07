@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import {
   ArrowDown,
   ArrowUp,
@@ -414,7 +415,7 @@ export function PaymentSummaryPanel({
                   colSpan={10}
                   className="px-4 py-12 text-center text-sm text-ink/45"
                 >
-                  Loading payment summary...
+                  <LoadingProgress label="Loading payment summary..." />
                 </td>
               </tr>
             ) : null}

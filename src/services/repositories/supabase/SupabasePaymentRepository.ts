@@ -311,7 +311,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
     if (error) throw error;
   }
 
-  async postBatch(input: PaymentBatchInput, lines: PaymentLineInput[]) {
+  async postBatch(input: PaymentBatchInput, lines: PaymentLineInput[], onProgress?: import("../../activity/activityStore").ProgressReporter) {
     const client = db();
     const ledger = await this.getLedger();
     const settings = effectiveSettings(ledger.settings, input.payment_date);
@@ -360,6 +360,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
       .insert(rows)
       .select("*");
     if (error) throw error;
+    onProgress?.(lines.length, lines.length);
     return { batch, payments: payments ?? [] };
   }
 

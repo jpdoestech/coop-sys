@@ -5,6 +5,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { useAccess } from "../../services/access/useAccess";
 import { getServerSyncStatus, runServerSync, saveServerSyncConfig, testServerSyncConnection, usesServerBackend, type ServerSyncStatus } from "../../services/server/syncApi";
+import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 
 type View = "activity" | "conflicts";
 type Notice = { tone: "success" | "error" | "info"; text: string } | null;
@@ -70,6 +71,7 @@ export function SynchronizationPage() {
     setBusy("sync"); setNotice(null);
     try {
       const result = await runServerSync();
+      await showTransactionSuccess("Synchronization completed", `${result.recordsSent} groups sent, ${result.recordsReceived} updated locally, ${result.conflictsDetected} conflicts resolved.`);
       setNotice({ tone: "success", text: `Sync completed: ${result.recordsSent} groups sent, ${result.recordsReceived} updated locally, ${result.conflictsDetected} conflicts resolved.` });
       await load();
     } catch (error) { setNotice({ tone: "error", text: error instanceof Error ? error.message : "Synchronization failed. Local data was retained." }); }

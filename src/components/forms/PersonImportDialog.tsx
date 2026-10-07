@@ -11,10 +11,11 @@ import { usePlacementSelection } from "./usePlacementSelection";
 import { PaginationControls } from "../ui/PaginationControls";
 import { PersonImportRowEditor } from "./PersonImportRowEditor";
 import { importErrorLabels } from "../../services/imports/personImportErrors";
-import { withActivity } from "../../services/activity/activityStore";
+import { withActivity, type ProgressReporter } from "../../services/activity/activityStore";
+import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 
 export type PersonLinkOption = { id: string; number: string; name: string; isActive: boolean };
-type Props = { kind: "member" | "employee"; branches: OrganizationBranch[]; clients: OrganizationClient[]; lookups?: PersonImportLookups; requireClient?: boolean; linkOptions: PersonLinkOption[]; importing: boolean; importError?: string; onClose: () => void; onImport: (rows: PersonImportRow[], branchId: string, clientId: string) => Promise<PersonImportOutcome[]> };
+type Props = { kind: "member" | "employee"; branches: OrganizationBranch[]; clients: OrganizationClient[]; lookups?: PersonImportLookups; requireClient?: boolean; linkOptions: PersonLinkOption[]; importing: boolean; importError?: string; onClose: () => void; onImport: (rows: PersonImportRow[], branchId: string, clientId: string, onProgress?: ProgressReporter) => Promise<PersonImportOutcome[]> };
 type Status = "all" | "ready" | "error" | "imported" | "attention";
 const errorLabels = importErrorLabels;
 
@@ -58,21 +59,27 @@ export function PersonImportDialog({ kind, branches, clients, lookups = { depart
   async function load(file?: File) {
     if (!file || !deploymentConfirmed || !placementReady) return;
     setReading(true);
-    try { setRows(await withActivity("Reading and validating imported data...", async () => personRowsFromSpreadsheet(await readSpreadsheet(file), kind, lookups))); setFileName(file.name); setLinkSearch({}); setOutcomes({}); setFilter("all"); setErrorType(""); setSearch(""); setPage(1); setError(""); }
+    try { setRows(await withActivity("Reading and validating imported data...", async (report) => personRowsFromSpreadsheet(await readSpreadsheet(file), kind, lookups, report))); setFileName(file.name); setLinkSearch({}); setOutcomes({}); setFilter("all"); setErrorType(""); setSearch(""); setPage(1); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Workbook could not be read."); }
     finally { setReading(false); }
   }
   async function importReady() {
     if (!placementReady || !deploymentConfirmed || busy || !readyRows.length) return;
     setProcessing(true); setError("");
-    try { const results = await withActivity(`Importing ${readyRows.length} records. Keep this window open...`, () => onImport(readyRows, branchId, clientId)); setOutcomes((current) => ({ ...current, ...Object.fromEntries(results.map((item) => [item.rowNumber, item])) })); setPage(1); }
+    try {
+      const results = await withActivity(`Importing ${readyRows.length} records. Keep this window open...`, (report) => onImport(readyRows, branchId, clientId, report));
+      setOutcomes((current) => ({ ...current, ...Object.fromEntries(results.map((item) => [item.rowNumber, item])) })); setPage(1);
+      const imported = results.filter((item) => item.status === "imported").length;
+      const failed = results.length - imported;
+      if (imported) await showTransactionSuccess("Import completed", `${imported} ${kind === "member" ? "members" : "employees"} imported successfully.${failed ? ` ${failed} rows failed and remain available for review.` : ""}`);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Import failed."); }
     finally { setProcessing(false); }
   }
   async function downloadTemplate() { setDownloading(true); try { await downloadPersonImportTemplate(kind, lookups); } catch { setError("Template could not be generated."); } finally { setDownloading(false); } }
   async function correctRow(source: SpreadsheetRow) {
     if (editingRow === null || busy || outcomes[editingRow]?.recordId) return;
-    const validated = await withActivity("Revalidating import corrections...", () => personRowsFromSpreadsheet(rows.map((row) => row.rowNumber === editingRow ? source : row.source || {}), kind, lookups));
+    const validated = await withActivity("Revalidating import corrections...", (report) => personRowsFromSpreadsheet(rows.map((row) => row.rowNumber === editingRow ? source : row.source || {}), kind, lookups, report));
     setRows(validated.map((row, index) => ({ ...row, rowNumber: rows[index].rowNumber, linkedRecordId: rows[index].linkedRecordId })));
     setOutcomes((current) => { const next = { ...current }; delete next[editingRow]; return next; });
   }

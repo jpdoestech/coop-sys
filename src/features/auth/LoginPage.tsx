@@ -1,3 +1,4 @@
+import { LoadingProgress } from "../../components/ui/LoadingProgress";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, KeyRound, LockKeyhole, LogIn, Mail } from "lucide-react";
 import { isSupabaseConfigured } from "../../database/supabase/client";
@@ -44,6 +45,7 @@ export function LoginPage() {
         {offline ? <p className="rounded border border-line bg-paper px-3 py-2 text-xs text-ink/65">Offline account authentication is active for this installation.</p> : null}
         {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
         {message ? <p role="status" className="text-sm text-emerald-700">{message}</p> : null}
+        {busy ? <LoadingProgress label={resetMode ? "Sending reset link..." : "Signing in..."} /> : null}
         <button disabled={busy || configurationMissing} className="primary-button w-full">{resetMode ? <Mail className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}{busy ? "Please wait..." : resetMode ? "Send reset link" : "Sign in"}</button>
         {!configurationMissing ? <button type="button" onClick={() => { clearError(); setMessage(""); setResetMode(!resetMode); }} className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-md p-2 text-sm font-semibold text-moss hover:bg-paper">{resetMode ? <ArrowLeft className="h-4 w-4" /> : <KeyRound className="h-4 w-4" />}{resetMode ? "Return to sign in" : "Forgot password?"}</button> : null}
       </form>

@@ -105,9 +105,12 @@ describe("person import workflow", () => {
   it("keeps imported and duplicate results separate without losing successful rows", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
     const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "New", "LAST NAME": "One" }, { ID: "000001", "FIRST NAME": "Duplicate", "LAST NAME": "One" }]);
-    const results = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "" });
+    const onProgress = vi.fn();
+    const results = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "", onProgress });
     expect(results.map((item) => item.status)).toEqual(["imported", "error"]);
     expect(results[1].errorType).toBe("duplicate");
+    expect(onProgress).toHaveBeenNthCalledWith(1, 0, 2);
+    expect(onProgress).toHaveBeenLastCalledWith(2, 2);
   });
   it("sets initial member-linked deployment and records subsequent placement changes as transfers", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };

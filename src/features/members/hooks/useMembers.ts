@@ -12,6 +12,8 @@ import type { ListOptions } from "../../../services/repositories/Repository";
 import type { MemberSubmission } from "../types/memberWorkflow";
 import { applyMemberPlacement } from "../../../services/identity/memberPlacement";
 import { ensureMemberEmployee } from "../../../services/identity/personRegistration";
+import { withActivity } from "../../../services/activity/activityStore";
+import { showTransactionSuccess } from "../../../services/activity/transactionNotifications";
 
 export function useMembers(options: ListOptions, editingMemberId?: string | null) {
   const repositories = useMemo(() => createRepositories(), []);
@@ -125,9 +127,10 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
           await ensureMemberEmployee(repositories, profile, member);
         }
       }
-      return repositories.members.approve(ids, approvalDate);
+      return withActivity(`Approving ${ids.length} members...`, () => repositories.members.approve(ids, approvalDate));
     },
-    onSuccess: () => {
+    onSuccess: async (resolution, { ids }) => {
+      await showTransactionSuccess("BOD approval completed", `${ids.length} members approved under resolution ${resolution}.`);
       queryClient.invalidateQueries({ queryKey: ["members"] });
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["member-options"] });

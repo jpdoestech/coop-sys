@@ -154,6 +154,7 @@ export interface PaymentRepository {
   postBatch(
     batch: PaymentBatchInput,
     lines: PaymentLineInput[],
+    onProgress?: import("../activity/activityStore").ProgressReporter,
   ): Promise<{ batch: PaymentBatch; payments: MemberPayment[] }>;
   correctPayment(
     input: PaymentCorrectionInput,
