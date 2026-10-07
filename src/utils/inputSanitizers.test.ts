@@ -14,7 +14,9 @@ describe("input sanitizers", () => {
     expect(normalizeProperCase("   ")).toBe("");
   });
   it("formats SSS digits and inserts hyphens automatically", () => {
-    expect(sanitizeGovernmentId("12A3456789-extra", "sss")).toBe("12-345678-9");
+    expect(sanitizeGovernmentId("12A34567890-extra", "sss")).toBe("12-3456789-0");
+    expect(sanitizeGovernmentId("0012345678", "sss")).toBe("00-1234567-8");
+    expect(sanitizeGovernmentId("123456789012", "sss")).toBe("12-3456789-0");
   });
 
   it("formats each government identifier using its required grouping", () => {

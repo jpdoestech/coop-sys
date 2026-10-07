@@ -19,8 +19,12 @@ describe("GovernmentIdFields", () => {
   it("accepts digits and automatically formats every government number", () => {
     render(<TestForm />);
     const sss = screen.getByLabelText("SSS number") as HTMLInputElement;
-    fireEvent.change(sss, { target: { value: "12a3456789" } });
-    expect(sss.value).toBe("12-345678-9");
+    expect(sss.maxLength).toBe(12);
+    expect(sss.placeholder).toBe("00-0000000-0");
+    fireEvent.change(sss, { target: { value: "12a34567890" } });
+    expect(sss.value).toBe("12-3456789-0");
+    fireEvent.change(sss, { target: { value: "001234567890" } });
+    expect(sss.value).toBe("00-1234567-8");
 
     const pagibig = screen.getByLabelText("PAG-IBIG MID number") as HTMLInputElement;
     fireEvent.change(pagibig, { target: { value: "123456789012" } });

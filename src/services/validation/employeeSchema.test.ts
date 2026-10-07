@@ -40,6 +40,12 @@ const baseEmployee = {
 };
 
 describe("employeeInputSchema", () => {
+  it("requires ten SSS digits with 2-7-1 formatting", () => {
+    expect(employeeInputSchema.safeParse({ ...baseEmployee, sss_number: "00-1234567-8" }).success).toBe(true);
+    for (const sss_number of ["12-345678-9", "12-34567890-1", "0012345678", "00-123456A-8"]) {
+      expect(employeeInputSchema.safeParse({ ...baseEmployee, sss_number }).success).toBe(false);
+    }
+  });
   it("proper-cases employee and beneficiary names consistently", () => {
     const result = employeeInputSchema.parse({ ...baseEmployee, first_name: "JUAN CARLOS", middle_name: "DELA", last_name: "DE LA CRUZ", suffix: "III", beneficiaries: [{ id: "00000000-0000-4000-8000-000000000001", full_name: "  MARIA   DELA CRUZ III ", relationship: "Child", is_active: true }] });
     expect(result).toMatchObject({ first_name: "Juan Carlos", middle_name: "Dela", last_name: "De La Cruz", suffix: "III", email: baseEmployee.email, beneficiaries: [{ full_name: "Maria Dela Cruz III" }] });

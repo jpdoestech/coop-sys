@@ -41,8 +41,16 @@ export function normalizeStoredMobileNumber(value: string | null | undefined) {
 
 export type GovernmentIdKind = "sss" | "pagibig" | "philhealth" | "tin";
 
-const governmentIdGroups: Record<GovernmentIdKind, number[]> = {
-  sss: [2, 6, 1],
+export const SSS_NUMBER_RULE = {
+  digits: 10,
+  groups: [2, 7, 1],
+  maxCharacters: 12,
+  placeholder: "00-0000000-0",
+  pattern: /^\d{2}-\d{7}-\d$/,
+} as const;
+
+const governmentIdGroups: Record<GovernmentIdKind, readonly number[]> = {
+  sss: SSS_NUMBER_RULE.groups,
   pagibig: [4, 4, 4],
   philhealth: [2, 9, 1],
   tin: [3, 3, 3, 3],

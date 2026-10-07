@@ -61,7 +61,9 @@ describe("memberInputSchema", () => {
   });
 
   it("validates Philippine government number lengths", () => {
-    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-345678-9" }).success).toBe(true);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-3456789-0" }).success).toBe(true);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "00-1234567-8" }).success).toBe(true);
+    expect(memberInputSchema.safeParse({ ...validMember, sss_number: "12-345678-9" }).success).toBe(false);
     expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123" }).success).toBe(false);
     expect(memberInputSchema.safeParse({ ...validMember, sss_number: "123456789" }).success).toBe(false);
   });

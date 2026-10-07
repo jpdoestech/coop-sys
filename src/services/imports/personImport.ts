@@ -1,6 +1,6 @@
 import { cities, provinces, barangaysForCity } from "../../address/addressService";
 import type { SpreadsheetRow } from "./excelWorkbook";
-import { normalizeProperCase, normalizeWhitespace, sanitizeGovernmentId } from "../../utils/inputSanitizers";
+import { normalizeProperCase, normalizeWhitespace, sanitizeGovernmentId, SSS_NUMBER_RULE } from "../../utils/inputSanitizers";
 import type { EmployeeInput } from "../../types/employee";
 import type { MemberInput } from "../../types/member";
 import type { EmploymentAssignmentInput } from "../../types/assignment";
@@ -71,7 +71,7 @@ export async function personRowsFromSpreadsheet(rows: SpreadsheetRow[], kind: "e
       if (!row[header]) return null;
       if ((governmentCounts.get(`${header}:${row[header].replace(/\D/g, "")}`) || 0) > 1) fail("government_id", `${header} is duplicated in this workbook.`);
       if (!/^[\d -]+$/.test(row[header])) { fail("government_id", `${header} contains invalid characters.`); return row[header]; }
-      const lengths = governmentKind === "sss" ? [9] : governmentKind === "tin" ? [9, 12] : [12];
+      const lengths = governmentKind === "sss" ? [SSS_NUMBER_RULE.digits] : governmentKind === "tin" ? [9, 12] : [12];
       if (!lengths.includes(row[header].replace(/\D/g, "").length)) { fail("government_id", `${header} must contain ${lengths.join(" or ")} digits.`); return row[header]; }
       return sanitizeGovernmentId(row[header], governmentKind);
     };

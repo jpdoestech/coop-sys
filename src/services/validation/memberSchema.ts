@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { terminalMemberStatuses } from "../lookups/statuses";
-import { governmentId } from "./governmentIdSchema";
+import { governmentId, sssNumberSchema } from "./governmentIdSchema";
 import { CHARACTER_LIMITS, normalizeWhitespace } from "../../utils/inputSanitizers";
 import { optionalPersonName, requiredPersonName } from "./personNameSchema";
 import { mobileNumberSchema } from "./mobileNumberSchema";
@@ -42,7 +42,7 @@ export const memberInputSchema = z.object({
   pending_department_name: nullableText,
   pending_position_name: nullableText,
   religion_affiliation_id: nullableText,
-  sss_number: governmentId([10], "SSS number", 12, [/^\d{2}-\d{7}-\d{1}$/]),
+  sss_number: sssNumberSchema,
   pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),
   philhealth_number: governmentId([12], "PhilHealth number", 14, [/^\d{2}-\d{9}-\d$/]),
   tax_identification_number: governmentId([9, 12], "TIN", 15, [/^\d{3}-\d{3}-\d{3}$/, /^\d{3}-\d{3}-\d{3}-\d{3}$/]),

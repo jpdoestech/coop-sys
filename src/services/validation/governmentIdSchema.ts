@@ -1,8 +1,13 @@
 import { z } from "zod";
+import { SSS_NUMBER_RULE } from "../../utils/inputSanitizers";
 
 function digitCount(value: string) {
   return value.replace(/\D/g, "").length;
 }
+
+export const sssNumberSchema = governmentId(
+  [SSS_NUMBER_RULE.digits], "SSS number", SSS_NUMBER_RULE.maxCharacters, [SSS_NUMBER_RULE.pattern],
+);
 
 export function governmentId(lengths: number[], label: string, maxCharacters: number, formats: RegExp[]) {
   return z

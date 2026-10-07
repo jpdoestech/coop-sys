@@ -28,9 +28,9 @@ describe("person import workflow", () => {
   });
   it("rejects existing-name, email and government-ID duplicates before creating a person", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
-    const [original] = await personRowsFromSpreadsheet([{ "FIRST NAME": "Existing", "LAST NAME": "Identity", EMAIL: "existing@example.test", "SSS NUMBER": "987654321" }]);
+    const [original] = await personRowsFromSpreadsheet([{ "FIRST NAME": "Existing", "LAST NAME": "Identity", EMAIL: "existing@example.test", "SSS NUMBER": "9876543210" }]);
     await importPersonRows("employee", repositories, admin, directory, { rows: [original], branchId: branches[0].id, clientId: "" });
-    const duplicates: SpreadsheetRow[] = [{ "FIRST NAME": "Existing", "LAST NAME": "Identity" }, { "FIRST NAME": "Email", "LAST NAME": "Duplicate", EMAIL: "EXISTING@example.test" }, { "FIRST NAME": "Government", "LAST NAME": "Duplicate", "SSS NUMBER": "98-765432-1" }];
+    const duplicates: SpreadsheetRow[] = [{ "FIRST NAME": "Existing", "LAST NAME": "Identity" }, { "FIRST NAME": "Email", "LAST NAME": "Duplicate", EMAIL: "EXISTING@example.test" }, { "FIRST NAME": "Government", "LAST NAME": "Duplicate", "SSS NUMBER": "98-7654321-0" }];
     for (const fields of duplicates) {
       const rows = await personRowsFromSpreadsheet([fields]);
       const [result] = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[0].id, clientId: "" });
@@ -51,11 +51,11 @@ describe("person import workflow", () => {
   });
   it("creates the employee assignment and preserves full imported data in the list", async () => {
     const repositories = { members: new LocalMemberRepository(), employees: new LocalEmployeeRepository() };
-    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "New", "LAST NAME": "Employee", "DATE HIRED": "1/15/2025", "SSS NUMBER": "123456789", ADDRESS: "Full address" }]);
+    const rows = await personRowsFromSpreadsheet([{ "FIRST NAME": "New", "LAST NAME": "Employee", "DATE HIRED": "1/15/2025", "SSS NUMBER": "1234567890", ADDRESS: "Full address" }]);
     const results = await importPersonRows("employee", repositories, admin, directory, { rows, branchId: branches[1].id, clientId: clients[0].id });
     expect(results[0].status).toBe("imported");
     const saved = await repositories.employees.getById(results[0].recordId!);
-    expect(saved).toMatchObject({ sss_number: "12-345678-9", address: "Full address", active_assignment: { branch_id: branches[1].id, client_id: clients[0].id, start_date: "2025-01-15" } });
+    expect(saved).toMatchObject({ sss_number: "12-3456789-0", address: "Full address", active_assignment: { branch_id: branches[1].id, client_id: clients[0].id, start_date: "2025-01-15" } });
     expect((await repositories.employees.listPage({ branchId: branches[1].id, clientId: clients[0].id })).items.some((item) => item.id === saved!.id)).toBe(true);
   });
   it("rejects forged or missing client assignments for client-scoped users", () => {

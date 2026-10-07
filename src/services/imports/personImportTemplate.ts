@@ -4,6 +4,7 @@ import { memberStatuses, memberTypes } from "../../features/members/data/memberO
 import { religionAffiliations } from "../lookups/religionAffiliations";
 import { educationalAttainments } from "../lookups/educationalAttainments";
 import type { PersonImportLookups } from "./personImport";
+import { SSS_NUMBER_RULE } from "../../utils/inputSanitizers";
 
 export function personImportHeaders(kind: "member" | "employee") {
   return [...columns.common, ...columns[kind], ...[1, 2, 3].flatMap((slot) => columns.beneficiary.map((field) => `BENEFICIARY ${slot} ${field}`))];
@@ -47,6 +48,7 @@ export async function createPersonImportTemplate(kind: "member" | "employee", lo
       : header === "SUPERVISOR ID" ? "Optional existing six-digit employee ID within your permitted scope."
       : header === "ID" ? "Optional shared member/employee ID: up to six digits. Leave blank to generate a new ID."
       : header === "MOBILE" ? "Optional 11-digit mobile number starting with 09. Keep it as text to preserve the leading zero."
+      : header === "SSS NUMBER" ? `Optional ${SSS_NUMBER_RULE.digits}-digit SSS number, formatted as ${SSS_NUMBER_RULE.placeholder}. Keep it as text to preserve leading zeros.`
       : "FIRST NAME LAST NAME".includes(header) ? "Required. Extra spaces are trimmed and names use proper case (each word capitalized)."
       : "Optional. Blank fields use the system default where applicable.";
     const listIndex = Object.keys(options).indexOf(header);
@@ -63,7 +65,7 @@ export async function createPersonImportTemplate(kind: "member" | "employee", lo
     ["Employment defaults", "Active / Probationary. Date hired defaults to today; assignment start defaults to date hired."],
     ["Membership defaults", "Associate / Pending approval / Employed-Salary. Approved records require an acceptance date, BOD number and approval permission."],
     ["Beneficiaries", "Up to three beneficiaries. ACTIVE defaults to YES; NO requires a deactivation reason."],
-    ["Government IDs", "SSS: 9 digits; PAG-IBIG and PHILHEALTH: 12; TIN: 9 or 12. Dashes are formatted automatically; sensitive-data permission is required."],
+    ["Government IDs", `SSS: ${SSS_NUMBER_RULE.digits} digits (${SSS_NUMBER_RULE.placeholder}); PAG-IBIG and PHILHEALTH: 12; TIN: 9 or 12. Dashes are formatted automatically; sensitive-data permission is required.`],
     ["Lookup values", "Dropdowns are suggestions, not restrictions. Custom values are preserved and marked Needs attention before and after import. Department and position can be created from the entry/correction form when permitted."],
     ["Import results", "Only ready rows are submitted. Imported rows cannot be resubmitted in the same preview; errors remain available for review."],
   ]);

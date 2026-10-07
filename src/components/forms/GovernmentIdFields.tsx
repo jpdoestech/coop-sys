@@ -24,7 +24,7 @@ export function GovernmentIdFields({ value, errors = {}, onChange, disabled }: P
     <>
       <label className="block text-xs font-semibold text-ink/75">
         SSS number
-        <input disabled={disabled} className={`${inputClass} disabled:bg-paper`} inputMode="numeric" maxLength={11} value={value.sss_number ?? ""} onChange={(event) => patch({ sss_number: sanitizeGovernmentId(event.target.value, "sss") || null })} placeholder="00-000000-0" />
+        <input disabled={disabled} className={`${inputClass} disabled:bg-paper`} inputMode="numeric" maxLength={SSS_NUMBER_RULE.maxCharacters} value={value.sss_number ?? ""} onChange={(event) => patch({ sss_number: sanitizeGovernmentId(event.target.value, "sss") || null })} placeholder={SSS_NUMBER_RULE.placeholder} />
         {errors.sss_number ? <span className="mt-1 block text-xs font-normal text-red-700">{errors.sss_number}</span> : null}
       </label>
       <label className="block text-xs font-semibold text-ink/75">
@@ -46,5 +46,5 @@ export function GovernmentIdFields({ value, errors = {}, onChange, disabled }: P
   );
 }
 
-import { sanitizeGovernmentId } from "../../utils/inputSanitizers";
+import { sanitizeGovernmentId, SSS_NUMBER_RULE } from "../../utils/inputSanitizers";
 

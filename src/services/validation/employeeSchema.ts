@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { terminalEmploymentStatuses } from "../lookups/statuses";
-import { governmentId } from "./governmentIdSchema";
+import { governmentId, sssNumberSchema } from "./governmentIdSchema";
 import { isValidPlacement } from "../lookups/organization";
 import { CHARACTER_LIMITS, normalizeWhitespace } from "../../utils/inputSanitizers";
 import { optionalPersonName, requiredPersonName } from "./personNameSchema";
@@ -16,7 +16,7 @@ export const employeeInputSchema = z
     member_id: nullableText,
     religion_affiliation_id: nullableText,
     religion_affiliation: nullableText,
-    sss_number: governmentId([9], "SSS number", 11, [/^\d{2}-\d{6}-\d$/]),
+    sss_number: sssNumberSchema,
     pagibig_number: governmentId([12], "PAG-IBIG MID number", 14, [/^\d{4}-\d{4}-\d{4}$/]),
     philhealth_number: governmentId([12], "PhilHealth number", 14, [/^\d{2}-\d{9}-\d$/]),
     tax_identification_number: governmentId([9, 12], "TIN", 15, [/^\d{3}-\d{3}-\d{3}$/, /^\d{3}-\d{3}-\d{3}-\d{3}$/]),
