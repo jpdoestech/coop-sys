@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultRoles } from "../../../services/access/accessControl";
 import { branches } from "../../../services/lookups/organization";
+import type { SystemUser } from "../../../types/systemUser";
 import { UserAccessForm } from "./UserAccessForm";
 
 function setup() {
@@ -40,5 +41,40 @@ describe("UserAccessForm steps", () => {
     fireEvent.submit(form);
     expect(screen.getByRole("button", { name: "Save user" })).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("allows Super Admin account details to be saved while access controls stay locked", () => {
+    const roles = createDefaultRoles();
+    const superAdminRole = roles.find((role) => role.code === "super_admin")!;
+    const user: SystemUser = {
+      id: "user-1",
+      display_name: "System Administrator",
+      email: "admin@example.test",
+      role: "super_admin",
+      role_ids: [superAdminRole.id],
+      branch_ids: [],
+      client_ids: [],
+      direct_grants: [],
+      direct_denies: [],
+      scope_type: "organization",
+      resource_assignments: [],
+      linked_employee_id: null,
+      manager_user_id: null,
+      is_active: true,
+      created_at: "2026-10-09T00:00:00.000Z",
+      updated_at: "2026-10-09T00:00:00.000Z",
+    };
+    const onSubmit = vi.fn();
+    render(<UserAccessForm user={user} roles={roles} users={[]} employees={[]} saving={false} offline onCancel={vi.fn()} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Updated Admin" } });
+    expect(screen.getByRole("checkbox", { name: /Super Admin/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save user" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      display_name: "Updated Admin",
+      role: "super_admin",
+      role_ids: [superAdminRole.id],
+    }));
   });
 });

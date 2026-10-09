@@ -20,6 +20,7 @@ export function useEmployees(options: ListOptions) {
   const query = useQuery({
     queryKey: ["employees", "page", options],
     refetchInterval: 30000,
+    staleTime: 30000,
     queryFn: async () => repositories.employees.listPage(options)
   });
   const members = useQuery({

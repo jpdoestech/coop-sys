@@ -2,6 +2,7 @@ import { developmentEmployees } from "../../../database/seeds/employeeSeed";
 import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { EmployeeRepository } from "../EmployeeRepository";
 import type { ListOptions } from "../Repository";
+import { matchesPersonSearch, personSearchTerms } from "../../identity/personSearch";
 import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
 import type { EmploymentAssignmentInput } from "../../../types/assignment";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
@@ -84,7 +85,10 @@ export class LocalEmployeeRepository implements EmployeeRepository {
     let employees = readEmployees();
     if (!options.includeDeleted) employees = employees.filter((employee) => !employee.deleted_at);
     if (options.attentionOnly) employees = employees.filter((item) => Object.keys(item.import_attention || {}).length || item.pending_department_name || item.pending_position_name);
-    if (options.search) { const search = options.search.toLowerCase(); employees = employees.filter((employee) => [employee.employee_number, employee.first_name, employee.last_name, employee.work_location].join(" ").toLowerCase().includes(search)); }
+    if (options.search) {
+      const terms = personSearchTerms(options.search);
+      employees = employees.filter((employee) => matchesPersonSearch(terms, [employee.employee_number, employee.first_name, employee.middle_name, employee.last_name, employee.suffix, employee.work_location]));
+    }
     if (options.statusId) employees = employees.filter((employee) => employee.employment_status_id === options.statusId);
     if (options.departmentId) employees = employees.filter((employee) => employee.department_id === options.departmentId);
     if (options.branchId) employees = employees.filter((employee) => employee.active_assignment?.branch_id === options.branchId);

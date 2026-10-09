@@ -1,4 +1,5 @@
 import { DropdownSurface } from "../../../components/ui/DropdownSurface";
+import { matchesPersonSearch, personSearchTerms } from "../../../services/identity/personSearch";
 import { Check, Search, UserRoundSearch } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Employee } from "../../../types/employee";
@@ -18,8 +19,15 @@ export function EmployeeSearchField({ employees, value, onChange, label, placeho
   const selected = employees.find((employee) => employee.id === value) ?? null;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const term = query.trim().toLowerCase();
-  const matches = useMemo(() => employees.filter((employee) => !term || [employee.employee_number, employee.first_name, employee.middle_name, employee.last_name, employee.suffix].filter(Boolean).join(" ").toLowerCase().includes(term)).slice(0, 8), [employees, term]);
+  const matches = useMemo(() => {
+    const terms = personSearchTerms(query);
+    const results = [];
+    for (const employee of employees) {
+      if (matchesPersonSearch(terms, [employee.employee_number, employee.first_name, employee.middle_name, employee.last_name, employee.suffix])) results.push(employee);
+      if (results.length === 8) break;
+    }
+    return results;
+  }, [employees, query]);
 
   function choose(employee: Employee) {
     onChange(employee.id);

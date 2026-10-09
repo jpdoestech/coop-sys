@@ -5,6 +5,16 @@ import { effectiveSettings } from "../../payments/paymentMath";
 afterEach(() => localStorage.clear());
 
 describe("LocalPaymentRepository corrections and refunds", () => {
+  it("finds summary employees by first or last name order", async () => {
+    const repository = new LocalPaymentRepository();
+    const options = { yearFrom: 2026, yearTo: 2026, limit: 1 };
+    const initial = await repository.getPaymentSummary(options);
+    const employee = initial.items[0];
+    for (const search of [`${employee.lastName}, ${employee.firstName}`, `${employee.firstName} ${employee.lastName}`]) {
+      const result = await repository.getPaymentSummary({ ...options, search, limit: 100 });
+      expect(result.items.map((item) => item.employeeId)).toContain(employee.employeeId);
+    }
+  });
   it("updates settings saved on the same effective date", async () => {
     const repository = new LocalPaymentRepository();
     await repository.saveSettings({

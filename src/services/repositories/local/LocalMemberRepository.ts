@@ -1,5 +1,6 @@
 import type { Member, MemberInput } from "../../../types/member";
 import type { ListOptions } from "../Repository";
+import { matchesPersonSearch, personSearchTerms } from "../../identity/personSearch";
 import type { MemberRepository } from "../MemberRepository";
 import { readStoredMembers, writeStoredMembers } from "./memberStorage";
 import { createUuid } from "../../../utils/createUuid";
@@ -57,7 +58,10 @@ export class LocalMemberRepository implements MemberRepository {
     let members = readStoredMembers();
     if (!options.includeDeleted) members = members.filter((member) => !member.deleted_at);
     if (options.attentionOnly) members = members.filter((item) => Object.keys(item.import_attention || {}).length || item.pending_department_name || item.pending_position_name);
-    if (options.search) { const search = options.search.toLowerCase(); members = members.filter((member) => [member.membership_number, member.first_name, member.last_name].join(" ").toLowerCase().includes(search)); }
+    if (options.search) {
+      const terms = personSearchTerms(options.search);
+      members = members.filter((member) => matchesPersonSearch(terms, [member.membership_number, member.first_name, member.middle_name, member.last_name, member.suffix]));
+    }
     if (options.statusId) members = members.filter((member) => member.membership_status_id === options.statusId);
     if (options.typeId) members = members.filter((member) => member.membership_type_id === options.typeId);
     if (options.approvalStatus) members = members.filter((member) => member.bod_approval_status === options.approvalStatus);

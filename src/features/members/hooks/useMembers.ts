@@ -25,6 +25,7 @@ export function useMembers(options: ListOptions, editingMemberId?: string | null
   const query = useQuery({
     queryKey,
     refetchInterval: 30000,
+    staleTime: 30000,
     queryFn: async () => {
       return repositories.members.listPage(options);
     }

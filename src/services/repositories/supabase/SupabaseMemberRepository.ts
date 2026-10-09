@@ -1,4 +1,5 @@
 import { supabase } from "../../../database/supabase/client";
+import { personSearchFilter } from "../../identity/personSearch";
 import type { Member, MemberInput } from "../../../types/member";
 import type { ListOptions } from "../Repository";
 import type { MemberRepository } from "../MemberRepository";
@@ -52,7 +53,8 @@ export class SupabaseMemberRepository implements MemberRepository {
     let query = client.from("members").select("*, beneficiaries(*)", { count: "exact" });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
     if (options.attentionOnly) query = query.or("import_attention.not.is.null,pending_department_name.not.is.null,pending_position_name.not.is.null");
-    if (options.search) { const term = `%${options.search}%`; query = query.or(`membership_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`); }
+    const searchFilter = personSearchFilter(options.search ?? "", "membership_number");
+    if (searchFilter) query = query.or(searchFilter);
     if (options.statusId) query = query.eq("membership_status_id", options.statusId);
     if (options.typeId) query = query.eq("membership_type_id", options.typeId);
     if (options.approvalStatus) query = query.eq("bod_approval_status", options.approvalStatus);
@@ -74,12 +76,8 @@ export class SupabaseMemberRepository implements MemberRepository {
       query = query.is("deleted_at", null);
     }
 
-    if (options.search) {
-      const term = `%${options.search}%`;
-      query = query.or(
-        `membership_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`
-      );
-    }
+    const searchFilter = personSearchFilter(options.search ?? "", "membership_number");
+    if (searchFilter) query = query.or(searchFilter);
 
     if (options.limit) {
       query = query.range(options.offset ?? 0, (options.offset ?? 0) + options.limit - 1);

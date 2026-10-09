@@ -1,4 +1,5 @@
 import { supabase } from "../../../database/supabase/client";
+import { personSearchFilter } from "../../identity/personSearch";
 import type { Beneficiary, BeneficiaryInput } from "../../../types/beneficiary";
 import type { Employee, EmployeeInput } from "../../../types/employee";
 import type { EmploymentAssignment } from "../../../types/assignment";
@@ -88,7 +89,8 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
     let query = client().from("employees").select(selection, { count: "exact" });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
     if (options.attentionOnly) query = query.or("import_attention.not.is.null,pending_department_name.not.is.null,pending_position_name.not.is.null");
-    if (options.search) { const term = `%${options.search}%`; query = query.or(`employee_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`); }
+    const searchFilter = personSearchFilter(options.search ?? "", "employee_number");
+    if (searchFilter) query = query.or(searchFilter);
     if (options.statusId) query = query.eq("employment_status_id", options.statusId);
     if (options.departmentId) query = query.eq("department_id", options.departmentId);
     if (placement) query = query.is("current_placement.end_date", null).is("current_placement.deleted_at", null);
@@ -109,10 +111,8 @@ export class SupabaseEmployeeRepository implements EmployeeRepository {
       .order("updated_at", { ascending: false });
     if (!options.includeDeleted) query = query.is("deleted_at", null);
     if (options.attentionOnly) query = query.or("import_attention.not.is.null,pending_department_name.not.is.null,pending_position_name.not.is.null");
-    if (options.search) {
-      const term = `%${options.search}%`;
-      query = query.or(`employee_number.ilike.${term},first_name.ilike.${term},last_name.ilike.${term}`);
-    }
+    const searchFilter = personSearchFilter(options.search ?? "", "employee_number");
+    if (searchFilter) query = query.or(searchFilter);
     if (options.limit) query = query.range(options.offset ?? 0, (options.offset ?? 0) + options.limit - 1);
     const { data, error } = await query;
     if (error) throw error;

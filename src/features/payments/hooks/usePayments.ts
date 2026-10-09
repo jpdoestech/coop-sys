@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { matchesPersonSearch, personSearchTerms } from "../../../services/identity/personSearch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccess } from "../../../services/access/useAccess";
 import {
@@ -40,26 +41,21 @@ export function usePayments(
         employeeIsInScope(employee, profile),
       ),
   });
-  const normalizedSearch = employeeSearch.trim().toLowerCase();
+  const searchTerms = personSearchTerms(employeeSearch);
   const scopedEmployeeIds = employees.data
     ?.filter(
       (employee) =>
-        !normalizedSearch ||
-        [
+        matchesPersonSearch(searchTerms, [
           employee.employee_number,
           employee.first_name,
           employee.middle_name,
           employee.last_name,
           employee.suffix,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(normalizedSearch),
+        ]),
     )
     .map((employee) => employee.id);
   const employeeIds =
-    normalizedSearch || isBranchScoped(profile) ? scopedEmployeeIds : undefined;
+    searchTerms.length || isBranchScoped(profile) ? scopedEmployeeIds : undefined;
   const ledger = useQuery({
     queryKey: [
       "payment-ledger",

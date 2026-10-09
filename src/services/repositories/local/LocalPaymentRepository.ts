@@ -1,3 +1,4 @@
+import { matchesPersonSearch, personSearchTerms } from "../../identity/personSearch";
 import type {
   MemberPayment,
   PaymentLedger,
@@ -131,7 +132,7 @@ export class LocalPaymentRepository implements PaymentRepository {
     const summaryLedger = periodPaymentIds
       ? { ...ledger, payments: ledger.payments.filter((payment) => periodPaymentIds.has(payment.id)) }
       : ledger;
-    const term = options.search?.trim().toLowerCase() ?? "";
+    const searchTerms = personSearchTerms(options.search ?? "");
     const branchIds = options.branchIds ? new Set(options.branchIds) : null;
     const clientIds = options.clientIds ? new Set(options.clientIds) : null;
     const value = (item: ReturnType<typeof buildPaymentSummary>[number]) =>
@@ -159,17 +160,13 @@ export class LocalPaymentRepository implements PaymentRepository {
       options.yearTo,
     )
       .filter((item) => {
-        const employeeText = [
+        return matchesPersonSearch(searchTerms, [
           item.employee.employee_number,
           item.employee.first_name,
           item.employee.middle_name,
           item.employee.last_name,
           item.employee.suffix,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return !term || employeeText.includes(term);
+        ]);
       })
       .filter(
         (item) =>

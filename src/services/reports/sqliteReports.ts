@@ -51,7 +51,10 @@ export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: 
     const ids = scope.scopeType === "assigned_clients" ? scope.clientIds : scope.branchIds;
     predicates.push(`${scope.scopeType === "assigned_clients" ? "clientId" : "branchId"} in (select value from json_each(?))`); params.push(JSON.stringify(ids));
   }
-  if (query.search?.trim()) { predicates.push("instr(lower(number||' '||name||' '||branch||' '||client||' '||department||' '||position),lower(?))>0"); params.push(query.search.trim().slice(0, 200)); }
+  for (const term of (query.search ?? "").trim().slice(0, 200).split(/[\s,]+/).filter(Boolean)) {
+    predicates.push("instr(lower(number||' '||name||' '||branch||' '||client||' '||department||' '||position),lower(?))>0");
+    params.push(term);
+  }
   for (const key of ["branchId", "clientId", "statusId", "typeId", "departmentId", "approval"] as const) if (query[key]) { predicates.push(`${key}=?`); params.push(query[key]!); }
   if (query.attentionOnly) predicates.push("attention=1");
   if (query.dateFrom) { predicates.push("date>=?"); params.push(query.dateFrom); }

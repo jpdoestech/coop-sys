@@ -30,6 +30,11 @@ type UserRow = {
 
 const userSelect = "id,email,display_name,is_active,scope_type,employee_id,manager_user_id,created_at,updated_at,user_roles(role_id,roles(id,code)),user_branch_access(branch_id),user_client_access(client_id),user_permission_overrides(permission,effect),user_resource_assignments(resource_key)";
 
+type UserRoleRow = {
+  role_id: string;
+  roles: { code: RoleCode } | Array<{ code: RoleCode }> | null;
+};
+
 async function functionErrorMessage(error: unknown) {
   if (error && typeof error === "object" && "context" in error) {
     const context = (error as { context?: unknown }).context;
@@ -68,6 +73,42 @@ function toSystemUser(row: UserRow): SystemUser {
     created_at: row.created_at,
     updated_at: row.updated_at,
   });
+}
+
+function roleCode(row: UserRoleRow) {
+  return Array.isArray(row.roles) ? row.roles[0]?.code : row.roles?.code;
+}
+
+async function syncRoleAssignments(userId: string, roleIds: string[]) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role_id,roles(code)")
+    .eq("user_id", userId);
+  if (error) throw error;
+  const existingRows = data as unknown as UserRoleRow[];
+  const existingIds = new Set(existingRows.map((row) => row.role_id));
+  const nextIds = new Set(roleIds);
+  const superAdminRole = existingRows.find((row) => roleCode(row) === "super_admin");
+  if (superAdminRole && !nextIds.has(superAdminRole.role_id)) {
+    throw new Error("The built-in Super Admin role cannot be removed.");
+  }
+  const additions = roleIds.filter((role_id) => !existingIds.has(role_id));
+  const removals = [...existingIds].filter((role_id) => !nextIds.has(role_id));
+  if (additions.length) {
+    const { error: insertError } = await supabase
+      .from("user_roles")
+      .insert(additions.map((role_id) => ({ user_id: userId, role_id })));
+    if (insertError) throw insertError;
+  }
+  if (removals.length) {
+    const { error: deleteError } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .in("role_id", removals);
+    if (deleteError) throw deleteError;
+  }
 }
 
 export class SupabaseUserAccessRepository implements UserAccessRepository {
@@ -123,9 +164,6 @@ export class SupabaseUserAccessRepository implements UserAccessRepository {
       })
       .eq("id", id);
     if (userError) throw userError;
-    await supabase.from("user_roles").delete().eq("user_id", id);
-    const { error: roleError } = await supabase.from("user_roles").insert(input.role_ids.map((role_id) => ({ user_id: id, role_id })));
-    if (roleError) throw roleError;
     await supabase.from("user_branch_access").delete().eq("user_id", id);
     if (input.branch_ids.length) {
       const { error: branchError } = await supabase
@@ -145,6 +183,7 @@ export class SupabaseUserAccessRepository implements UserAccessRepository {
     if (overrides.length) { const { error } = await supabase.from("user_permission_overrides").insert(overrides); if (error) throw error; }
     await supabase.from("user_resource_assignments").delete().eq("user_id", id);
     if (input.resource_assignments.length) { const { error } = await supabase.from("user_resource_assignments").insert(input.resource_assignments.map((resource_key) => ({ user_id: id, resource_key }))); if (error) throw error; }
+    await syncRoleAssignments(id, input.role_ids);
     if (input.temporary_password)
       throw new Error(
         "Send online password resets from the sign-in screen; passwords are never handled by the administrator browser.",

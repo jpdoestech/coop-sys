@@ -19,6 +19,9 @@ beforeEach(() => {
 });
 afterEach(() => db.close());
 describe("SQLite report database pagination", () => {
+  it.each(["Person, Current", "Current Person", "Person Current"])("finds names in either order: %s", (search) => {
+    expect(sqliteReportPage(db, { kind: "employees", search }, scope).items.map((item) => item.id)).toEqual(["e2"]);
+  });
   it("counts before paging and never projects government IDs", () => {
     const page = sqliteReportPage(db, { kind: "employees", limit: 1, offset: 1 }, scope);
     expect(page.total).toBe(2); expect(page.records).toBe(2); expect(page.items).toHaveLength(1); expect(page.active).toBe(2);
