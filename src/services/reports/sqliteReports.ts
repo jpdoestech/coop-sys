@@ -1,16 +1,28 @@
 import type { ReportPage, ReportQuery } from "../repositories/ReportRepository";
+import type { ReportRow } from "../repositories/ReportRepository";
+import type { Member } from "../../types/member";
+import type { Employee } from "../../types/employee";
+import type { PaymentLedger } from "../../types/payment";
+import type { OrganizationDirectory } from "../../types/organization";
 
 type SqliteDatabase = { prepare(sql: string): { all(...params: (string | number)[]): unknown[]; get(...params: (string | number)[]): unknown } };
 type Scope = { scopeType: string; branchIds: string[]; clientIds: string[]; linkedEmployeeId?: string | null };
 
 // Embedded into the EXE bundle; no runtime imports or browser APIs here.
 export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: Scope): ReportPage {
-  if (!["members", "employees", "deployment"].includes(query.kind)) throw new Error("Unknown report.");
-  const sortKeys = ["number", "name", "branch", "client", "department", "position", "statusId", "typeId", "date", "approval", "attention", "employees", "active", "direct", "clientDeployed"];
+  if (!["members", "employees", "deployment", "amounts"].includes(query.kind)) throw new Error("Unknown report.");
+  const sortKeys = ["number", "name", "branch", "client", "department", "position", "statusId", "typeId", "date", "approval", "attention", "employees", "active", "direct", "clientDeployed", "members", "paid", "unpaid", "amountCentavos", "paidAmountCentavos", "unpaidAmountCentavos", "balanceCentavos"];
   const sort = query.sort || (query.kind === "deployment" ? "branch" : "name");
   if (!sortKeys.includes(sort)) throw new Error("Unknown sort column.");
   for (const date of [query.dateFrom, query.dateTo]) if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw new Error("Enter a valid report date.");
   if (query.dateFrom && query.dateTo && query.dateFrom > query.dateTo) throw new Error("The end date must not precede the start date.");
+  if (query.kind === "amounts") {
+    const read = (key: string, fallback: unknown) => {
+      const row = db.prepare("select value from app_storage where storage_key=?").get(key) as { value: string } | undefined;
+      return row ? JSON.parse(row.value) : fallback;
+    };
+    return buildAmountsReport(query, scope, read("coop_sys_members", []), read("coop_sys_employees", []), read("coop_sys_payment_ledger", { payments: [], settings: [] }), read("coop_sys_organization_directory", { branches: [], clients: [] }));
+  }
   const member = query.kind === "members", kind = member ? "members" : "employees";
   const placement = member ? "coalesce(linked.placement,json_extract(p.value,'$.active_assignment'))" : "json_extract(p.value,'$.active_assignment')";
   const branch = member ? "case when linked.employee_id is not null then coalesce(json_extract(linked.placement,'$.branch_id'),'') else coalesce(json_extract(p.value,'$.proposed_branch_id'),'') end" : `coalesce(json_extract(${placement},'$.branch_id'),'')`;
@@ -73,4 +85,64 @@ export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: 
   const order = labels.length ? `case "${sort}" ${labels.map((label, index) => `when '${prefix}000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}' then '${label}'`).join(" ")} else 'Not set' end` : `"${sort}"`;
   const rows = db.prepare(`${output} select * from output order by ${order} collate nocase ${direction},id asc limit ? offset ?`).all(...params, limit, offset) as ReportPage["items"];
   return { ...stats, pending: stats.pending || 0, items: rows.map((row) => ({ ...row, attention: Boolean(row.attention) })) };
+}
+
+export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Member[], employees: Employee[], ledger: Pick<PaymentLedger, "payments" | "settings">, directory: Pick<OrganizationDirectory, "branches" | "clients">): ReportPage {
+  if (query.paymentStatus && !["paid", "unpaid"].includes(query.paymentStatus)) throw new Error("Unknown payment status.");
+  const asOf = query.dateTo || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const settings = [...(ledger.settings ?? [])].filter((item) => item.effective_from <= asOf)
+    .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.updated_at.localeCompare(a.updated_at) || b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))[0];
+  const target = settings ? settings.membership_fee_centavos + settings.capital_share_target_centavos : 550000;
+  const linked = new Map<string, Employee>();
+  const allowed = new Set<string>();
+  const inScope = (branchId: string, clientId: string, employeeId?: string) => scope.scopeType === "organization" || scope.scopeType === "self" && Boolean(scope.linkedEmployeeId) && employeeId === scope.linkedEmployeeId || scope.scopeType === "assigned_clients" && scope.clientIds.includes(clientId) || scope.scopeType === "assigned_branches" && scope.branchIds.includes(branchId);
+  for (const employee of [...employees].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (employee.deleted_at) continue;
+    if (inScope(employee.active_assignment?.branch_id || "", employee.active_assignment?.client_id || "", employee.id)) allowed.add(employee.id);
+    if (employee.member_id) {
+      const existing = linked.get(employee.member_id);
+      if (!existing || allowed.has(employee.id) && !allowed.has(existing.id)) linked.set(employee.member_id, employee);
+    }
+  }
+  const payments = new Map<string, number>();
+  for (const payment of ledger.payments ?? []) {
+    if (payment.deleted_at || query.dateFrom && payment.payment_date < query.dateFrom || query.dateTo && payment.payment_date > query.dateTo || scope.scopeType !== "organization" && !allowed.has(payment.employee_id)) continue;
+    payments.set(payment.member_id, (payments.get(payment.member_id) || 0) + payment.amount_centavos);
+  }
+  const branchLabels = new Map(directory.branches.map((item) => [item.id, item.label]));
+  const clientLabels = new Map(directory.clients.map((item) => [item.id, item.label]));
+  const groups = new Map<string, ReportRow>();
+  const totals = { records: 0, paid: 0, unpaid: 0, amountCentavos: 0, balanceCentavos: 0 };
+  const terms = (query.search ?? "").trim().toLowerCase().split(/[\s,]+/).filter(Boolean);
+  for (const member of members) {
+    if (member.deleted_at) continue;
+    const employee = linked.get(member.id);
+    const branchId = (employee ? employee.active_assignment?.branch_id : member.proposed_branch_id) || "";
+    const clientId = (employee ? employee.active_assignment?.client_id : member.proposed_client_id) || "";
+    if (!inScope(branchId, clientId, employee?.id) || query.branchId && branchId !== query.branchId || query.clientId && clientId !== query.clientId) continue;
+    const branch = branchLabels.get(branchId) || "No placement", client = clientLabels.get(clientId) || "Direct members";
+    const text = [member.membership_number, member.first_name, member.middle_name, member.last_name, member.suffix, branch, client].filter(Boolean).join(" ").toLowerCase();
+    if (!terms.every((term) => text.includes(term))) continue;
+    const amount = payments.get(member.id) || 0, paid = Number(target > 0 && amount >= target), unpaid = 1 - paid, balance = Math.max(0, target - amount);
+    if (query.paymentStatus === "paid" && !paid || query.paymentStatus === "unpaid" && !unpaid) continue;
+    totals.records++; totals.paid += paid; totals.unpaid += unpaid; totals.amountCentavos += amount; totals.balanceCentavos += balance;
+    for (const level of ["branch", "client"] as const) {
+      const id = level === "branch" ? `branch:${branchId}` : `client:${branchId}:${clientId}`;
+      let row = groups.get(id);
+      if (!row) {
+        row = { id, level, branchId, clientId: level === "branch" ? "" : clientId, branch, client: level === "branch" ? "Branch total" : client, number: "", name: "", department: "", position: "", statusId: "", typeId: "", date: "", approval: "", attention: false, employees: 0, active: 0, direct: 0, clientDeployed: 0, members: 0, paid: 0, unpaid: 0, amountCentavos: 0, paidAmountCentavos: 0, unpaidAmountCentavos: 0, balanceCentavos: 0 };
+        groups.set(id, row);
+      }
+      row.members!++; row.paid! += paid; row.unpaid! += unpaid; row.amountCentavos! += amount;
+      row.paidAmountCentavos! += paid ? amount : 0; row.unpaidAmountCentavos! += unpaid ? amount : 0; row.balanceCentavos! += balance;
+    }
+  }
+  const rows = [...groups.values()], direction = query.direction === "desc" ? -1 : 1, sort = query.sort || "branch";
+  rows.sort((a, b) => {
+    if (sort === "branch" || sort === "name") return a.branch.localeCompare(b.branch) * direction || Number(a.level === "client") - Number(b.level === "client") || a.client.localeCompare(b.client) * direction || a.id.localeCompare(b.id);
+    const left = a[sort] ?? "", right = b[sort] ?? "";
+    return (typeof left === "number" ? left - Number(right) : String(left).localeCompare(String(right))) * direction || a.id.localeCompare(b.id);
+  });
+  const offset = Math.max(0, Number(query.offset) || 0), limit = Math.min(500, Math.max(1, Number(query.limit) || 25));
+  return { ...totals, items: rows.slice(offset, offset + limit), total: rows.length, active: 0, pending: 0, attention: 0 };
 }

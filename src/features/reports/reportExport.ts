@@ -19,14 +19,14 @@ export async function downloadReport(kind: ReportKind, rows: ReportRow[], format
   else {
     const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook(); workbook.creator = "Records Desk";
-    const sheet = workbook.addWorksheet(reportTitles[kind].slice(0, 31), { views: [{ state: "frozen", ySplit: 1 }] });
+    const sheet = workbook.addWorksheet(reportTitles[kind].replace(/[\\/:*?[\]]/g, "-").slice(0, 31), { views: [{ state: "frozen", ySplit: 1 }] });
     const columns = reportColumns(kind);
     sheet.columns = columns.map((column) => ({ header: column.label, key: column.key, width: column.key === "name" ? 32 : ["branch", "client", "department", "position"].includes(column.key) ? 27 : 18 }));
-    rows.forEach((row) => sheet.addRow(Object.fromEntries(columns.map((column) => [column.key, column.numeric ? Number(row[column.key]) : spreadsheetSafeText(reportCell(row, column.key, kind))]))));
+    rows.forEach((row) => sheet.addRow(Object.fromEntries(columns.map((column) => [column.key, column.numeric ? Number(row[column.key] ?? 0) / (column.currency ? 100 : 1) : spreadsheetSafeText(reportCell(row, column.key, kind))]))));
     sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
     sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF247253" } }; sheet.getRow(1).height = 24;
     sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: rows.length + 1, column: columns.length } };
-    columns.forEach((column, index) => { if (!column.numeric) sheet.getColumn(index + 1).numFmt = "@"; });
+    columns.forEach((column, index) => { if (!column.numeric) sheet.getColumn(index + 1).numFmt = "@"; if (column.currency) sheet.getColumn(index + 1).numFmt = '"PHP "#,##0.00'; });
     const scope = workbook.addWorksheet("Report Filters"); scope.getColumn(1).width = 100;
     scope.addRows([[reportTitles[kind]], ...metadata.map((text) => [spreadsheetSafeText(text)])]);
     const bytes = await workbook.xlsx.writeBuffer(); blob = new Blob([new Uint8Array(bytes)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });

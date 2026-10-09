@@ -565,9 +565,10 @@ async function api(req, res, url) {
   }
   if (req.method === "GET" && url.pathname === "/api/reports") {
     const input = Object.fromEntries(url.searchParams);
-    const module = input.kind === "members" ? "members" : "employees";
+    const module = input.kind === "members" || input.kind === "amounts" ? "members" : "employees";
     if (!hasPermission(user, "reports.view") || !hasPermission(user, `${module}.view`)) return json(res, 403, { error: "Your effective access does not permit this report." });
     if (input.exporting === "true" && (!hasPermission(user, "reports.export") || !hasPermission(user, `${module}.export`))) return json(res, 403, { error: "Your effective access does not permit this export." });
+    if (input.kind === "amounts" && (!hasPermission(user, "payments.view") || !hasPermission(user, "employees.view") || input.exporting === "true" && !hasPermission(user, "payments.export"))) return json(res, 403, { error: "Your effective access does not permit payment reports." });
     try {
       return json(res, 200, reports.sqliteReportPage(db, { ...input, attentionOnly: input.attentionOnly === "true" }, { scopeType: user.scope_type || "self", branchIds: parseArray(user.branch_ids), clientIds: parseArray(user.client_ids), linkedEmployeeId: user.linked_employee_id }));
     } catch (error) { return json(res, 400, { error: error.message }); }

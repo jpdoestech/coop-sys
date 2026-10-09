@@ -6,6 +6,14 @@ import type { ReportRow } from "../repositories/ReportRepository";
 
 const reader: AccessProfile = { userId: "reader", displayName: "Reader", role: "custom", branchIds: [], effectivePermissions: ["reports.view", "reports.export", "employees.view"] };
 describe("report access and query contracts", () => {
+  it("requires member, employee and payment access for amounts and payment export access for exports", () => {
+    expect(() => assertReportAccess(reader, { kind: "amounts" })).toThrow();
+    const viewer = { ...reader, effectivePermissions: [...reader.effectivePermissions!, "members.view", "payments.view", "members.export"] };
+    expect(() => assertReportAccess(viewer, { kind: "amounts" })).not.toThrow();
+    expect(canExportReport(viewer, "amounts")).toBe(false);
+    expect(() => assertReportAccess(viewer, { kind: "amounts", exporting: true })).toThrow();
+    expect(canExportReport({ ...viewer, effectivePermissions: [...viewer.effectivePermissions, "payments.export"] }, "amounts")).toBe(true);
+  });
   it("requires both report and source permissions, including export permission", () => {
     expect(() => assertReportAccess(reader, { kind: "employees" })).not.toThrow();
     expect(() => assertReportAccess(reader, { kind: "members" })).toThrow();
@@ -30,6 +38,12 @@ describe("report access and query contracts", () => {
     const csv = reportCsv("members", [{ number: "000019", name: '=HYPERLINK("bad")', statusId: "", typeId: "", approval: "pending", attention: true } as ReportRow]);
     expect(csv).toContain('"000019"'); expect(csv).toContain('"\'=HYPERLINK(""bad"")"');
     expect(csv).not.toContain("sss_number");
+  });
+  it("exports amounts as currency and keeps branch totals distinguishable", () => {
+    const csv = reportCsv("amounts", [{ branch: "Alpha", client: "Branch total", members: 3, paid: 1, unpaid: 2, amountCentavos: 650000, paidAmountCentavos: 550000, unpaidAmountCentavos: 100000, balanceCentavos: 1000000 } as ReportRow]);
+    expect(csv).toContain('"Branch total","3","1","2"');
+    expect(csv).toContain('"₱6,500.00"');
+    expect(csv).toContain('"₱10,000.00"');
   });
   it("rejects oversized exports before collecting rows", async () => {
     await expect(collectReportRows(async () => ({ ...emptyReport, total: 50001 }), { kind: "members" })).rejects.toThrow("50,000");

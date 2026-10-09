@@ -8,7 +8,8 @@ export class SupabaseReportRepository implements ReportRepository {
     const query = validateReportQuery(raw); assertReportAccess(profile, query);
     if (!supabase) throw new Error("Supabase is not configured.");
     const { kind, limit, offset, sort, direction, exporting, ...filters } = query;
-    const { data, error } = await supabase.rpc("reports_page", { p_kind: kind, p_filters: filters, p_limit: limit, p_offset: offset, p_sort: sort || (kind === "deployment" ? "branch" : "name"), p_direction: direction, p_export: Boolean(exporting) });
+    const args = { p_filters: filters, p_limit: limit, p_offset: offset, p_sort: sort || (kind === "deployment" || kind === "amounts" ? "branch" : "name"), p_direction: direction, p_export: Boolean(exporting) };
+    const { data, error } = kind === "amounts" ? await supabase.rpc("reports_amounts_page", args) : await supabase.rpc("reports_page", { ...args, p_kind: kind });
     if (error) throw new Error(error.message);
     return data as ReportPage;
   }
