@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { AlertTriangle, CheckCircle2, FileCheck2, Link2, Search, UserCheck, X } from "lucide-react";
 import type { Employee } from "../../../types/employee";
 import type { PaymentImportMatch } from "../../../types/payment";
@@ -31,6 +32,7 @@ function optionValue(employee: Employee) {
 }
 
 export function PaymentImportValidationDialog({ matches, employees, overrides, overrideSearch, fileName, scopeLabel, periodLabel, includeInactive, saving, error, onClose, onToggleInactive, onAmountChange, onSearchChange, onSaveAlias, onPost }: Props) {
+  useWorkspaceDialog("Import Validation", onClose);
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -66,7 +68,7 @@ export function PaymentImportValidationDialog({ matches, employees, overrides, o
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-2 sm:p-4">
     <section className="flex h-[min(800px,95vh)] w-full max-w-7xl flex-col overflow-hidden rounded-md border border-line bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="payment-import-review-title">
       <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-4 py-2.5 sm:px-5">
-        <div className="flex min-w-0 items-start gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-moss/10 text-moss"><FileCheck2 className="h-4 w-4" /></span><div className="min-w-0"><h2 id="payment-import-review-title" className="text-sm font-semibold">Payroll import validation</h2><p className="truncate text-xs text-ink/50">{fileName} · {scopeLabel} · {periodLabel}</p></div></div>
+        <div className="flex min-w-0 items-start gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-moss/10 text-moss"><FileCheck2 className="h-4 w-4" /></span><div className="min-w-0"><WorkspaceBreadcrumbs dialog /><h2 id="payment-import-review-title" className="sr-only">Payroll import validation</h2><p className="truncate text-xs text-ink/50">{fileName} · {scopeLabel} · {periodLabel}</p></div></div>
         <button type="button" onClick={onClose} className="icon-button" aria-label="Close validation preview"><X className="h-4 w-4" /></button>
       </header>
 

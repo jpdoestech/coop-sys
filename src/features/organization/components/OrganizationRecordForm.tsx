@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useState, type FormEvent } from "react";
@@ -13,6 +14,7 @@ type RecordValue = OrganizationBranch | OrganizationClient | OrganizationDepartm
 type Props = { kind: OrganizationKind; record: RecordValue | null; onCancel: () => void; onSaved: () => void };
 
 export function OrganizationRecordForm({ kind, record, onCancel, onSaved }: Props) {
+  useWorkspaceDialog(`${record ? "Edit" : "Add"} ${kind[0].toUpperCase()}${kind.slice(1)}`, onCancel);
   const directory = useOrganization();
   const [code, setCode] = useState(""); const [name, setName] = useState(""); const [detail, setDetail] = useState("");
   const [parentId, setParentId] = useState(""); const [contactPerson, setContactPerson] = useState(""); const [contactDetails, setContactDetails] = useState(""); const [active, setActive] = useState(true);
@@ -45,7 +47,7 @@ export function OrganizationRecordForm({ kind, record, onCancel, onSaved }: Prop
 
   const title = { branch: "branch", client: "client", department: "department", position: "position" }[kind];
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-4"><form onSubmit={submit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-md border border-line bg-white shadow-2xl">
-    <div className="flex items-center justify-between border-b border-line px-6 py-4"><div><p className="text-xs font-semibold uppercase text-moss">Organization</p><h2 className="font-display text-xl font-semibold">{record ? "Edit" : "Add"} {title}</h2></div><button type="button" onClick={cancel} className="focus-ring rounded p-2 hover:bg-paper" aria-label="Close"><X className="h-5 w-5" /></button></div>
+    <div className="flex items-center justify-between border-b border-line px-6 py-4"><div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 className="sr-only">{record ? "Edit" : "Add"} {title}</h2></div><button type="button" onClick={cancel} className="focus-ring rounded p-2 hover:bg-paper" aria-label="Close"><X className="h-5 w-5" /></button></div>
     <div className="grid gap-5 p-6 sm:grid-cols-2">
       <label className="text-sm font-medium">Code<input required maxLength={20} value={code} onChange={(event) => setCode(event.target.value.replace(/[^A-Za-z0-9_-]/g, ""))} className="control mt-1.5 w-full uppercase" /></label>
       <label className="text-sm font-medium">Name<input required maxLength={CHARACTER_LIMITS.name} value={name} onChange={(event) => setName(event.target.value)} className="control mt-1.5 w-full" /></label>

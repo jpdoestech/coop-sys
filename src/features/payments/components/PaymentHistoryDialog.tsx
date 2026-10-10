@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import { History, Printer, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -34,6 +35,7 @@ export function PaymentHistoryDialog({
   onLoadLedger,
   onClose,
 }: Props) {
+  useWorkspaceDialog("Payment History", onClose);
   const [ledger, setLedger] = useState<PaymentLedger | null>(null);
   const [loadError, setLoadError] = useState("");
   const [printError, setPrintError] = useState("");
@@ -175,12 +177,12 @@ export function PaymentHistoryDialog({
         className="flex h-[min(760px,90vh)] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-white shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded bg-[#e4efe9] text-moss">
+          <div className="flex min-w-0 flex-1 items-center gap-3 pr-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[#e4efe9] text-moss">
               <History className="h-4 w-4" />
             </span>
-            <div>
-              <h2 className="text-sm font-bold">Payment history</h2>
+            <div className="min-w-0 flex-1">
+              <WorkspaceBreadcrumbs dialog /><h2 className="sr-only">Payment history</h2>
               <p className="text-[11px] text-ink/45">
                 {employee.employeeNumber} · {employeeName}
               </p>

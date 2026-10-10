@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../layout/WorkspaceNavigation";
 import { SearchableSelect } from "../ui/SearchableSelect";
 import { useUnsavedChanges } from "./unsavedChanges";
 import { useState } from "react";
@@ -20,6 +21,7 @@ type Status = "all" | "ready" | "error" | "imported" | "attention";
 const errorLabels = importErrorLabels;
 
 export function PersonImportDialog({ kind, branches, clients, lookups = { departments, positions }, requireClient = false, linkOptions, importing, importError, onClose, onImport }: Props) {
+  useWorkspaceDialog(kind === "member" ? "Import Members" : "Import Employees", onClose);
   const [rows, setRows] = useState<PersonImportRow[]>([]);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [outcomes, setOutcomes] = useState<Record<number, PersonImportOutcome>>({});
@@ -85,7 +87,7 @@ export function PersonImportDialog({ kind, branches, clients, lookups = { depart
   }
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-2 sm:p-3"><section role="dialog" aria-modal="true" aria-labelledby="person-import-title" className="flex h-[min(800px,94dvh)] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-white shadow-2xl">
-    <header className="flex shrink-0 items-center justify-between border-b border-line px-3 py-3 sm:px-4"><div><h2 id="person-import-title" className="text-sm font-bold">Import {kind === "member" ? "members" : "employees"}</h2><p className="text-[11px] text-ink/45">{deploymentConfirmed ? [branch?.label, client?.label || "Direct deployment"].filter(Boolean).join(" / ") : "Deployment"}</p></div><button type="button" className="icon-button" onClick={close} aria-label="Close import"><X className="h-4 w-4" /></button></header>
+    <header className="flex shrink-0 items-center justify-between border-b border-line px-3 py-3 sm:px-4"><div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 id="person-import-title" className="sr-only">Import {kind === "member" ? "members" : "employees"}</h2><p className="text-[11px] text-ink/45">{deploymentConfirmed ? [branch?.label, client?.label || "Direct deployment"].filter(Boolean).join(" / ") : "Deployment"}</p></div><button type="button" className="icon-button" onClick={close} aria-label="Close import"><X className="h-4 w-4" /></button></header>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {!deploymentConfirmed ? <div className="space-y-4 p-4"><div className="flex items-center gap-2 text-xs font-semibold"><Building2 className="h-4 w-4 text-moss" />Deployment assignment</div><div className="responsive-fields">
         <label className="field-label">Branch<SearchableSelect aria-label="Branch" disabled={fixedBranch || busy} className="compact-control mt-1 w-full disabled:bg-paper" value={branchId} onChange={(e) => setBranchId(e.target.value)}><option value="">Select branch</option>{branches.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></label>

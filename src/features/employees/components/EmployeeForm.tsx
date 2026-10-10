@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -144,6 +145,7 @@ function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput
 }
 
 export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
+  useWorkspaceDialog(employee ? "Edit Employee" : "New Employee", onCancel);
   const { branches } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
   const [error, setError] = useState("");
@@ -329,11 +331,11 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/35" role="presentation">
       <div className="h-full w-full max-w-4xl overflow-y-auto bg-white shadow-panel" role="dialog" aria-modal="true" aria-labelledby="employee-form-title">
         <form onSubmit={submit}>
-          <header className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
-            <div><p className="text-xs font-semibold uppercase text-clay">Employee record</p><h2 id="employee-form-title" className="mt-1 font-display text-2xl font-semibold">{employee ? "Edit employee" : "New employee"}</h2></div>
+          <header className="sticky top-0 z-10 flex h-20 items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
+            <div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 id="employee-form-title" className="sr-only">{employee ? "Edit employee" : "New employee"}</h2></div>
             <button type="button" className="focus-ring rounded p-2 text-ink/65 hover:bg-white" onClick={cancel} aria-label="Close employee form"><X className="h-5 w-5" /></button>
           </header>
-          <nav className="sticky top-[85px] z-[9] overflow-x-auto border-b border-line bg-white/95 px-4 backdrop-blur sm:px-8" aria-label="Employee information sections">
+          <nav className="sticky top-20 z-[9] overflow-x-auto border-b border-line bg-white/95 px-4 backdrop-blur sm:px-8" aria-label="Employee information sections">
             <div className="flex min-w-max gap-1">
               {employeeTabs.map((item) => {
                 const Icon = item.icon;

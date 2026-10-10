@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { AlertTriangle, Save, X } from "lucide-react";
 import { useState } from "react";
@@ -25,6 +26,7 @@ export function PaymentCorrectionDialog({
   onClose,
   onSave,
 }: Props) {
+  useWorkspaceDialog("Edit Transaction", onClose);
   const [amount, setAmount] = useState(
     (payment.amount_centavos / 100).toFixed(2),
   );
@@ -57,8 +59,8 @@ export function PaymentCorrectionDialog({
         className="w-full max-w-lg overflow-hidden rounded-md bg-white shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div>
-            <h2 className="text-sm font-bold">Edit transaction</h2>
+          <div className="min-w-0 flex-1 pr-2">
+            <WorkspaceBreadcrumbs dialog /><h2 className="sr-only">Edit transaction</h2>
             <p className="text-[11px] text-ink/45">
               The original value and correction comment remain in the audit
               history.

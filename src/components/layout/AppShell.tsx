@@ -25,6 +25,7 @@ import { useAuth } from "../../services/auth/useAuth";
 import { useConfirmLeave } from "../forms/unsavedChanges";
 import { ActivityIndicator } from "../ui/ActivityIndicator";
 import { TransactionSuccessDialog } from "../ui/TransactionSuccessDialog";
+import { WorkspaceBreadcrumbs, WorkspaceNavigationProvider } from "./WorkspaceNavigation";
 
 type AppShellProps = {
   children: ReactNode;
@@ -45,6 +46,10 @@ const navItems: Array<{ to: string; label: string; icon: typeof Gauge; permissio
 ];
 
 export function AppShell({ children }: AppShellProps) {
+  return <WorkspaceNavigationProvider><AppShellLayout>{children}</AppShellLayout></WorkspaceNavigationProvider>;
+}
+
+function AppShellLayout({ children }: AppShellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const online = useOnlineStatus();
   const appMode = getAppMode();
@@ -122,7 +127,7 @@ export function AppShell({ children }: AppShellProps) {
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">Membership &amp; Workforce</p>
+                <WorkspaceBreadcrumbs />
                 <p className="truncate text-xs text-ink/45">Head Office / Operations</p>
               </div>
               <div className="flex shrink-0 items-center gap-2 rounded-full bg-paper px-2 py-1.5 text-[11px] font-medium text-ink/65 sm:px-3 sm:text-xs">

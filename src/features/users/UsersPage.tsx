@@ -1,4 +1,6 @@
 import { LoadingProgress } from "../../components/ui/LoadingProgress";
+import { PageHeader } from "../../components/ui/PageHeader";
+import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -32,6 +34,7 @@ export function UsersPage() {
   const confirm = useConfirmation();
   const [tab, setTab] = useState<Tab>("users"); const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(10); const [search, setSearch] = useState(""); const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
   const deferredSearch = useDeferredValue(search);
+  useWorkspacePath([{ label: "User Access", onSelect: () => setTab("users") }, { label: { users: "Users", roles: "Roles", matrix: "Permission Matrix" }[tab] }]);
   const { query, roles, saveUser, saveRole, deleteRole } = useUsers({ search: deferredSearch, status, limit: pageSize, offset: (page - 1) * pageSize });
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null); const [userOpen, setUserOpen] = useState(false); const [effectiveUser, setEffectiveUser] = useState<SystemUser | null>(null);
   const [editingRole, setEditingRole] = useState<AccessRole | null>(null); const [roleOpen, setRoleOpen] = useState(false); const [cloning, setCloning] = useState(false); const [matrixRoleId, setMatrixRoleId] = useState("");
@@ -46,7 +49,7 @@ export function UsersPage() {
   function openRole(role: AccessRole | null, clone = false) { saveRole.reset(); setEditingRole(role); setCloning(clone); setRoleOpen(true); }
   const employeeOptions = (employees.data ?? []).map((employee) => ({ id: employee.id, label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}` }));
   return <>
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><h1 className="text-xl font-semibold">Access Control</h1><span className="rounded bg-moss/10 px-2 py-1 text-[10px] font-bold uppercase text-moss">Administration</span></div><p className="text-xs text-ink/55">Users, roles, permissions, and scoped resource access.</p></div>{tab === "users" && can("users.create") ? <button onClick={() => { saveUser.reset(); setEditingUser(null); setUserOpen(true); }} className="primary-button"><Plus className="h-4 w-4" /> Add user</button> : tab === "roles" && can("roles.create") ? <button onClick={() => openRole(null)} className="primary-button"><Plus className="h-4 w-4" /> Create role</button> : null}</div>
+    <div className="mb-3 flex flex-wrap items-center justify-end gap-3"><PageHeader title="User Access" />{tab === "users" && can("users.create") ? <button onClick={() => { saveUser.reset(); setEditingUser(null); setUserOpen(true); }} className="primary-button"><Plus className="h-4 w-4" /> Add user</button> : tab === "roles" && can("roles.create") ? <button onClick={() => openRole(null)} className="primary-button"><Plus className="h-4 w-4" /> Create role</button> : null}</div>
     <section className="overflow-hidden rounded-md border border-line bg-white shadow-panel">
       <div className="flex items-center gap-1 border-b border-line px-3 pt-2">{([['users','Users',UsersRound],['roles','Roles',ShieldCheck],['matrix','Permission matrix',ShieldCheck]] as const).map(([id,label,Icon]) => <button key={id} onClick={() => setTab(id)} className={`flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold ${tab === id ? "border-moss text-moss" : "border-transparent text-ink/55 hover:text-ink"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div>
       {tab === "users" ? <>

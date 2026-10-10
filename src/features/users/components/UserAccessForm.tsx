@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -24,6 +25,7 @@ function SearchLink({ label, value, options, onChange, placeholder }: { label: s
 }
 
 export function UserAccessForm({ user, roles, users, employees, saving, error, onCancel, onSubmit, offline }: Props) {
+  useWorkspaceDialog(user ? "Edit User" : "Add User", onCancel);
   const [value, setValue] = useState<SystemUserInput>(emptyUser); const [validationError, setValidationError] = useState(""); const [section, setSection] = useState<"account" | "scope" | "overrides">("account");
   useEffect(() => { setValue(user ? { ...normalizeSystemUser(user), temporary_password: "" } : emptyUser); setValidationError(""); setSection("account"); }, [user]);
   const immutableAccess = user?.role === "super_admin";
@@ -68,7 +70,7 @@ export function UserAccessForm({ user, roles, users, employees, saving, error, o
     setValue({ ...value, direct_grants: mode === "grant" ? [...value.direct_grants.filter((item) => item !== permission), permission] : value.direct_grants.filter((item) => item !== permission), direct_denies: mode === "deny" ? [...value.direct_denies.filter((item) => item !== permission), permission] : value.direct_denies.filter((item) => item !== permission) });
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-3"><form onSubmit={submit} className="flex h-[min(760px,94vh)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-line bg-white shadow-2xl">
-    <header className="flex items-center justify-between border-b border-line px-5 py-3"><div><p className="text-[10px] font-bold uppercase text-moss">Access control</p><h2 className="text-lg font-semibold">{user ? "Edit system user" : "Add system user"}</h2></div><button type="button" onClick={cancel} className="icon-button" aria-label="Close"><X className="h-4 w-4" /></button></header>
+    <header className="flex items-center justify-between border-b border-line px-5 py-3"><div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 className="sr-only">{user ? "Edit system user" : "Add system user"}</h2></div><button type="button" onClick={cancel} className="icon-button" aria-label="Close"><X className="h-4 w-4" /></button></header>
     <nav className="flex gap-1 overflow-x-auto border-b border-line px-5 pt-2">{([['account','Account & roles'],['scope','Scope & assignments'],['overrides','Direct overrides']] as const).map(([id,label], index) => <button type="button" key={id} onClick={() => { setValidationError(""); setSection(id); }} aria-current={section === id ? "step" : undefined} className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold ${section === id ? "border-moss text-moss" : "border-transparent text-ink/55 hover:text-ink"}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${section === id ? "bg-moss text-white" : "bg-paper text-ink/55"}`}>{index + 1}</span>{label}</button>)}</nav>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">
       {immutableAccess ? <div className="mb-4 flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><ShieldAlert className="h-4 w-4" /> Super Admin is unrestricted. Its roles and overrides are locked.</div> : null}

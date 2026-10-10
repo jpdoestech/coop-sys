@@ -13,6 +13,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { useAccess } from "../../services/access/useAccess";
 import { placementOptions } from "../../services/access/placementOptions";
 import { useOrganization } from "../../services/organization/useOrganization";
@@ -66,6 +67,8 @@ export function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [tab, setTab] = useState<Tab>("summary");
+  const tabNames: Record<Tab, string> = { ledger: "Transactions", summary: "Payment Summary", manual: "Manual Payment", import: "Payroll Import", aliases: "Import Aliases", refunds: "Refunds", final: "Final Pay", export: "Export", settings: "Settings" };
+  useWorkspacePath([{ label: "Payments", onSelect: () => setTab("ledger") }, { label: tabNames[tab] }]);
   const confirmLeave = useConfirmLeave();
   const [editingPayment, setEditingPayment] = useState<MemberPayment | null>(
     null,
@@ -200,7 +203,7 @@ export function PaymentsPage() {
     payments.saveRefund.error;
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <PageHeader
           eyebrow="Member finance"
           title="Payments"

@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import { draftChanged, useUnsavedChanges } from "../../../components/forms/unsavedChanges";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -128,6 +129,7 @@ function Section({ title, description, children }: { title: string; description:
 }
 
 export function MemberForm({ member, linkedEmployee, placementLoading = false, saveError, suggestedNumber, saving, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: MemberFormProps) {
+  useWorkspaceDialog(member ? "Edit Member" : "New Member", onCancel);
   const [draft, setDraft] = useState<Draft>(() => toDraft(member, suggestedNumber));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [addressValid, setAddressValid] = useState(true);
@@ -245,10 +247,10 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/35" role="presentation">
       <div className="h-full w-full max-w-3xl overflow-y-auto bg-white shadow-panel" role="dialog" aria-modal="true" aria-labelledby="member-form-title">
         <form onSubmit={submit}>
-          <header className="sticky top-0 z-10 flex items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
-            <div>
-              <p className="text-xs font-semibold uppercase text-clay">Member record</p>
-              <h2 id="member-form-title" className="mt-1 font-display text-2xl font-semibold text-ink">
+          <header className="sticky top-0 z-10 flex h-20 items-start justify-between border-b border-line bg-paper/95 px-6 py-5 backdrop-blur sm:px-8">
+            <div className="min-w-0 flex-1 pr-2">
+              <WorkspaceBreadcrumbs dialog />
+              <h2 id="member-form-title" className="sr-only">
                 {member ? "Edit member" : "New member"}
               </h2>
             </div>
@@ -257,7 +259,7 @@ export function MemberForm({ member, linkedEmployee, placementLoading = false, s
             </button>
           </header>
 
-          <nav className="sticky top-[85px] z-10 flex gap-1 overflow-x-auto border-b border-line bg-white px-4 pt-2 sm:px-8" aria-label="Member information sections">
+          <nav className="sticky top-20 z-10 flex gap-1 overflow-x-auto border-b border-line bg-white px-4 pt-2 sm:px-8" aria-label="Member information sections">
             {([
               ["personal", "Personal", UserRound],
               ["contact", "Contact", Contact],

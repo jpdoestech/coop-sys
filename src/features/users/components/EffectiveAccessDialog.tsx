@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { CheckCircle2, ShieldCheck, X, XCircle } from "lucide-react";
 import type { AccessRole } from "../../../services/access/accessControl";
 import { accessProfileForUser, rolesForUser } from "../../../services/access/userAccessModel";
@@ -6,11 +7,12 @@ import { branches, clients } from "../../../services/lookups/organization";
 import { PermissionMatrix } from "./PermissionMatrix";
 
 export function EffectiveAccessDialog({ user, roles, users = [], employees = [], onClose }: { user: SystemUser; roles: AccessRole[]; users?: SystemUser[]; employees?: Array<{ id: string; label: string }>; onClose: () => void }) {
+  useWorkspaceDialog("Effective Access", onClose);
   const assigned = rolesForUser(user, roles); const profile = accessProfileForUser(user, roles);
   const roleDerived = [...new Set(assigned.flatMap((role) => role.permissions))].sort();
   const scope = user.scope_type === "organization" ? "All organization records" : user.scope_type === "assigned_branches" ? user.branch_ids.map((id) => branches.find((item) => item.id === id)?.label ?? id).join(", ") : user.scope_type === "assigned_clients" ? user.client_ids.map((id) => clients.find((item) => item.id === id)?.label ?? id).join(", ") : "Linked employee only";
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-3"><section className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-line bg-white shadow-2xl">
-    <header className="flex items-center justify-between border-b border-line px-5 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded bg-moss/10 text-moss"><ShieldCheck className="h-5 w-5" /></span><div><h2 className="font-semibold">Effective access: {user.display_name}</h2><p className="text-xs text-ink/55">The final result after roles, direct grants, and direct denies.</p></div></div><button onClick={onClose} className="icon-button" aria-label="Close"><X className="h-4 w-4" /></button></header>
+    <header className="flex items-center justify-between border-b border-line px-5 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded bg-moss/10 text-moss"><ShieldCheck className="h-5 w-5" /></span><div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 className="sr-only">Effective access: {user.display_name}</h2><p className="text-xs text-ink/55">The final result after roles, direct grants, and direct denies.</p></div></div><button onClick={onClose} className="icon-button" aria-label="Close"><X className="h-4 w-4" /></button></header>
     <div className="grid min-h-0 gap-4 overflow-y-auto p-5">
       <div className="grid gap-3 md:grid-cols-4">
         <div className="rounded border border-line p-3"><p className="text-[10px] font-bold uppercase text-ink/45">Roles</p><p className="mt-1 text-sm font-medium">{assigned.map((r) => r.name).join(", ") || "None"}</p></div>

@@ -10,6 +10,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { useOrganization } from "../../services/organization/useOrganization";
 import type {
   OrganizationBranch,
@@ -49,6 +50,7 @@ export function OrganizationPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  useWorkspacePath([{ label: "Organization", onSelect: () => { setKind("branch"); setSearch(""); setPage(1); } }, { label: tabs.find((tab) => tab.id === kind)!.label }]);
   const deferredSearch = useDeferredValue(search);
   const recordsQuery = useOrganizationRecords(kind, {
     search: deferredSearch,
@@ -79,7 +81,7 @@ export function OrganizationPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <PageHeader
           eyebrow="Organization"
           title="Organization administration"

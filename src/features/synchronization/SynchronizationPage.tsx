@@ -2,6 +2,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, CloudCog, Database, Eye, EyeOff, History, RefreshCcw, Save, Server, ShieldCheck, TestTube2, Wifi, WifiOff } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
+import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import { useAccess } from "../../services/access/useAccess";
 import { getServerSyncStatus, runServerSync, saveServerSyncConfig, testServerSyncConnection, usesServerBackend, type ServerSyncStatus } from "../../services/server/syncApi";
@@ -29,6 +30,7 @@ export function SynchronizationPage() {
   const canManage = can("sync.manage");
   const [status, setStatus] = useState<ServerSyncStatus | null>(null);
   const [view, setView] = useState<View>("activity");
+  useWorkspacePath([{ label: "Synchronization", onSelect: () => setView("activity") }, { label: view === "activity" ? "Activity" : "Conflicts" }]);
   const [showKey, setShowKey] = useState(false);
   const [busy, setBusy] = useState<"save" | "sync" | "test" | "refresh" | null>(null);
   const [notice, setNotice] = useState<Notice>(null);

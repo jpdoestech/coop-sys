@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import {
   Printer,
   RectangleHorizontal,
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function PrintOrientationDialog({ title, onSelect, onCancel }: Props) {
+  useWorkspaceDialog("Print", onCancel);
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/45 p-4">
       <section
@@ -23,12 +25,12 @@ export function PrintOrientationDialog({ title, onSelect, onCancel }: Props) {
         className="w-full max-w-sm overflow-hidden rounded-md border border-line bg-white shadow-2xl"
       >
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded bg-[#e4efe9] text-moss">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 pr-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[#e4efe9] text-moss">
               <Printer className="h-4 w-4" />
             </span>
-            <div>
-              <h2 id="print-orientation-title" className="text-sm font-bold">
+            <div className="min-w-0 flex-1">
+              <WorkspaceBreadcrumbs dialog /><h2 id="print-orientation-title" className="sr-only">
                 Print {title}
               </h2>
               <p className="text-[11px] text-ink/45">Choose page orientation</p>

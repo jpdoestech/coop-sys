@@ -1,3 +1,4 @@
+import { useWorkspaceDialog, WorkspaceBreadcrumbs } from "../../../components/layout/WorkspaceNavigation";
 import { useState, type FormEvent } from "react";
 import { CalendarDays, CheckCircle2, Hash, X } from "lucide-react";
 import { useUnsavedChanges } from "../../../components/forms/unsavedChanges";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function MemberApprovalDialog({ count, resolutionNumber, saving, error, onCancel, onApprove }: Props) {
+  useWorkspaceDialog("Approve Members", onCancel);
   const [approvalDate, setApprovalDate] = useState(new Date().toISOString().slice(0, 10));
   const { confirmLeave } = useUnsavedChanges(approvalDate !== new Date().toISOString().slice(0, 10), saving);
   const cancel = () => confirmLeave(onCancel);
@@ -25,7 +27,7 @@ export function MemberApprovalDialog({ count, resolutionNumber, saving, error, o
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
       <form onSubmit={submit} className="w-full max-w-md rounded-md border border-line bg-white shadow-panel" role="dialog" aria-modal="true" aria-labelledby="approval-title">
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
-          <div><p className="text-[10px] font-bold uppercase text-moss">BOD approval</p><h2 id="approval-title" className="mt-1 text-lg font-semibold">Approve {count} member{count === 1 ? "" : "s"}</h2></div>
+          <div className="min-w-0 flex-1 pr-2"><WorkspaceBreadcrumbs dialog /><h2 id="approval-title" className="sr-only">Approve {count} member{count === 1 ? "" : "s"}</h2></div>
           <button type="button" onClick={cancel} className="icon-button h-8 w-8" aria-label="Close approval"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-4 p-5">
