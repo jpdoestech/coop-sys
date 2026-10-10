@@ -81,10 +81,8 @@ export function SynchronizationPage() {
   }
 
   return <div>
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <PageHeader eyebrow="Synchronization" title="Sync center" description="Manage host replication and inspect data movement." />
-      {databaseBuild ? <button type="button" className="secondary-button" disabled={Boolean(busy)} onClick={() => void load(true)}><RefreshCcw className={`h-4 w-4 ${busy === "refresh" ? "animate-spin" : ""}`} /> Refresh</button> : null}
-    </div>
+    <PageHeader title="Synchronization" />
+    {databaseBuild && !status ? <div className="data-toolbar"><button type="button" className="icon-button" title="Refresh synchronization" aria-label="Refresh synchronization" disabled={Boolean(busy)} onClick={() => void load(true)}><RefreshCcw className={`h-4 w-4 ${busy === "refresh" ? "animate-spin" : ""}`} /></button></div> : null}
 
     {!databaseBuild ? <div className="flex items-start gap-3 rounded-md border border-line bg-white p-4 text-sm text-ink/65 shadow-sm"><Database className="mt-0.5 h-4 w-4 shrink-0 text-moss" /><span>This browser-local edition does not have a shared synchronization host. Build with <strong>build-database-exe.bat</strong> to use SQLite WAL, LAN access, and hybrid synchronization.</span></div> : null}
 
@@ -100,7 +98,7 @@ export function SynchronizationPage() {
       </section>
 
       <section className="mt-3 overflow-hidden rounded-md border border-line bg-white shadow-sm">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-sm font-semibold"><Server className="h-4 w-4 text-moss" /> Host deployment <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-normal text-ink/45"><ShieldCheck className="h-3.5 w-3.5" /> {canManage ? "Manage access" : "Read only"}</span></div>
+        <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-sm font-semibold"><Server className="h-4 w-4 text-moss" /> Host deployment <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-normal text-ink/45"><ShieldCheck className="h-3.5 w-3.5" /> {canManage ? "Manage access" : "Read only"}</span><button type="button" className="icon-button" title="Refresh synchronization" aria-label="Refresh synchronization" disabled={Boolean(busy)} onClick={() => void load(true)}><RefreshCcw className={`h-4 w-4 ${busy === "refresh" ? "animate-spin" : ""}`} /></button></div>
         <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-[10rem_minmax(18rem,1fr)_8rem_minmax(14rem,0.8fr)]">
           <label className="field-label">Mode<SearchableSelect className="compact-control mt-1 w-full" value={status.deploymentMode} disabled={!canManage} onChange={(event) => setStatus({ ...status, deploymentMode: event.target.value as "LAN_ONLY" | "HYBRID", autoSync: event.target.value === "HYBRID" && status.autoSync })}><option value="LAN_ONLY">LAN only</option><option value="HYBRID">Hybrid</option></SearchableSelect></label>
           <label className="field-label">Remote host URL<input className="compact-control mt-1 w-full" placeholder="https://records.example.com" value={status.remoteUrl} disabled={!canManage || status.deploymentMode !== "HYBRID"} onChange={(event) => setStatus({ ...status, remoteUrl: event.target.value })} /></label>

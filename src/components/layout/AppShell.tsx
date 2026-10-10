@@ -141,7 +141,7 @@ function AppShellLayout({ children }: AppShellProps) {
               </div>
             </div>
           </header>
-          <main className="workspace-width min-w-0 flex-1 px-3 py-4 sm:px-6">{children}</main>
+          <main className="workspace-width min-w-0 flex-1 px-3 py-2 sm:px-4">{children}</main>
         </div>
       </div>
     </div>

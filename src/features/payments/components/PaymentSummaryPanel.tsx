@@ -1,3 +1,5 @@
+import { SlidersHorizontal } from "lucide-react";
+import { ToolbarDisclosure } from "../../../components/ui/ToolbarDisclosure";
 import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import {
   ArrowDown,
@@ -229,8 +231,8 @@ export function PaymentSummaryPanel({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-2">
-        <div className="relative w-full sm:w-60">
+      <div className="data-toolbar">
+        <div className="relative min-w-[160px] flex-1 sm:max-w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
             className="compact-control w-full pl-8"
@@ -240,8 +242,10 @@ export function PaymentSummaryPanel({
               setPage(1);
             }}
             placeholder="Search employee"
+            aria-label="Search payment summary by employee"
           />
         </div>
+        <ToolbarDisclosure label="Payment summary filters" icon={SlidersHorizontal} count={Number(Boolean(placement)) + Number(Boolean(period)) + Number(year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
         <div className="relative w-full sm:w-36">
           <CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
@@ -253,6 +257,7 @@ export function PaymentSummaryPanel({
               setPage(1);
             }}
             placeholder="2021-2025"
+            aria-label="Filter summary year or year range"
           />
         </div>
         <PlacementSearchField
@@ -278,18 +283,24 @@ export function PaymentSummaryPanel({
             setPage(1);
           }}
         />
+        </div></ToolbarDisclosure>
+        <div className="toolbar-actions">
         <button
           type="button"
-          className="secondary-button sm:ml-auto"
+          className="icon-button"
+          title="Print payment summary"
+          aria-label="Print payment summary"
           onClick={() => setChoosingOrientation(true)}
           disabled={printing || !result.total || !years}
         >
           <Printer className="h-3.5 w-3.5" />
-          {printing ? "Preparing..." : "Print"}
+          <span className="sr-only">{printing ? "Preparing..." : "Print"}</span>
         </button>
         <button
           type="button"
-          className="secondary-button"
+          className="icon-button"
+          title="Reset payment summary filters"
+          aria-label="Reset payment summary filters"
           onClick={() => {
             setSearch("");
             setYear(String(new Date().getFullYear()));
@@ -301,8 +312,9 @@ export function PaymentSummaryPanel({
           }}
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Reset
+          <span className="sr-only">Reset</span>
         </button>
+        </div>
       </div>
       {error || (year.trim() && !years) ? (
         <p className="border-b border-line bg-red-50 px-3 py-2 text-xs text-red-700">

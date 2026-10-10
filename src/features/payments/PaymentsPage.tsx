@@ -10,8 +10,9 @@ import {
   Settings2,
   Tags,
   Undo2,
-  WalletCards,
 } from "lucide-react";
+import { Info } from "lucide-react";
+import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { useAccess } from "../../services/access/useAccess";
@@ -203,23 +204,10 @@ export function PaymentsPage() {
     payments.saveRefund.error;
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        <PageHeader
-          eyebrow="Member finance"
-          title="Payments"
-          description="Deductions, refunds, capital allocation, and transaction controls."
-        />
-        <div className="mb-3 inline-flex h-9 items-center gap-2 self-start rounded-md border border-line bg-white px-3 text-xs text-ink/65 shadow-sm">
-          <WalletCards className="h-4 w-4 text-moss" />
-          <span>
-            {currentSettings
-              ? `${formatPesos(currentSettings.membership_fee_centavos + currentSettings.capital_share_target_centavos)} default obligation`
-              : "No active settings"}
-          </span>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <div className="inline-flex min-w-max rounded-md border border-line bg-white p-1 shadow-sm">
+      <PageHeader title="Payments" />
+      <div className="flex items-center gap-1 border-b border-line bg-white">
+      <div className="min-w-0 flex-1 overflow-x-auto">
+        <div className="flex min-w-max gap-1 bg-white p-1">
           {tabs
             .filter((item) => item.visible)
             .map((item) => (
@@ -227,7 +215,7 @@ export function PaymentsPage() {
                 key={item.id}
                 type="button"
                 onClick={() => { if (item.id !== tab) confirmLeave(() => setTab(item.id)); }}
-                className={`focus-ring inline-flex items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-xs font-semibold transition ${tab === item.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper hover:text-ink"}`}
+                className={`focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs font-semibold transition ${tab === item.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper hover:text-ink"}`}
               >
                 <item.icon className="h-3.5 w-3.5" />
                 {item.label}
@@ -235,7 +223,12 @@ export function PaymentsPage() {
             ))}
         </div>
       </div>
-      <section className="mt-3 overflow-hidden rounded-md border border-line bg-white shadow-panel">
+        <div className="shrink-0 px-1"><ToolbarDisclosure label="Payment obligation" icon={Info}>
+          <p className="text-xs text-ink/65">{currentSettings ? `${formatPesos(currentSettings.membership_fee_centavos + currentSettings.capital_share_target_centavos)} default obligation` : "No active settings"}</p>
+          {currentSettings ? <dl className="grid grid-cols-2 gap-2 text-xs"><dt>Membership fee</dt><dd className="text-right font-mono">{formatPesos(currentSettings.membership_fee_centavos)}</dd><dt>Share capital target</dt><dd className="text-right font-mono">{formatPesos(currentSettings.capital_share_target_centavos)}</dd></dl> : null}
+        </ToolbarDisclosure></div>
+      </div>
+      <section className="overflow-hidden rounded-b-md border border-t-0 border-line bg-white">
         {payments.ledger.isError || payments.employees.isError ? (
           <p className="p-5 text-sm text-red-700">
             Payment records could not be loaded.

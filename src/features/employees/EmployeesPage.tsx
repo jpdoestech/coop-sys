@@ -2,6 +2,8 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowUpDown, BriefcaseBusiness, CircleDotDashed, FileUp, Plus, Search } from "lucide-react";
+import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import type { Employee } from "../../types/employee";
 import { EmployeeForm } from "./components/EmployeeForm";
@@ -52,20 +54,21 @@ export function EmployeesPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        <PageHeader eyebrow="Employees" title="Employee records" description="Manage employment, cooperative membership links, client deployments, and beneficiary records." />
-        {canCreate || canImport ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto">{canImport ? <button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button> : null}{canCreate ? <button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /> New employee</button> : null}</div> : null}
-      </div>
+      <PageHeader title="Employees" />
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
-        <div className="flex flex-wrap items-center gap-2 p-2">
-          <div className="relative w-full sm:w-56 lg:w-64"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" /><input className="compact-control w-full pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employees" aria-label="Search employees" /></div>
+        <div className="data-toolbar" aria-label="Employee tools">
+          <div className="relative min-w-[160px] flex-1 sm:max-w-72"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" /><input className="compact-control w-full pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employees" aria-label="Search employees" /></div>
+          <ToolbarDisclosure label="Employee filters" icon={SlidersHorizontal} count={[statusFilter, branchFilter, clientFilter, departmentFilter].filter(Boolean).length + Number(attentionOnly) + Number(sort !== "name-asc")}><div className="toolbar-filters">
           <label className="inline-flex items-center gap-1.5 text-xs text-amber-800"><input type="checkbox" checked={attentionOnly} onChange={(event) => setAttentionOnly(event.target.checked)} />Needs attention</label><div className="relative min-w-[140px] flex-1 sm:flex-none"><CircleDotDashed className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter employment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-36"><option value="">All statuses</option>{employmentStatuses.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></div>
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><BriefcaseBusiness className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter department" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></div>
           <div className="flex max-w-full flex-wrap items-center gap-2">
             <PlacementSelectors branchId={branchFilter} clientId={clientFilter} onBranchChange={(value) => { setBranchFilter(value); setClientFilter(""); }} onClientChange={setClientFilter} />
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Sort employees" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Employee number</option><option value="hired-desc">Newest hire</option></SearchableSelect></div>
           </div>
-          <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
+          </div></ToolbarDisclosure>
+          <button type="button" className="icon-button" title="Reset filters" aria-label="Reset filters" onClick={() => { setStatusFilter(""); setDepartmentFilter(""); setBranchFilter(""); setClientFilter(""); setAttentionOnly(false); setSort("name-asc"); setSearch(""); }}><RotateCcw className="h-4 w-4" /></button>
+          <span className="hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">{query.data?.total ?? 0} records</span>
+          {canCreate || canImport ? <div className="toolbar-actions">{canImport ? <button className="icon-button" title="Import employees from Excel" aria-label="Import employees from Excel" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /></button> : null}{canCreate ? <button className="primary-button" title="New employee" aria-label="New employee" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /><span className="hidden sm:inline">New employee</span></button> : null}</div> : null}
         </div>
         {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { confirm(`Archive ${employee.first_name} ${employee.last_name}?`, () => archiveEmployee.mutate(employee.id), "Archive employee", "Archive"); }} />}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />

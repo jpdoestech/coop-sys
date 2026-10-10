@@ -54,24 +54,36 @@ select {
     min-width: 0;
   }
 
+  .data-toolbar {
+    @apply flex flex-wrap items-center gap-1.5 border-b border-line bg-white p-2;
+  }
+
+  .toolbar-actions {
+    @apply ml-auto flex shrink-0 items-center gap-1.5;
+  }
+
+  .toolbar-filters {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
   .control {
     @apply focus-ring min-h-10 rounded-md border border-line bg-white px-3 text-sm text-ink shadow-sm transition placeholder:text-ink/40 hover:border-ink/20;
   }
 
   .compact-control {
-    @apply focus-ring h-9 rounded-md border border-line bg-white px-3 text-xs text-ink shadow-sm transition placeholder:text-ink/40 hover:border-ink/20;
+    @apply focus-ring h-8 rounded-md border border-line bg-white px-2.5 text-xs text-ink transition placeholder:text-ink/40 hover:border-ink/20;
   }
 
   .icon-button {
-    @apply focus-ring inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-ink/55 transition hover:border-line hover:bg-paper hover:text-ink;
+    @apply focus-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-ink/55 transition hover:border-line hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .primary-button {
-    @apply focus-ring inline-flex h-9 items-center justify-center gap-2 rounded-md bg-moss px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1f6145] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus-ring inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-moss px-2.5 text-xs font-semibold text-white transition hover:bg-[#1f6145] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .secondary-button {
-    @apply focus-ring inline-flex h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3.5 text-xs font-semibold text-ink/65 shadow-sm transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
+    @apply focus-ring inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 text-xs font-semibold text-ink/65 transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .field-label {

@@ -9,6 +9,8 @@ import {
   Search,
   UsersRound,
 } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
+import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { useOrganization } from "../../services/organization/useOrganization";
@@ -81,28 +83,10 @@ export function OrganizationPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        <PageHeader
-          eyebrow="Organization"
-          title="Organization administration"
-          description="Maintain the Head Office hierarchy, branches, branch clients, departments, and positions."
-        />
-        <button
-          onClick={() => {
-            setEditing(null);
-            setOpen(true);
-          }}
-          disabled={
-            kind === "branch" &&
-            !directory.branches.some((item) => item.type === "head_office")
-          }
-          className="primary-button mb-3"
-        >
-          <Plus className="h-4 w-4" /> Add {kind}
-        </button>
-      </div>
+      <PageHeader title="Organization" />
+      <section className="overflow-hidden rounded-md border border-line bg-white">
       <div className="overflow-x-auto">
-        <div className="inline-flex min-w-max rounded-md border border-line bg-white p-1 shadow-sm">
+        <div className="flex min-w-max gap-1 border-b border-line bg-white p-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -111,7 +95,7 @@ export function OrganizationPage() {
                 setSearch("");
                 setPage(1);
               }}
-              className={`focus-ring inline-flex items-center gap-2 whitespace-nowrap rounded px-3 py-2 text-xs font-semibold transition ${kind === tab.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper hover:text-ink"}`}
+              className={`focus-ring inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded px-2 text-xs font-semibold transition ${kind === tab.id ? "bg-[#e4efe9] text-moss" : "text-ink/55 hover:bg-paper hover:text-ink"}`}
             >
               <tab.icon className="h-3.5 w-3.5" />
               {tab.label}
@@ -119,9 +103,8 @@ export function OrganizationPage() {
           ))}
         </div>
       </div>
-      <section className="mt-4 overflow-hidden rounded-md border border-line bg-white shadow-panel">
-        <div className="flex flex-wrap items-center gap-2 p-2">
-          <div className="relative w-full sm:w-56 lg:w-64">
+        <div className="data-toolbar">
+          <div className="relative min-w-[160px] flex-1 sm:max-w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
             <input
               value={search}
@@ -131,7 +114,7 @@ export function OrganizationPage() {
               aria-label="Search organization records"
             />
           </div>
-          <SearchableSelect
+          <ToolbarDisclosure label="Organization filters" icon={SlidersHorizontal} count={Number(status !== "active")}><div className="toolbar-filters">          <SearchableSelect
             aria-label="Filter organization status"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
@@ -140,10 +123,23 @@ export function OrganizationPage() {
             <option value="active">Active records</option>
             <option value="inactive">Inactive records</option>
             <option value="all">All statuses</option>
-          </SearchableSelect>
-          <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">
+          </SearchableSelect></div></ToolbarDisclosure>
+          <p className="hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">
             {recordsQuery.data?.total ?? 0} records
           </p>
+          <div className="toolbar-actions"><button
+          onClick={() => {
+            setEditing(null);
+            setOpen(true);
+          }}
+          disabled={
+            kind === "branch" &&
+            !directory.branches.some((item) => item.type === "head_office")
+          }
+          className="primary-button"
+        >
+          <Plus className="h-4 w-4" /> Add {kind}
+        </button></div>
         </div>
         <div className="max-h-[62vh] overflow-auto border-t border-line">
           <table className="w-full min-w-[720px] text-left text-sm">

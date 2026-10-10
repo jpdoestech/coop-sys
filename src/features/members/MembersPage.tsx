@@ -2,6 +2,8 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowUpDown, CheckCheck, CircleDotDashed, ClipboardCheck, FileUp, Plus, Search, UsersRound } from "lucide-react";
+import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import type { Member } from "../../types/member";
 import { MemberForm } from "./components/MemberForm";
@@ -76,18 +78,10 @@ export function MembersPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-        <PageHeader
-          eyebrow="Members"
-          title="Cooperative members"
-          description="Maintain registration, contact, and membership details. Employee relationships are linked from the employee record."
-        />
-        {canCreate || canImport ? <div className="mb-3 flex w-full flex-wrap gap-2 sm:w-auto">{canImport ? <button className="secondary-button flex-1 whitespace-nowrap sm:flex-none" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import Excel</button> : null}{canCreate ? <button className="primary-button flex-1 whitespace-nowrap sm:flex-none" onClick={openCreate}><Plus className="h-4 w-4" /> New member</button> : null}</div> : null}
-      </div>
-
+      <PageHeader title="Members" />
       <section className="overflow-visible rounded-md border border-line bg-white shadow-panel">
-        <div className="flex flex-wrap items-center gap-2 p-2">
-          <div className="relative w-full sm:w-56 lg:w-64">
+        <div className="data-toolbar" aria-label="Member tools">
+          <div className="relative min-w-[160px] flex-1 sm:max-w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
             <input
               className="compact-control w-full pl-9"
@@ -97,6 +91,7 @@ export function MembersPage() {
               aria-label="Search members"
             />
           </div>
+          <ToolbarDisclosure label="Member filters" icon={SlidersHorizontal} count={[statusFilter, typeFilter, approvalFilter, branchFilter, clientFilter].filter(Boolean).length + Number(attentionOnly) + Number(sort !== "name-asc")}><div className="toolbar-filters">
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><ClipboardCheck className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter BOD approval" value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All approvals</option><option value="pending">Pending approval</option><option value="approved">Approved</option></SearchableSelect></div>
           <div className="relative min-w-[150px] flex-1 sm:flex-none"><UsersRound className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Filter membership type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="compact-control w-full pl-8 sm:w-40"><option value="">All member types</option>{memberTypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</SearchableSelect></div>
           <div className="flex max-w-full flex-wrap items-center gap-2">
@@ -104,9 +99,11 @@ export function MembersPage() {
             <PlacementSelectors branchId={branchFilter} clientId={clientFilter} onBranchChange={(value) => { setBranchFilter(value); setClientFilter(""); }} onClientChange={setClientFilter} />
             <div className="relative"><ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><SearchableSelect aria-label="Sort members" value={sort} onChange={(event) => setSort(event.target.value)} className="compact-control w-36 pl-8"><option value="name-asc">Name A-Z</option><option value="name-desc">Name Z-A</option><option value="number-asc">Member number</option><option value="joined-desc">Newest membership</option></SearchableSelect></div>
           </div>
-          <p className="ml-auto hidden whitespace-nowrap text-[11px] text-ink/40 xl:block">{query.data?.total ?? 0} records</p>
-          {canApprove && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}
-        </div>
+          </div></ToolbarDisclosure>
+          <button type="button" className="icon-button" title="Reset filters" aria-label="Reset filters" onClick={() => { setStatusFilter(""); setTypeFilter(""); setApprovalFilter(""); setBranchFilter(""); setClientFilter(""); setAttentionOnly(false); setSort("name-asc"); setSearch(""); }}><RotateCcw className="h-4 w-4" /></button>
+          <span className="hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">{query.data?.total ?? 0} records</span>
+          {canCreate || canImport ? <div className="toolbar-actions">{canImport ? <button className="icon-button" title="Import members from Excel" aria-label="Import members from Excel" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /></button> : null}{canCreate ? <button className="primary-button" title="New member" aria-label="New member" onClick={openCreate}><Plus className="h-4 w-4" /><span className="hidden sm:inline">New member</span></button> : null}</div> : null}
+          {canApprove && selectedIds.size ? <button type="button" onClick={() => { approveMembers.reset(); setApprovalOpen(true); }} className="primary-button"><CheckCheck className="h-4 w-4" /> Approve {selectedIds.size}</button> : null}        </div>
         {query.isError ? (
           <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load member records.</div>
         ) : (

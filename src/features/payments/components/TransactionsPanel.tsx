@@ -1,3 +1,5 @@
+import { SlidersHorizontal } from "lucide-react";
+import { ToolbarDisclosure } from "../../../components/ui/ToolbarDisclosure";
 import {
   ArrowDown,
   ArrowUp,
@@ -101,8 +103,8 @@ export function TransactionsPanel({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-2">
-        <div className="relative w-full sm:w-60">
+      <div className="data-toolbar">
+        <div className="relative min-w-[160px] flex-1 sm:max-w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
             className="compact-control w-full pl-8"
@@ -117,6 +119,7 @@ export function TransactionsPanel({
             aria-label="Search payment transactions by employee"
           />
         </div>
+        <ToolbarDisclosure label="Transaction filters" icon={SlidersHorizontal} count={Number(Boolean(filters.placement)) + Number(filters.year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
         <div className="relative w-full sm:w-36">
           <CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
@@ -135,9 +138,13 @@ export function TransactionsPanel({
           value={filters.placement}
           onChange={(placement) => onFiltersChange({ ...filters, placement })}
         />
+        </div></ToolbarDisclosure>
+        <div className="toolbar-actions">
         <button
           type="button"
-          className="secondary-button ml-auto"
+          className="icon-button"
+          title="Reset transaction filters"
+          aria-label="Reset transaction filters"
           onClick={() =>
             onFiltersChange({
               employeeSearch: "",
@@ -149,8 +156,9 @@ export function TransactionsPanel({
           }
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Reset
+          <span className="sr-only">Reset</span>
         </button>
+        </div>
       </div>
       {yearError ? (
         <p className="border-b border-line bg-red-50 px-3 py-2 text-xs text-red-700">
