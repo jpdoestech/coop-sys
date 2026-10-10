@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
 import { ToolbarDisclosure } from "../../../components/ui/ToolbarDisclosure";
+import { FilterField } from "../../../components/ui/FilterField";
 import {
   ArrowDown,
   ArrowUp,
@@ -120,7 +121,7 @@ export function TransactionsPanel({
           />
         </div>
         <ToolbarDisclosure label="Transaction filters" icon={SlidersHorizontal} count={Number(Boolean(filters.placement)) + Number(filters.year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
-        <div className="relative w-full sm:w-36">
+        <FilterField label="Year / Range" fullWidth><div className="relative">
           <CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
             className={`compact-control w-full pl-8 ${yearError ? "border-red-400" : ""}`}
@@ -132,13 +133,13 @@ export function TransactionsPanel({
             aria-label="Filter transaction year or year range"
           />
         </div>
-        <PlacementSearchField
+        </FilterField><FilterField label="Branch / Client" fullWidth><PlacementSearchField
           branches={branches}
           clients={clients}
           value={filters.placement}
           onChange={(placement) => onFiltersChange({ ...filters, placement })}
         />
-        </div></ToolbarDisclosure>
+        </FilterField></div></ToolbarDisclosure>
         <div className="toolbar-actions">
         <button
           type="button"

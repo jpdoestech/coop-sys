@@ -63,7 +63,19 @@ select {
   }
 
   .toolbar-filters {
-    @apply flex flex-wrap items-center gap-2;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+    @apply items-start gap-x-3 gap-y-2.5;
+  }
+
+  .filter-field .compact-control,
+  .filter-field > .relative {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-toggle {
+    @apply col-span-full flex items-center gap-2 border-t border-line pt-2.5 text-xs text-ink/70;
   }
 
   .control {

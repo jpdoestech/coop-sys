@@ -47,7 +47,7 @@ export function SearchableSelect({ children, className = "compact-control", onCu
   return <>
     <select {...props} ref={native} className="sr-only" aria-hidden="true" tabIndex={-1} onInvalid={(event) => { event.preventDefault(); setInvalid(true); show(); props.onInvalid?.(event); }}>{children}</select>
     <button ref={button} type="button" role="combobox" aria-label={label} aria-controls={`${id}-list`} aria-expanded={open} aria-haspopup="listbox" aria-required={props.required} aria-invalid={invalid || undefined} disabled={props.disabled} className={`${className} inline-flex min-w-0 items-center justify-between gap-2 overflow-hidden text-left ${invalid ? "border-red-500" : attentionValue || (onCustomValue && selectedValue && !selected) ? "border-amber-400 bg-amber-50" : ""}`} onClick={(event) => { event.preventDefault(); if (open) close(); else show(); }} onKeyDown={(event) => { if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) { event.preventDefault(); show(); } }}>
-      <span className="min-w-0 truncate">{attentionValue || selected?.label || selectedValue || "Select option"}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink/45" />
+      <span className="min-w-0 truncate" title={attentionValue || selected?.label || selectedValue || "Select option"}>{attentionValue || selected?.label || selectedValue || "Select option"}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink/45" />
     </button>
     {open && !props.disabled ? createPortal(<DropdownSurface anchorRef={button} preferredWidth={Math.max(button.current?.getBoundingClientRect().width || 240, 240)}><div ref={menu} onKeyDown={(event) => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }

@@ -1,3 +1,4 @@
+import { FilterField } from "../../components/ui/FilterField";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useDeferredValue, useEffect, useState } from "react";
 import {
@@ -51,7 +52,7 @@ export function OrganizationPage() {
   const [status, setStatus] = useState("active");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   useWorkspacePath([{ label: "Organization", onSelect: () => { setKind("branch"); setSearch(""); setPage(1); } }, { label: tabs.find((tab) => tab.id === kind)!.label }]);
   const deferredSearch = useDeferredValue(search);
   const recordsQuery = useOrganizationRecords(kind, {
@@ -114,16 +115,16 @@ export function OrganizationPage() {
               aria-label="Search organization records"
             />
           </div>
-          <ToolbarDisclosure label="Organization filters" icon={SlidersHorizontal} count={Number(status !== "active")}><div className="toolbar-filters">          <SearchableSelect
+          <ToolbarDisclosure label="Organization filters" icon={SlidersHorizontal} count={Number(status !== "active")}><div className="toolbar-filters"><FilterField label="Status" fullWidth><SearchableSelect
             aria-label="Filter organization status"
             value={status}
             onChange={(event) => setStatus(event.target.value)}
-            className="compact-control w-full sm:w-36"
+            className="compact-control w-full"
           >
             <option value="active">Active records</option>
             <option value="inactive">Inactive records</option>
             <option value="all">All statuses</option>
-          </SearchableSelect></div></ToolbarDisclosure>
+          </SearchableSelect></FilterField></div></ToolbarDisclosure>
           <p className="hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">
             {recordsQuery.data?.total ?? 0} records
           </p>

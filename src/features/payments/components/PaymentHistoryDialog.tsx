@@ -42,7 +42,7 @@ export function PaymentHistoryDialog({
   const [printing, setPrinting] = useState(false);
   const [choosingOrientation, setChoosingOrientation] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   useEffect(() => {
     let active = true;
     setLedger(null);

@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
 import { ToolbarDisclosure } from "../../../components/ui/ToolbarDisclosure";
+import { FilterField } from "../../../components/ui/FilterField";
 import { LoadingProgress } from "../../../components/ui/LoadingProgress";
 import {
   ArrowDown,
@@ -74,7 +75,7 @@ export function PaymentSummaryPanel({
   const [sortBy, setSortBy] = useState<PaymentSummarySortKey>("employee");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [historyEmployee, setHistoryEmployee] =
     useState<PaymentSummaryItem | null>(null);
   const years = parseYearFilter(year);
@@ -246,7 +247,7 @@ export function PaymentSummaryPanel({
           />
         </div>
         <ToolbarDisclosure label="Payment summary filters" icon={SlidersHorizontal} count={Number(Boolean(placement)) + Number(Boolean(period)) + Number(year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
-        <div className="relative w-full sm:w-36">
+        <FilterField label="Year / Range" fullWidth><div className="relative">
           <CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
             className={`compact-control w-full pl-8 ${year.trim() && !years ? "border-red-400" : ""}`}
@@ -260,7 +261,7 @@ export function PaymentSummaryPanel({
             aria-label="Filter summary year or year range"
           />
         </div>
-        <PlacementSearchField
+        </FilterField><FilterField label="Branch / Client" fullWidth><PlacementSearchField
           branches={branches}
           clients={clients}
           value={placement}
@@ -269,7 +270,7 @@ export function PaymentSummaryPanel({
             setPage(1);
           }}
         />
-        <PaymentPeriodSearchField
+        </FilterField><FilterField label="Cut-off / Payment Date" fullWidth><PaymentPeriodSearchField
           batches={batches.filter((batch) => {
             const batchYear = Number(batch.payment_date.slice(0, 4));
             return (
@@ -283,7 +284,7 @@ export function PaymentSummaryPanel({
             setPage(1);
           }}
         />
-        </div></ToolbarDisclosure>
+        </FilterField></div></ToolbarDisclosure>
         <div className="toolbar-actions">
         <button
           type="button"

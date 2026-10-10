@@ -22,6 +22,6 @@ export function ToolbarDisclosure({ label, icon: Icon, count = 0, children, disa
       <Icon className="h-4 w-4" />
       {count ? <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-moss px-0.5 text-[9px] font-bold text-white">{count}<span className="sr-only"> active filters</span></span> : null}
     </button>
-    {open ? <DropdownSurface id={id} role="group" preferredWidth={440}><div className="space-y-2 p-2"><p className="text-xs font-semibold text-ink">{label}</p>{children}</div></DropdownSurface> : null}
+    {open ? <DropdownSurface id={id} role="group" preferredWidth={440} maxHeight={480}><div className="space-y-3 p-2"><p className="border-b border-line pb-2 text-xs font-semibold text-ink">{label}</p>{children}</div></DropdownSurface> : null}
   </div>;
 }

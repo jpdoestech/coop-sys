@@ -85,7 +85,7 @@ export function RefundPanel({
     total: 0,
   });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const baseline = editing ? { employeeId: editing.employee_id, amount: (editing.amount_centavos / 100).toFixed(2), refundDate: editing.refund_date, from: editing.cutoff_from ?? "", to: editing.cutoff_to ?? "", remarks: editing.remarks ?? "" } : { employeeId: "", amount: "", refundDate: today(), from: "", to: "", remarks: "" };
   const { confirmDiscard } = useUnsavedChanges(matches.length > 0 || draftChanged({ employeeId, amount, refundDate, from, to, remarks }, baseline), busy);

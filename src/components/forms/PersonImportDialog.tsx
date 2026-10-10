@@ -30,7 +30,7 @@ export function PersonImportDialog({ kind, branches, clients, lookups = { depart
   const [deploymentConfirmed, setDeploymentConfirmed] = useState(false);
   const { branchId, clientId, setBranchId, setClientId, availableClients, fixedBranch, fixedClient } = usePlacementSelection(branches.filter((item) => item.isActive), clients.filter((item) => item.isActive));
   const [linkSearch, setLinkSearch] = useState<Record<number, string>>({}); const [includeInactive, setIncludeInactive] = useState(false);
-  const [filter, setFilter] = useState<Status>("all"); const [errorType, setErrorType] = useState(""); const [search, setSearch] = useState(""); const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(10);
+  const [filter, setFilter] = useState<Status>("all"); const [errorType, setErrorType] = useState(""); const [search, setSearch] = useState(""); const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(25);
   const busy = importing || reading || processing;
   const visibleLinkOptions = linkOptions.filter((item) => item.isActive || includeInactive).sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name));
   const issuesFor = (row: PersonImportRow) => {

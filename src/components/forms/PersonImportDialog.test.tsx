@@ -40,20 +40,20 @@ describe("PersonImportDialog", () => {
     expect(screen.getByLabelText("Excel workbook")).toBeInTheDocument();
   });
   it("paginates validation, filters by error type and retains successful results without resubmitting", async () => {
-    vi.mocked(readSpreadsheet).mockResolvedValue(Array.from({ length: 13 }, (_, index) => ({ "FIRST NAME": `Person ${index}`, "LAST NAME": "Test", MOBILE: index === 12 ? "123" : "", "BIRTH DATE": index === 11 ? "2026-02-30" : "" })));
+    vi.mocked(readSpreadsheet).mockResolvedValue(Array.from({ length: 28 }, (_, index) => ({ "FIRST NAME": `Person ${index}`, "LAST NAME": "Test", MOBILE: index === 27 ? "123" : "", "BIRTH DATE": index === 26 ? "2026-02-30" : "" })));
     const onImport = vi.fn(async (rows: PersonImportRow[]) => rows.map((row) => ({ rowNumber: row.rowNumber, status: "imported" as const, message: `Imported ${row.rowNumber}` })));
     render(<PersonImportDialog kind="employee" branches={[branches[1]]} clients={[clients[0]]} linkOptions={[]} importing={false} onClose={vi.fn()} onImport={onImport} />);
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.change(screen.getByLabelText("Excel workbook"), { target: { files: [new File(["test"], "employees.xlsx")] } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Import 11 ready" })).toBeEnabled());
-    expect(screen.getAllByRole("row")).toHaveLength(11);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import 26 ready" })).toBeEnabled());
+    expect(screen.getAllByRole("row")).toHaveLength(26);
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(screen.getAllByRole("row")).toHaveLength(4);
     fireEvent.change(screen.getByLabelText("Error type", { selector: "select" }), { target: { value: "date" } });
     expect(screen.getAllByRole("row")).toHaveLength(2);
     expect(screen.getByText(/BIRTH DATE: enter/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Error type", { selector: "select" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Import 11 ready" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import 26 ready" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Import 0 ready" })).toBeDisabled());
     expect(onImport).toHaveBeenCalledTimes(1);
     expect(onImport).toHaveBeenCalledWith(expect.any(Array), branches[1].id, clients[0].id, expect.any(Function));

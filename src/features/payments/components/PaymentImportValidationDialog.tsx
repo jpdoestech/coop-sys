@@ -35,7 +35,7 @@ export function PaymentImportValidationDialog({ matches, employees, overrides, o
   useWorkspaceDialog("Import Validation", onClose);
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const resolvedEmployee = (row: PaymentImportMatch) => employees.find((employee) => employee.id === (row.employeeId ?? overrides[row.rowNumber]));
   const ready = (row: PaymentImportMatch) => Boolean(resolvedEmployee(row)?.member_id);
   const counts = {

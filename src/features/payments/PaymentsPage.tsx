@@ -66,7 +66,7 @@ export function PaymentsPage() {
   const isSuperAdmin = profile.role === "super_admin";
   const { branches, clients } = useOrganization();
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
   const [tab, setTab] = useState<Tab>("summary");
   const tabNames: Record<Tab, string> = { ledger: "Transactions", summary: "Payment Summary", manual: "Manual Payment", import: "Payroll Import", aliases: "Import Aliases", refunds: "Refunds", final: "Final Pay", export: "Export", settings: "Settings" };
   useWorkspacePath([{ label: "Payments", onSelect: () => setTab("ledger") }, { label: tabNames[tab] }]);
