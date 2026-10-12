@@ -267,6 +267,7 @@ export function PaymentsPage() {
               allowedBranchIds.has(batch.branch_id),
             )}
             onLoadSummary={payments.loadPaymentSummary}
+            refreshVersion={payments.ledger.dataUpdatedAt}
             onOpenRefunds={() => setTab("refunds")}
             onLoadEmployeeLedger={payments.loadEmployeeLedger}
           />

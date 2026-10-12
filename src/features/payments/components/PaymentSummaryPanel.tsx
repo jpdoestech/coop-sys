@@ -13,6 +13,7 @@ import {
   Eye,
   Printer,
   RotateCcw,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
@@ -48,6 +49,7 @@ type Props = {
   branches: OrganizationBranch[];
   clients: OrganizationClient[];
   batches: PaymentBatch[];
+  refreshVersion?: number;
   onOpenRefunds?: () => void;
   onLoadSummary: (
     options: PaymentSummaryQueryOptions,
@@ -64,6 +66,7 @@ export function PaymentSummaryPanel({
   branches,
   clients,
   batches,
+  refreshVersion = 0,
   onOpenRefunds,
   onLoadSummary,
   onLoadEmployeeLedger,
@@ -71,6 +74,7 @@ export function PaymentSummaryPanel({
   const [result, setResult] = useState<PaymentSummaryPage>(emptyPage);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PaymentStatus | "">("");
@@ -142,6 +146,8 @@ export function PaymentSummaryPanel({
     sortBy,
     yearFrom,
     yearTo,
+    refreshVersion,
+    reloadVersion,
   ]);
 
   function sort(key: PaymentSummarySortKey) {
@@ -301,7 +307,9 @@ export function PaymentSummaryPanel({
           }}
         />
         </FilterField></div></ToolbarDisclosure>
+        <span className="text-xs text-ink/55" aria-label="Payment summary scope">{year}{period ? ` / ${period.label}` : " / All periods"}</span>
         <div className="toolbar-actions">
+        <button type="button" className="icon-button" title="Refresh payment summary" aria-label="Refresh payment summary" disabled={loading || !years} onClick={() => setReloadVersion((value) => value + 1)}><RefreshCw className="h-3.5 w-3.5" /></button>
         <button
           type="button"
           className="icon-button"
@@ -327,6 +335,7 @@ export function PaymentSummaryPanel({
             setSortBy("employee");
             setDirection("asc");
             setPage(1);
+            setReloadVersion((value) => value + 1);
           }}
         >
           <RotateCcw className="h-3.5 w-3.5" />
@@ -470,7 +479,7 @@ export function PaymentSummaryPanel({
           branches={branches}
           clients={clients}
           onLoadLedger={onLoadEmployeeLedger}
-          onClose={() => setHistoryEmployee(null)}
+          onClose={() => { setHistoryEmployee(null); setReloadVersion((value) => value + 1); }}
         />
       ) : null}
       {choosingOrientation ? (
