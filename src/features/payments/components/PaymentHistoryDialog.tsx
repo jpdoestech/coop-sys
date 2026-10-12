@@ -10,6 +10,9 @@ import type {
 } from "../../../types/organization";
 import type { PaymentLedger } from "../../../types/payment";
 import { formatPesos } from "../../../services/payments/paymentMath";
+import { effectiveSettings } from "../../../services/payments/paymentMath";
+import { paymentBalance } from "../../../services/payments/paymentBalance";
+import { paymentPrintTotals } from "../paymentPrintTotals";
 import { detailedPeriod } from "../paymentFilters";
 import { openPrintReport, openPrintWindow } from "../printPaymentReport";
 import {
@@ -135,6 +138,11 @@ export function PaymentHistoryDialog({
           event.remarks,
         ];
       });
+      const fee = reportLedger.payments.reduce((sum, item) => sum + item.membership_fee_centavos, 0);
+      const capital = reportLedger.payments.reduce((sum, item) => sum + item.capital_share_centavos, 0);
+      const paid = reportLedger.payments.reduce((sum, item) => sum + item.amount_centavos, 0);
+      const refund = reportLedger.refunds.reduce((sum, item) => sum + item.amount_centavos, 0);
+      const totals = paymentPrintTotals([{ membershipFeeCentavos: fee, capitalShareCentavos: capital, totalPaidCentavos: paid, ...paymentBalance(paid, refund, effectiveSettings(reportLedger.settings, new Date().toISOString().slice(0, 10))) }]);
       openPrintReport(
         {
           title: "Payment History",
@@ -156,6 +164,8 @@ export function PaymentHistoryDialog({
             { label: "Remarks" },
           ],
           rows,
+          totals: ["Totals", "", "", totals.fee, totals.capital, totals.paid, formatPesos(paid - refund), ""],
+          summary: totals.summary,
         },
         printWindow,
       );

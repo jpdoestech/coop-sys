@@ -43,6 +43,8 @@ import { PaginationControls } from "../../../components/ui/PaginationControls";
 import { usePlacementSelection } from "../../../components/forms/usePlacementSelection";
 import { withActivity } from "../../../services/activity/activityStore";
 import { showTransactionSuccess } from "../../../services/activity/transactionNotifications";
+import type { PaymentLedger } from "../../../types/payment";
+import { refundableBalance } from "../../../services/payments/paymentBalance";
 
 type View = "records" | "manual" | "import";
 type Props = {
@@ -52,6 +54,7 @@ type Props = {
   userId: string;
   saving: boolean;
   onLoadRefunds: (options: RefundQueryOptions) => Promise<RefundPage>;
+  onLoadLedger: (employeeId: string) => Promise<PaymentLedger>;
   onSave: (input: RefundInput) => Promise<OverDeductionRefund>;
 };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -63,6 +66,7 @@ export function RefundPanel({
   userId,
   saving,
   onLoadRefunds,
+  onLoadLedger,
   onSave,
 }: Props) {
   const [view, setView] = useState<View>("records");
@@ -87,6 +91,16 @@ export function RefundPanel({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [availableRefund, setAvailableRefund] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    setAvailableRefund(null);
+    if (!employeeId || view !== "manual") return;
+    void onLoadLedger(employeeId).then((ledger) => {
+      if (active) setAvailableRefund(refundableBalance(ledger.payments, ledger.refunds, ledger.settings, employeeId, refundDate, editing?.id));
+    }).catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "Refund eligibility could not be loaded."); });
+    return () => { active = false; };
+  }, [employeeId, refundDate, editing?.id, onLoadLedger, view, refreshVersion]);
   const baseline = editing ? { employeeId: editing.employee_id, amount: (editing.amount_centavos / 100).toFixed(2), refundDate: editing.refund_date, from: editing.cutoff_from ?? "", to: editing.cutoff_to ?? "", remarks: editing.remarks ?? "" } : { employeeId: "", amount: "", refundDate: today(), from: "", to: "", remarks: "" };
   const { confirmDiscard } = useUnsavedChanges(matches.length > 0 || draftChanged({ employeeId, amount, refundDate, from, to, remarks }, baseline), busy);
   useEffect(() => {
@@ -486,7 +500,7 @@ export function RefundPanel({
             />
           </label>
           <div className="flex items-end gap-2 lg:col-span-2">
-            <button className="primary-button flex-1" disabled={saving}>
+            <button className="primary-button flex-1" disabled={busy || availableRefund === null || availableRefund <= 0}>
               <Save className="h-4 w-4" />
               {saving ? "Saving..." : editing ? "Update" : "Save refund"}
             </button>
@@ -504,6 +518,7 @@ export function RefundPanel({
               </button>
             ) : null}
           </div>
+          {employeeId ? <p role="status" className={`text-xs sm:col-span-2 lg:col-span-12 ${availableRefund === 0 ? "text-amber-700" : "text-red-700"}`}>{availableRefund === null ? "Checking refund eligibility..." : availableRefund > 0 ? `Available overpayment refund: ${formatPesos(availableRefund)}` : "No outstanding overpayment. This employee is not eligible for an over-deduction refund."}</p> : null}
         </form>
       ) : null}
       {view === "import" ? (

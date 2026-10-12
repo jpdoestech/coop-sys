@@ -267,6 +267,7 @@ export function PaymentsPage() {
               allowedBranchIds.has(batch.branch_id),
             )}
             onLoadSummary={payments.loadPaymentSummary}
+            onOpenRefunds={() => setTab("refunds")}
             onLoadEmployeeLedger={payments.loadEmployeeLedger}
           />
         ) : null}
@@ -310,6 +311,7 @@ export function PaymentsPage() {
             userId={profile.userId}
             saving={payments.saveRefund.isPending}
             onLoadRefunds={payments.loadRefunds}
+            onLoadLedger={payments.loadEmployeeLedger}
             onSave={payments.saveRefund.mutateAsync}
           />
         ) : null}
@@ -317,6 +319,8 @@ export function PaymentsPage() {
           <FinalPayPanel
             employees={employees}
             payments={ledger.payments}
+            refunds={ledger.refunds}
+            settings={ledger.settings}
             settlements={ledger.settlements}
             userId={profile.userId}
             saving={payments.settle.isPending}

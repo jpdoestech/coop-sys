@@ -99,6 +99,7 @@ export type PaymentSummarySortKey =
   | "balance"
   | "status";
 export type PaymentSummaryQueryOptions = {
+  status?: import("../payments/paymentBalance").PaymentStatus;
   search?: string;
   yearFrom: number;
   yearTo: number;
@@ -130,9 +131,13 @@ export type PaymentSummaryItem = {
   capitalShareCentavos: number;
   totalPaidCentavos: number;
   totalBalanceCentavos: number;
-  status: "Paid" | "Unpaid";
+  refundCentavos: number;
+  netPaidCentavos: number;
+  overpaidCentavos: number;
+  retainedCapitalShareCentavos: number;
+  status: import("../payments/paymentBalance").PaymentStatus;
 };
-export type PaymentSummaryPage = { items: PaymentSummaryItem[]; total: number };
+export type PaymentSummaryPage = { items: PaymentSummaryItem[]; total: number; overpaidTotal?: number };
 export type RefundQueryOptions = {
   employeeIds?: string[];
   branchIds?: string[];

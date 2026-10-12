@@ -87,7 +87,7 @@ export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: 
   return { ...stats, pending: stats.pending || 0, items: rows.map((row) => ({ ...row, attention: Boolean(row.attention) })) };
 }
 
-export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Member[], employees: Employee[], ledger: Pick<PaymentLedger, "payments" | "settings">, directory: Pick<OrganizationDirectory, "branches" | "clients">): ReportPage {
+export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Member[], employees: Employee[], ledger: Pick<PaymentLedger, "payments" | "settings"> & Partial<Pick<PaymentLedger, "refunds">>, directory: Pick<OrganizationDirectory, "branches" | "clients">): ReportPage {
   if (query.paymentStatus && !["paid", "unpaid"].includes(query.paymentStatus)) throw new Error("Unknown payment status.");
   const asOf = query.dateTo || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const settings = [...(ledger.settings ?? [])].filter((item) => item.effective_from <= asOf)
@@ -105,9 +105,16 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
     }
   }
   const payments = new Map<string, number>();
+  const fees = new Map<string, number>(), capitals = new Map<string, number>(), refunds = new Map<string, number>();
   for (const payment of ledger.payments ?? []) {
     if (payment.deleted_at || query.dateFrom && payment.payment_date < query.dateFrom || query.dateTo && payment.payment_date > query.dateTo || scope.scopeType !== "organization" && !allowed.has(payment.employee_id)) continue;
     payments.set(payment.member_id, (payments.get(payment.member_id) || 0) + payment.amount_centavos);
+    fees.set(payment.member_id, (fees.get(payment.member_id) || 0) + (payment.membership_fee_centavos || 0));
+    capitals.set(payment.member_id, (capitals.get(payment.member_id) || 0) + (payment.capital_share_centavos || 0));
+  }
+  for (const refund of ledger.refunds ?? []) {
+    if (refund.deleted_at || query.dateFrom && refund.refund_date < query.dateFrom || query.dateTo && refund.refund_date > query.dateTo || scope.scopeType !== "organization" && !allowed.has(refund.employee_id)) continue;
+    refunds.set(refund.member_id, (refunds.get(refund.member_id) || 0) + refund.amount_centavos);
   }
   const branchLabels = new Map(directory.branches.map((item) => [item.id, item.label]));
   const clientLabels = new Map(directory.clients.map((item) => [item.id, item.label]));
@@ -123,7 +130,7 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
     const branch = branchLabels.get(branchId) || "No placement", client = clientLabels.get(clientId) || "Direct members";
     const text = [member.membership_number, member.first_name, member.middle_name, member.last_name, member.suffix, branch, client].filter(Boolean).join(" ").toLowerCase();
     if (!terms.every((term) => text.includes(term))) continue;
-    const amount = payments.get(member.id) || 0, paid = Number(target > 0 && amount >= target), unpaid = 1 - paid, balance = Math.max(0, target - amount);
+    const amount = payments.get(member.id) || 0, refund = refunds.get(member.id) || 0, net = amount - refund, paid = Number(target > 0 && net >= target), unpaid = 1 - paid, balance = Math.max(0, target - net);
     if (query.paymentStatus === "paid" && !paid || query.paymentStatus === "unpaid" && !unpaid) continue;
     totals.records++; totals.paid += paid; totals.unpaid += unpaid; totals.amountCentavos += amount; totals.balanceCentavos += balance;
     for (const level of ["branch", "client"] as const) {
@@ -134,6 +141,11 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
         groups.set(id, row);
       }
       row.members!++; row.paid! += paid; row.unpaid! += unpaid; row.amountCentavos! += amount;
+      row.membershipFeeCentavos = (row.membershipFeeCentavos || 0) + (fees.get(member.id) || 0);
+      row.capitalShareCentavos = (row.capitalShareCentavos || 0) + (capitals.get(member.id) || 0);
+      row.refundCentavos = (row.refundCentavos || 0) + refund;
+      row.retainedCapitalShareCentavos = (row.retainedCapitalShareCentavos || 0) + Math.max(0, net - (settings?.membership_fee_centavos ?? 50000));
+      row.overpaidCentavos = (row.overpaidCentavos || 0) + Math.max(0, net - target);
       row.paidAmountCentavos! += paid ? amount : 0; row.unpaidAmountCentavos! += unpaid ? amount : 0; row.balanceCentavos! += balance;
     }
   }

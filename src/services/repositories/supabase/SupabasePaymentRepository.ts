@@ -10,6 +10,7 @@ import {
   normalizePaymentSettings,
 } from "../../payments/paymentMath";
 import { createUuid } from "../../../utils/createUuid";
+import { finalPayBalance } from "../../payments/paymentBalance";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -73,6 +74,7 @@ export class SupabasePaymentRepository implements PaymentRepository {
       p_sort_direction: options.sortDirection ?? "asc",
       p_page_limit: options.limit ?? null,
       p_page_offset: options.offset ?? 0,
+      p_status: options.status ?? null,
     });
     if (error) throw error;
     const rows = (data ?? []) as Array<Record<string, unknown>>;
@@ -95,10 +97,15 @@ export class SupabasePaymentRepository implements PaymentRepository {
           capitalShareCentavos: Number(row.capital_share_centavos),
           totalPaidCentavos: Number(row.total_paid_centavos),
           totalBalanceCentavos: Number(row.total_balance_centavos),
-          status: row.payment_status === "Paid" ? "Paid" : "Unpaid",
+          refundCentavos: Number(row.refund_centavos),
+          netPaidCentavos: Number(row.net_paid_centavos),
+          overpaidCentavos: Number(row.overpaid_centavos),
+          retainedCapitalShareCentavos: Number(row.retained_capital_share_centavos),
+          status: row.payment_status === "Overpaid" ? "Overpaid" : row.payment_status === "Paid" ? "Paid" : "Unpaid",
         }),
       ),
       total: Number(rows[0]?.total_count ?? 0),
+      overpaidTotal: Number(rows[0]?.overpaid_count ?? 0),
     };
   }
 
@@ -458,22 +465,14 @@ export class SupabasePaymentRepository implements PaymentRepository {
 
   async settleFinalPay(input: SettlementInput) {
     const ledger = await this.getLedger();
-    const payments = ledger.payments.filter(
-      (payment) => payment.member_id === input.member_id,
-    );
+    const balance = finalPayBalance(ledger.payments, ledger.refunds, ledger.settings, input.member_id, input.settlement_date);
     const { data, error } = await db()
       .from("final_pay_settlements")
       .insert({
         ...input,
-        capital_share_refund_centavos: payments.reduce(
-          (sum, item) => sum + item.capital_share_centavos,
-          0,
-        ),
+        capital_share_refund_centavos: balance.capital,
         membership_fee_refund_centavos: input.refund_membership_fee
-          ? payments.reduce(
-              (sum, item) => sum + item.membership_fee_centavos,
-              0,
-            )
+          ? balance.fee
           : 0,
         sync_status: "synced",
       })

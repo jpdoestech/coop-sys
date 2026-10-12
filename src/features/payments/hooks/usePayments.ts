@@ -11,6 +11,7 @@ import { createRepositories } from "../../../services/repositories/repositoryFac
 import { createPaymentRepository } from "../../../services/repositories/paymentRepositoryFactory";
 import { withActivity } from "../../../services/activity/activityStore";
 import { showTransactionSuccess } from "../../../services/activity/transactionNotifications";
+import { assertRefundAmount, refundableBalance } from "../../../services/payments/paymentBalance";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -121,8 +122,12 @@ export function usePayments(
     onSuccess: refresh,
   });
   const saveRefund = useMutation({
-    mutationFn: (input: RefundInput) => {
+    mutationFn: async (input: RefundInput) => {
       assertPermission(profile, "payments.create");
+      const employee = await repositories.employees.getById(input.employee_id);
+      if (!employee || employee.member_id !== input.member_id || !employeeIsInScope(employee, profile)) throw new Error("This employee is outside your access scope.");
+      const ledger = await paymentRepository.getLedger({ employeeIds: [input.employee_id] });
+      assertRefundAmount(input.amount_centavos, refundableBalance(ledger.payments, ledger.refunds, ledger.settings, input.employee_id, input.refund_date, input.id));
       return paymentRepository.saveRefund(input);
     },
     onSuccess: refresh,

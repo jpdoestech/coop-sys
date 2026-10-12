@@ -9,6 +9,7 @@ export type ReportRow = {
   level?: "branch" | "client";
   members?: number; paid?: number; unpaid?: number;
   amountCentavos?: number; paidAmountCentavos?: number; unpaidAmountCentavos?: number; balanceCentavos?: number;
+  membershipFeeCentavos?: number; capitalShareCentavos?: number; refundCentavos?: number; retainedCapitalShareCentavos?: number; overpaidCentavos?: number;
 };
 export type ReportSort = keyof Pick<ReportRow, "number" | "name" | "branch" | "client" | "department" | "position" | "statusId" | "typeId" | "date" | "approval" | "attention" | "employees" | "active" | "direct" | "clientDeployed" | "members" | "paid" | "unpaid" | "amountCentavos" | "paidAmountCentavos" | "unpaidAmountCentavos" | "balanceCentavos">;
 export type ReportFilters = { search?: string; branchId?: string; clientId?: string; statusId?: string; typeId?: string; departmentId?: string; dateFrom?: string; dateTo?: string; approval?: string; attentionOnly?: boolean; paymentStatus?: "paid" | "unpaid" };

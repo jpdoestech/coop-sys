@@ -10,6 +10,8 @@ export type PrintReport = {
   orientation?: "portrait" | "landscape";
   columns: PrintColumn[];
   rows: string[][];
+  totals?: string[];
+  summary?: Array<{ label: string; value: string }>;
 };
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -63,6 +65,11 @@ export function openPrintReport(report: PrintReport, target?: Window) {
     tr { break-inside: avoid; }
     .right { text-align: right; font-variant-numeric: tabular-nums; }
     .empty { padding: 48px 12px; color: #6b756f; text-align: center; }
+    tfoot { display: table-row-group; font-weight: 700; background: #edf3ef; }
+    .payment-summary { margin: 20px 0 0 auto; max-width: 360px; font-size: 12px; break-inside: avoid; border-top: 2px solid #1f5039; padding-top: 8px; }
+    .payment-summary div { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; }
+    .payment-summary dt, .payment-summary dd { margin: 0; }
+    .payment-summary dd { font-weight: 600; font-variant-numeric: tabular-nums; }
     @page { size: ${report.orientation ?? "landscape"}; margin: 12mm; }
     @media print {
       body { background: white; }
@@ -131,7 +138,26 @@ export function openPrintReport(report: PrintReport, target?: Window) {
     tableBody.append(row);
   }
   table.append(tableBody);
+  if (report.totals) {
+    const footer = element(document, "tfoot");
+    const row = element(document, "tr");
+    report.columns.forEach((column, index) => {
+      const cell = element(document, "td", report.totals?.[index] ?? "");
+      if (column.align === "right") cell.className = "right";
+      row.append(cell);
+    });
+    footer.append(row); table.append(footer);
+  }
   main.append(table);
+  if (report.summary?.length) {
+    const summary = element(document, "dl"); summary.className = "payment-summary";
+    report.summary.forEach((item) => {
+      const row = element(document, "div");
+      row.append(element(document, "dt", item.label), element(document, "dd", item.value));
+      summary.append(row);
+    });
+    main.append(summary);
+  }
   document.body.replaceChildren(toolbar, main);
   popup.focus();
 }

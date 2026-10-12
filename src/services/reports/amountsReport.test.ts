@@ -32,6 +32,11 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe("member amounts report", () => {
+  it("includes gross components and refunds without counting branch/client totals twice", () => {
+    db.prepare("update app_storage set value=? where storage_key='coop_sys_payment_ledger'").run(JSON.stringify({ settings: [{ id: "s", membership_fee_centavos: 50000, capital_share_target_centavos: 500000, effective_from: "2020-01-01", updated_at: "2020", created_at: "2020" }], payments: [{ employee_id: "e1", member_id: "m1", amount_centavos: 650000, membership_fee_centavos: 50000, capital_share_centavos: 600000, payment_date: "2026-01-01" }], refunds: [{ employee_id: "e1", member_id: "m1", amount_centavos: 100000, refund_date: "2026-01-02" }] }));
+    const page = load({ search: "Juan" });
+    expect(page.items.find((row) => row.level === "branch")).toMatchObject({ paid: 1, membershipFeeCentavos: 50000, capitalShareCentavos: 600000, refundCentavos: 100000, retainedCapitalShareCentavos: 500000, overpaidCentavos: 0 });
+  });
   it("counts each member once in overall totals and rolls clients into branch totals", () => {
     const page = load();
     expect(page).toMatchObject({ records: 4, paid: 1, unpaid: 3, amountCentavos: 850000, balanceCentavos: 1350000, total: 6 });

@@ -20,6 +20,7 @@ import { memberStatuses, memberTypes } from "../members/data/memberOptions";
 import { employmentStatuses, employmentTypes } from "../employees/data/employeeOptions";
 import { PrintOrientationDialog, type PrintOrientation } from "../payments/components/PrintOrientationDialog";
 import { openPrintReport, openPrintWindow } from "../payments/printPaymentReport";
+import { paymentPrintTotals } from "../payments/paymentPrintTotals";
 import { withActivity } from "../../services/activity/activityStore";
 import { downloadReport } from "./reportExport";
 
@@ -56,7 +57,10 @@ export function ReportsPage() {
       if (format === "print") target = openPrintWindow(reportTitles[kind]);
       await withActivity("Preparing report...", async () => {
         const rows = await collectReportRows((options) => repository.listPage(options, profile), { ...request, search: filters.search || "" }, setProgress);
-        if (format === "print") openPrintReport({ title: reportTitles[kind], orientation, meta: [...metadata(), `Records: ${rows.length}`], columns: columns.map((column) => ({ label: column.label, align: column.numeric ? "right" : "left" })), rows: rows.map((row) => columns.map((column) => reportCell(row, column.key, kind))) }, target);
+        if (format === "print") {
+          const totals = kind === "amounts" ? paymentPrintTotals(rows.filter((row) => row.level === "branch").map((row) => ({ membershipFeeCentavos: row.membershipFeeCentavos ?? 0, capitalShareCentavos: row.capitalShareCentavos ?? 0, totalPaidCentavos: row.amountCentavos ?? 0, refundCentavos: row.refundCentavos ?? 0, retainedCapitalShareCentavos: row.retainedCapitalShareCentavos ?? 0, overpaidCentavos: row.overpaidCentavos ?? 0 }))) : null;
+          openPrintReport({ title: reportTitles[kind], orientation, meta: [...metadata(), `Records: ${rows.length}`], columns: columns.map((column) => ({ label: column.label, align: column.numeric ? "right" : "left" })), rows: rows.map((row) => columns.map((column) => reportCell(row, column.key, kind))), summary: totals ? [{ label: "Membership Fee", value: totals.fee }, { label: "Share Capital Payments", value: totals.capital }, ...totals.summary] : undefined }, target);
+        }
         else await downloadReport(kind, rows, format, metadata());
       });
     } catch (reason) { target?.close(); setActionError(reason instanceof Error ? reason.message : "Report could not be generated."); }

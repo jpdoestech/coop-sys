@@ -1,4 +1,8 @@
 import { SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Undo2 } from "lucide-react";
+import { SearchableSelect } from "../../../components/ui/SearchableSelect";
+import { paymentStatusClass, type PaymentStatus } from "../../../services/payments/paymentBalance";
+import { paymentPrintTotals } from "../paymentPrintTotals";
 import { ToolbarDisclosure } from "../../../components/ui/ToolbarDisclosure";
 import { FilterField } from "../../../components/ui/FilterField";
 import { LoadingProgress } from "../../../components/ui/LoadingProgress";
@@ -44,6 +48,7 @@ type Props = {
   branches: OrganizationBranch[];
   clients: OrganizationClient[];
   batches: PaymentBatch[];
+  onOpenRefunds?: () => void;
   onLoadSummary: (
     options: PaymentSummaryQueryOptions,
   ) => Promise<PaymentSummaryPage>;
@@ -59,6 +64,7 @@ export function PaymentSummaryPanel({
   branches,
   clients,
   batches,
+  onOpenRefunds,
   onLoadSummary,
   onLoadEmployeeLedger,
 }: Props) {
@@ -67,6 +73,7 @@ export function PaymentSummaryPanel({
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<PaymentStatus | "">("");
   const deferredSearch = useDeferredValue(search);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [placement, setPlacement] = useState<PlacementFilter>(null);
@@ -93,6 +100,7 @@ export function PaymentSummaryPanel({
     setError("");
     void onLoadSummary({
       search: deferredSearch,
+      status: status || undefined,
       yearFrom,
       yearTo,
       branchIds: placement?.kind === "branch" ? [placement.id] : undefined,
@@ -124,6 +132,7 @@ export function PaymentSummaryPanel({
     };
   }, [
     direction,
+    status,
     onLoadSummary,
     page,
     pageSize,
@@ -152,6 +161,7 @@ export function PaymentSummaryPanel({
       setError("");
       const report = await onLoadSummary({
         search: deferredSearch,
+        status: status || undefined,
         yearFrom,
         yearTo,
         branchIds: placement?.kind === "branch" ? [placement.id] : undefined,
@@ -160,6 +170,7 @@ export function PaymentSummaryPanel({
         sortBy,
         sortDirection: direction,
       });
+      const totals = paymentPrintTotals(report.items);
       openPrintReport(
         {
           title: "Payment Summary",
@@ -179,6 +190,7 @@ export function PaymentSummaryPanel({
             { label: "Last Payment" },
             { label: "Membership Fee", align: "right" },
             { label: "Share Capital", align: "right" },
+            { label: "Total Paid", align: "right" },
             { label: "Total Balance", align: "right" },
             { label: "Status" },
           ],
@@ -192,9 +204,12 @@ export function PaymentSummaryPanel({
             row.lastPayment ?? "-",
             formatPesos(row.membershipFeeCentavos),
             formatPesos(row.capitalShareCentavos),
+            formatPesos(row.totalPaidCentavos),
             formatPesos(row.totalBalanceCentavos),
             row.status,
           ]),
+          totals: ["Totals", "", "", "", "", totals.fee, totals.capital, totals.paid, "", ""],
+          summary: totals.summary,
         },
         printWindow,
       );
@@ -246,7 +261,8 @@ export function PaymentSummaryPanel({
             aria-label="Search payment summary by employee"
           />
         </div>
-        <ToolbarDisclosure label="Payment summary filters" icon={SlidersHorizontal} count={Number(Boolean(placement)) + Number(Boolean(period)) + Number(year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
+        <ToolbarDisclosure label="Payment summary filters" icon={SlidersHorizontal} count={Number(Boolean(status)) + Number(Boolean(placement)) + Number(Boolean(period)) + Number(year !== String(new Date().getFullYear()))}><div className="toolbar-filters">
+        <FilterField label="Payment Status" fullWidth><SearchableSelect aria-label="Payment status" className="compact-control w-full" value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatus | ""); setPage(1); }}><option value="">All statuses</option><option value="Paid">Paid</option><option value="Unpaid">Unpaid</option><option value="Overpaid">Overpaid</option></SearchableSelect></FilterField>
         <FilterField label="Year / Range" fullWidth><div className="relative">
           <CalendarRange className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
           <input
@@ -304,6 +320,7 @@ export function PaymentSummaryPanel({
           aria-label="Reset payment summary filters"
           onClick={() => {
             setSearch("");
+            setStatus("");
             setYear(String(new Date().getFullYear()));
             setPlacement(null);
             setPeriod(null);
@@ -323,6 +340,7 @@ export function PaymentSummaryPanel({
             "Use a four-digit year or range, such as 2026 or 2021-2025."}
         </p>
       ) : null}
+      {!loading && (result.overpaidTotal ?? 0) > 0 ? <div role="status" className="flex flex-wrap items-center gap-2 border-b border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700"><AlertTriangle className="h-4 w-4 shrink-0" /><span>{result.overpaidTotal} {result.overpaidTotal === 1 ? "employee has an overpayment" : "employees have overpayments"} in this summary.</span><button type="button" className="ml-auto inline-flex items-center gap-1 font-semibold underline" onClick={() => { setStatus("Overpaid"); setPage(1); }}>View overpaid</button>{onOpenRefunds ? <button type="button" className="inline-flex items-center gap-1 font-semibold underline" onClick={onOpenRefunds}><Undo2 className="h-3.5 w-3.5" />Refunds</button> : null}</div> : null}
       <div className="max-h-[64vh] overflow-auto">
         <table className="w-full min-w-[960px] table-fixed text-left text-xs">
           <thead className="sticky top-0 z-20 bg-[#f6f8f6] shadow-[0_1px_0_0_#d9ded9]">
@@ -349,7 +367,7 @@ export function PaymentSummaryPanel({
               <th className="w-24 px-2 py-2 text-right">
                 {heading("balance", "Total balance", true)}
               </th>
-              <th className="w-16 px-2 py-2">{heading("status", "Status")}</th>
+              <th className="w-24 px-2 py-2">{heading("status", "Status")}</th>
               <th className="w-12 px-2 py-2 text-right text-[10px] font-semibold uppercase text-ink/45">
                 Actions
               </th>
@@ -394,10 +412,11 @@ export function PaymentSummaryPanel({
                 </td>
                 <td className="px-2 py-2.5">
                   <span
-                    className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${row.status === "Paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+                    className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${paymentStatusClass(row.status)}`}
                   >
                     {row.status}
                   </span>
+                  {row.overpaidCentavos > 0 ? <span className="mt-1 block text-[10px] font-mono text-red-700">{formatPesos(row.overpaidCentavos)} excess</span> : null}
                 </td>
                 <td className="px-2 py-2.5 text-right">
                   <button

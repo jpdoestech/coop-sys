@@ -202,8 +202,25 @@ function mergeById(current, incoming, context) {
   }
   return Array.from(records.values());
 }
+function validateChangedRefunds(current, ledger) {
+  for (const refund of ledger.refunds || []) {
+    const previous = (current.refunds || []).find((item) => item.id === refund.id);
+    if (refund.deleted_at || previous && comparable(previous) === comparable(refund)) continue;
+    const settings = (ledger.settings || []).filter((item) => item.effective_from <= refund.refund_date && (!item.effective_to || item.effective_to >= refund.refund_date)).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+    const paid = (ledger.payments || []).filter((item) => !item.deleted_at && item.employee_id === refund.employee_id && item.payment_date <= refund.refund_date).reduce((sum, item) => sum + item.amount_centavos, 0);
+    const otherRefunds = (ledger.refunds || []).filter((item) => !item.deleted_at && item.employee_id === refund.employee_id && item.id !== refund.id).reduce((sum, item) => sum + item.amount_centavos, 0);
+    if (!settings || !Number.isSafeInteger(refund.amount_centavos) || refund.amount_centavos <= 0 || refund.amount_centavos > Math.max(0, paid - otherRefunds - settings.membership_fee_centavos - settings.capital_share_target_centavos) || (ledger.settlements || []).some((item) => !item.deleted_at && item.employee_id === refund.employee_id)) {
+      const error = new Error("Refund cannot exceed the remaining overpayment under Payment Settings.");
+      error.refundValidation = true;
+      throw error;
+    }
+  }
+}
 function mergeStorageValueDetailed(key, currentValue, incomingValue, currentModifiedAt = "", incomingModifiedAt = "") {
-  if (!currentValue) return { value: incomingValue, conflicts: [] };
+  if (!currentValue) {
+    if (key === "coop_sys_payment_ledger") validateChangedRefunds({}, JSON.parse(incomingValue));
+    return { value: incomingValue, conflicts: [] };
+  }
   const conflicts = [];
   const merge = (current, incoming, collection) => mergeById(current, incoming, { collection, conflicts, currentModifiedAt, incomingModifiedAt });
   try {
@@ -221,9 +238,10 @@ function mergeStorageValueDetailed(key, currentValue, incomingValue, currentModi
         refunds: merge(current.refunds, incoming.refunds, "refunds"), paymentTotal: 0, refundTotal: 0,
       };
       merged.paymentTotal = merged.payments.length; merged.refundTotal = merged.refunds.length;
+      validateChangedRefunds(current, merged);
       return { value: JSON.stringify(merged), conflicts };
     }
-  } catch {}
+  } catch (error) { if (error.refundValidation) throw error; }
   const incomingWins = incomingModifiedAt >= currentModifiedAt;
   if (currentValue !== incomingValue) conflicts.push({ recordKey: key, currentUpdatedAt: currentModifiedAt, incomingUpdatedAt: incomingModifiedAt, resolution: incomingWins ? "incoming_wins" : "current_wins" });
   return { value: incomingWins ? incomingValue : currentValue, conflicts };

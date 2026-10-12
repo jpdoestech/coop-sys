@@ -13,6 +13,7 @@ import { buildPaymentSummary } from "../../payments/paymentSummary";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
 import { LocalOrganizationDirectoryRepository } from "./LocalOrganizationDirectoryRepository";
 import { createUuid } from "../../../utils/createUuid";
+import { assertRefundAmount, finalPayBalance, refundableBalance } from "../../payments/paymentBalance";
 import type {
   AliasInput,
   PaymentBatchInput,
@@ -130,7 +131,7 @@ export class LocalPaymentRepository implements PaymentRepository {
         )
       : null;
     const summaryLedger = periodPaymentIds
-      ? { ...ledger, payments: ledger.payments.filter((payment) => periodPaymentIds.has(payment.id)) }
+      ? { ...ledger, payments: ledger.payments.filter((payment) => periodPaymentIds.has(payment.id)), refunds: ledger.refunds.filter((refund) => period?.kind === "cutoff" ? refund.cutoff_from === period.cutoffFrom && refund.cutoff_to === period.cutoffTo : refund.refund_date === period?.paymentDate && !refund.cutoff_from && !refund.cutoff_to) }
       : ledger;
     const searchTerms = personSearchTerms(options.search ?? "");
     const branchIds = options.branchIds ? new Set(options.branchIds) : null;
@@ -187,9 +188,10 @@ export class LocalPaymentRepository implements PaymentRepository {
         return options.sortDirection === "desc" ? -result : result;
       });
     const offset = options.offset ?? 0;
+    const filtered = records.filter((item) => !options.status || item.status === options.status);
     const page = options.limit
-      ? records.slice(offset, offset + options.limit)
-      : records;
+      ? filtered.slice(offset, offset + options.limit)
+      : filtered;
     return {
       items: page.map((item) => ({
         employeeId: item.employee.id,
@@ -208,9 +210,14 @@ export class LocalPaymentRepository implements PaymentRepository {
         capitalShareCentavos: item.capitalShareCentavos,
         totalPaidCentavos: item.totalPaidCentavos,
         totalBalanceCentavos: item.totalBalanceCentavos,
+        refundCentavos: item.refundCentavos,
+        netPaidCentavos: item.netPaidCentavos,
+        overpaidCentavos: item.overpaidCentavos,
+        retainedCapitalShareCentavos: item.retainedCapitalShareCentavos,
         status: item.status,
       })),
-      total: records.length,
+      total: filtered.length,
+      overpaidTotal: records.filter((item) => item.status === "Overpaid").length,
     };
   }
 
@@ -501,6 +508,8 @@ export class LocalPaymentRepository implements PaymentRepository {
 
   async saveRefund(input: RefundInput) {
     const ledger = readLedger();
+    assertRefundAmount(input.amount_centavos, refundableBalance(ledger.payments, ledger.refunds, ledger.settings, input.employee_id, input.refund_date, input.id));
+    if (ledger.settlements.some((item) => !item.deleted_at && item.employee_id === input.employee_id)) throw new Error("This employee already has a final-pay settlement.");
     const timestamp = new Date().toISOString();
     if (
       input.cutoff_from &&
@@ -541,22 +550,14 @@ export class LocalPaymentRepository implements PaymentRepository {
       throw new Error(
         "A final-pay settlement already exists for this employment record.",
       );
-    const payments = ledger.payments.filter(
-      (payment) => payment.member_id === input.member_id && !payment.deleted_at,
-    );
+    const balance = finalPayBalance(ledger.payments, ledger.refunds, ledger.settings, input.member_id, input.settlement_date);
     const timestamp = new Date().toISOString();
     const settlement = {
       ...recordMeta(timestamp),
       ...input,
-      capital_share_refund_centavos: payments.reduce(
-        (sum, payment) => sum + payment.capital_share_centavos,
-        0,
-      ),
+      capital_share_refund_centavos: balance.capital,
       membership_fee_refund_centavos: input.refund_membership_fee
-        ? payments.reduce(
-            (sum, payment) => sum + payment.membership_fee_centavos,
-            0,
-          )
+        ? balance.fee
         : 0,
     };
     ledger.settlements.push(settlement);

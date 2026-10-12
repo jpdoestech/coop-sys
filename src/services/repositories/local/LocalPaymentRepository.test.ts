@@ -135,7 +135,7 @@ describe("LocalPaymentRepository corrections and refunds", () => {
     });
     expect(correctedManual.payment.amount_centavos).toBe(15000);
 
-    await repository.saveRefund({
+    const refundInput = {
       employee_id: "employee-1",
       member_id: "member-1",
       branch_id: "branch-1",
@@ -144,11 +144,15 @@ describe("LocalPaymentRepository corrections and refunds", () => {
       refund_date: "2026-01-20",
       cutoff_from: "2026-01-01",
       cutoff_to: "2026-01-15",
-      method: "manual",
+      method: "manual" as const,
       source_file_name: null,
       remarks: "Over deduction",
       created_by: "user-1",
-    });
+    };
+    await expect(repository.saveRefund(refundInput)).rejects.toThrow("Only employees");
+    await repository.postBatch({ branch_id: "branch-1", client_id: "client-1", method: "manual", cutoff_from: null, cutoff_to: null, payroll_month: null, payment_date: "2026-01-19", source_file_name: null, remarks: null, created_by: "user-1" }, [{ employee_id: "employee-1", member_id: "member-1", amount_centavos: 600000, remarks: null }]);
+    await expect(repository.saveRefund({ ...refundInput, amount_centavos: 200000 })).rejects.toThrow("cannot exceed");
+    await repository.saveRefund(refundInput);
     const ledger = await repository.getLedger({
       yearFrom: 2026,
       yearTo: 2026,
@@ -161,7 +165,7 @@ describe("LocalPaymentRepository corrections and refunds", () => {
     });
     expect(ledger.corrections).toHaveLength(2);
     expect(ledger.refunds).toHaveLength(1);
-    expect(ledger.paymentTotal).toBe(2);
+    expect(ledger.paymentTotal).toBe(3);
     expect(refundPage.total).toBe(1);
     expect(refundPage.items).toHaveLength(1);
   });

@@ -23,10 +23,14 @@ describe("openPrintReport", () => {
       meta: ["Year: 2026", "Records: 1"],
       columns: [{ label: "Employee" }, { label: "Total", align: "right" }],
       rows: [["000001 - Santos, Amara", "PHP 5,500.00"]],
+      totals: ["Totals", "PHP 5,500.00"],
+      summary: [{ label: "Total Payments", value: "PHP 5,500.00" }, { label: "Total Share Capital", value: "PHP 5,000.00" }],
     });
 
     expect(popupDocument.title).toBe("Payment Summary");
     expect(popupDocument.body.textContent).toContain("000001 - Santos, Amara");
+    expect(popupDocument.querySelector("tfoot")?.textContent).toContain("TotalsPHP 5,500.00");
+    expect(popupDocument.querySelector(".payment-summary")?.textContent).toContain("Total Share CapitalPHP 5,000.00");
     expect(popupDocument.querySelector("td.right")?.textContent).toBe(
       "PHP 5,500.00",
     );
