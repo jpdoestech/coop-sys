@@ -75,8 +75,12 @@ export function usePayments(
         employeeIds,
       }),
   });
-  const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["payment-ledger"] });
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["payment-ledger"] }),
+      queryClient.invalidateQueries({ queryKey: ["reports"] }),
+    ]);
+  };
   const saveSettings = useMutation({
     mutationFn: (input: PaymentSettingsInput) => {
       assertPermission(profile, "payments.settings.manage");

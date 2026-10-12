@@ -32,6 +32,31 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe("member amounts report", () => {
+  it("separates remaining overpayment from unpaid outstanding and settles it after refunds", () => {
+    const ledger = JSON.parse(db.prepare("select value from app_storage where storage_key='coop_sys_payment_ledger'").get()!.value as string);
+    ledger.payments = [{ employee_id: "e1", member_id: "m1", amount_centavos: 1215000, membership_fee_centavos: 125000, capital_share_centavos: 1090000, payment_date: "2026-10-12" }];
+    ledger.refunds = [{ employee_id: "e1", member_id: "m1", amount_centavos: 540000, refund_date: "2026-10-12" }];
+    const write = () => db.prepare("update app_storage set value=? where storage_key='coop_sys_payment_ledger'").run(JSON.stringify(ledger));
+    write();
+    const page = load({ search: "Juan" });
+    expect(page).toMatchObject({ records: 1, paid: 0, unpaid: 0, overpaid: 1, amountCentavos: 1215000, refundCentavos: 540000, netPaidCentavos: 675000, overpaidCentavos: 125000, balanceCentavos: 0 });
+    for (const row of page.items) expect(row).toMatchObject({ overpaid: 1, overpaidCentavos: 125000, netPaidCentavos: 675000, overpaidAmountCentavos: 675000, paidAmountCentavos: 0, unpaidAmountCentavos: 0 });
+    expect(load({ paymentStatus: "overpaid" }).records).toBe(1);
+    expect(load({ paymentStatus: "paid" }).records).toBe(0);
+    ledger.refunds[0].amount_centavos = 665000;
+    write();
+    expect(load({ search: "Juan" })).toMatchObject({ paid: 1, unpaid: 0, overpaid: 0, netPaidCentavos: 550000, overpaidCentavos: 0, balanceCentavos: 0 });
+    expect(load({ paymentStatus: "overpaid" }).records).toBe(0);
+    expect(load({ search: "Juan" }).items[0].paidAmountCentavos).toBe(550000);
+  });
+
+  it("uses configured obligations and excludes deleted refunds", () => {
+    const ledger = JSON.parse(db.prepare("select value from app_storage where storage_key='coop_sys_payment_ledger'").get()!.value as string);
+    ledger.settings[0].capital_share_target_centavos = 400000;
+    ledger.refunds = [{ employee_id: "e1", member_id: "m1", amount_centavos: 100000, refund_date: "2026-02-02", deleted_at: "2026-02-03" }];
+    db.prepare("update app_storage set value=? where storage_key='coop_sys_payment_ledger'").run(JSON.stringify(ledger));
+    expect(load({ search: "Juan" })).toMatchObject({ overpaid: 1, refundCentavos: 0, overpaidCentavos: 100000, netPaidCentavos: 550000 });
+  });
   it("includes gross components and refunds without counting branch/client totals twice", () => {
     db.prepare("update app_storage set value=? where storage_key='coop_sys_payment_ledger'").run(JSON.stringify({ settings: [{ id: "s", membership_fee_centavos: 50000, capital_share_target_centavos: 500000, effective_from: "2020-01-01", updated_at: "2020", created_at: "2020" }], payments: [{ employee_id: "e1", member_id: "m1", amount_centavos: 650000, membership_fee_centavos: 50000, capital_share_centavos: 600000, payment_date: "2026-01-01" }], refunds: [{ employee_id: "e1", member_id: "m1", amount_centavos: 100000, refund_date: "2026-01-02" }] }));
     const page = load({ search: "Juan" });

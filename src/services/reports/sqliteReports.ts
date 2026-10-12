@@ -11,7 +11,7 @@ type Scope = { scopeType: string; branchIds: string[]; clientIds: string[]; link
 // Embedded into the EXE bundle; no runtime imports or browser APIs here.
 export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: Scope): ReportPage {
   if (!["members", "employees", "deployment", "amounts"].includes(query.kind)) throw new Error("Unknown report.");
-  const sortKeys = ["number", "name", "branch", "client", "department", "position", "statusId", "typeId", "date", "approval", "attention", "employees", "active", "direct", "clientDeployed", "members", "paid", "unpaid", "amountCentavos", "paidAmountCentavos", "unpaidAmountCentavos", "balanceCentavos"];
+  const sortKeys = ["number", "name", "branch", "client", "department", "position", "statusId", "typeId", "date", "approval", "attention", "employees", "active", "direct", "clientDeployed", "members", "paid", "unpaid", "amountCentavos", "paidAmountCentavos", "unpaidAmountCentavos", "overpaidAmountCentavos", "netPaidCentavos", "refundCentavos", "overpaidCentavos", "overpaid", "balanceCentavos"];
   const sort = query.sort || (query.kind === "deployment" ? "branch" : "name");
   if (!sortKeys.includes(sort)) throw new Error("Unknown sort column.");
   for (const date of [query.dateFrom, query.dateTo]) if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw new Error("Enter a valid report date.");
@@ -88,9 +88,9 @@ export function sqliteReportPage(db: SqliteDatabase, query: ReportQuery, scope: 
 }
 
 export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Member[], employees: Employee[], ledger: Pick<PaymentLedger, "payments" | "settings"> & Partial<Pick<PaymentLedger, "refunds">>, directory: Pick<OrganizationDirectory, "branches" | "clients">): ReportPage {
-  if (query.paymentStatus && !["paid", "unpaid"].includes(query.paymentStatus)) throw new Error("Unknown payment status.");
+  if (query.paymentStatus && !["paid", "unpaid", "overpaid"].includes(query.paymentStatus)) throw new Error("Unknown payment status.");
   const asOf = query.dateTo || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const settings = [...(ledger.settings ?? [])].filter((item) => item.effective_from <= asOf)
+  const settings = [...(ledger.settings ?? [])].filter((item) => item.effective_from <= asOf && (!item.effective_to || item.effective_to >= asOf))
     .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.updated_at.localeCompare(a.updated_at) || b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id))[0];
   const target = settings ? settings.membership_fee_centavos + settings.capital_share_target_centavos : 550000;
   const linked = new Map<string, Employee>();
@@ -119,7 +119,7 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
   const branchLabels = new Map(directory.branches.map((item) => [item.id, item.label]));
   const clientLabels = new Map(directory.clients.map((item) => [item.id, item.label]));
   const groups = new Map<string, ReportRow>();
-  const totals = { records: 0, paid: 0, unpaid: 0, amountCentavos: 0, balanceCentavos: 0 };
+  const totals = { records: 0, paid: 0, unpaid: 0, overpaid: 0, amountCentavos: 0, refundCentavos: 0, netPaidCentavos: 0, overpaidCentavos: 0, balanceCentavos: 0 };
   const terms = (query.search ?? "").trim().toLowerCase().split(/[\s,]+/).filter(Boolean);
   for (const member of members) {
     if (member.deleted_at) continue;
@@ -130,9 +130,9 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
     const branch = branchLabels.get(branchId) || "No placement", client = clientLabels.get(clientId) || "Direct members";
     const text = [member.membership_number, member.first_name, member.middle_name, member.last_name, member.suffix, branch, client].filter(Boolean).join(" ").toLowerCase();
     if (!terms.every((term) => text.includes(term))) continue;
-    const amount = payments.get(member.id) || 0, refund = refunds.get(member.id) || 0, net = amount - refund, paid = Number(target > 0 && net >= target), unpaid = 1 - paid, balance = Math.max(0, target - net);
-    if (query.paymentStatus === "paid" && !paid || query.paymentStatus === "unpaid" && !unpaid) continue;
-    totals.records++; totals.paid += paid; totals.unpaid += unpaid; totals.amountCentavos += amount; totals.balanceCentavos += balance;
+    const amount = payments.get(member.id) || 0, refund = refunds.get(member.id) || 0, net = amount - refund, paid = Number(target > 0 && net === target), overpaid = Number(target > 0 && net > target), unpaid = 1 - paid - overpaid, balance = Math.max(0, target - net);
+    if (query.paymentStatus === "paid" && !paid || query.paymentStatus === "unpaid" && !unpaid || query.paymentStatus === "overpaid" && !overpaid) continue;
+    totals.records++; totals.paid += paid; totals.unpaid += unpaid; totals.overpaid += overpaid; totals.amountCentavos += amount; totals.refundCentavos += refund; totals.netPaidCentavos += net; totals.overpaidCentavos += Math.max(0, net - target); totals.balanceCentavos += balance;
     for (const level of ["branch", "client"] as const) {
       const id = level === "branch" ? `branch:${branchId}` : `client:${branchId}:${clientId}`;
       let row = groups.get(id);
@@ -140,13 +140,13 @@ export function buildAmountsReport(query: ReportQuery, scope: Scope, members: Me
         row = { id, level, branchId, clientId: level === "branch" ? "" : clientId, branch, client: level === "branch" ? "Branch total" : client, number: "", name: "", department: "", position: "", statusId: "", typeId: "", date: "", approval: "", attention: false, employees: 0, active: 0, direct: 0, clientDeployed: 0, members: 0, paid: 0, unpaid: 0, amountCentavos: 0, paidAmountCentavos: 0, unpaidAmountCentavos: 0, balanceCentavos: 0 };
         groups.set(id, row);
       }
-      row.members!++; row.paid! += paid; row.unpaid! += unpaid; row.amountCentavos! += amount;
+      row.members!++; row.paid! += paid; row.unpaid! += unpaid; row.overpaid = (row.overpaid || 0) + overpaid; row.amountCentavos! += amount; row.netPaidCentavos = (row.netPaidCentavos || 0) + net;
       row.membershipFeeCentavos = (row.membershipFeeCentavos || 0) + (fees.get(member.id) || 0);
       row.capitalShareCentavos = (row.capitalShareCentavos || 0) + (capitals.get(member.id) || 0);
       row.refundCentavos = (row.refundCentavos || 0) + refund;
       row.retainedCapitalShareCentavos = (row.retainedCapitalShareCentavos || 0) + Math.max(0, net - (settings?.membership_fee_centavos ?? 50000));
       row.overpaidCentavos = (row.overpaidCentavos || 0) + Math.max(0, net - target);
-      row.paidAmountCentavos! += paid ? amount : 0; row.unpaidAmountCentavos! += unpaid ? amount : 0; row.balanceCentavos! += balance;
+      row.paidAmountCentavos! += paid ? net : 0; row.unpaidAmountCentavos! += unpaid ? net : 0; row.overpaidAmountCentavos = (row.overpaidAmountCentavos || 0) + (overpaid ? net : 0); row.balanceCentavos! += balance;
     }
   }
   const rows = [...groups.values()], direction = query.direction === "desc" ? -1 : 1, sort = query.sort || "branch";

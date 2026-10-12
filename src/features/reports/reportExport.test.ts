@@ -19,8 +19,12 @@ it("exports payment amounts as numeric pesos with currency formatting", async ()
   await workbook.xlsx.load(Buffer.from(await file!.arrayBuffer()) as unknown as Parameters<typeof workbook.xlsx.load>[0]);
   const sheet = workbook.worksheets[0];
   expect(sheet.getCell("C2").value).toBe(3);
-  expect(sheet.getCell("F2").value).toBe(6500);
-  expect(sheet.getCell("I2").value).toBe(10000);
-  expect(sheet.getCell("F2").numFmt).toBe('"PHP "#,##0.00');
+  const amountCell = (label: string) => {
+    const headers = sheet.getRow(1).values as string[];
+    return sheet.getRow(2).getCell(headers.indexOf(label));
+  };
+  expect(amountCell("Gross payments").value).toBe(6500);
+  expect(amountCell("Outstanding").value).toBe(10000);
+  expect(amountCell("Gross payments").numFmt).toBe('"PHP "#,##0.00');
   await new Promise((resolve) => setTimeout(resolve, 1050));
 });
