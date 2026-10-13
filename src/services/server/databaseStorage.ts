@@ -5,6 +5,8 @@ const SERVER_KEYS = [
   "coop_sys_employees",
   "coop_sys_organization_directory",
   "coop_sys_payment_ledger",
+  "coop_sys_payroll_setup",
+  "coop_sys_attendance",
 ] as const;
 
 let pending = Promise.resolve();

@@ -41,6 +41,7 @@ export function spreadsheetRowsFromCells(values: unknown[][], date1904 = false):
     const record = Object.fromEntries(headers.filter(Boolean).map((header) => {
       const value = row[headers.indexOf(header)];
       let text = cellText(value);
+      if (["TIME IN", "TIME OUT"].includes(header) && value instanceof Date && !Number.isNaN(value.getTime())) text = [value.getUTCHours(), value.getUTCMinutes(), value.getUTCSeconds()].map((part) => String(part).padStart(2, "0")).join(":");
       if (header.includes("DATE")) text = spreadsheetDate(value, date1904) ?? text;
       if (header === "MOBILE" && typeof value === "number" && /^9\d{9}$/.test(text)) text = `0${text}`;
       return [header, text];

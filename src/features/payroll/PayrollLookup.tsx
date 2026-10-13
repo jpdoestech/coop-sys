@@ -1,0 +1,11 @@
+import { useDeferredValue, useId, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { DropdownSurface } from "../../components/ui/DropdownSurface";
+
+export function PayrollLookup({ label, value, selectedLabel, load, onChange, required = false }: { label: string; value: string; selectedLabel?: string; load: (search: string) => Promise<{ id: string; label: string }[]>; onChange: (id: string, label: string) => void; required?: boolean }) {
+  const [search, setSearch] = useState(""), [open, setOpen] = useState(false);
+  const deferred = useDeferredValue(search), id = useId();
+  const query = useQuery({ queryKey: ["payroll-lookup", label, deferred], queryFn: () => load(deferred), enabled: open });
+  return <label className="field-label relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>{label}<div className="relative mt-1"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><input className="compact-control w-full pl-8" role="combobox" aria-label={label} aria-expanded={open} aria-controls={id} aria-autocomplete="list" required={required && !value} value={value && !search ? selectedLabel || value : search} onFocus={() => setOpen(true)} onChange={(e) => { setSearch(e.target.value); onChange("", ""); setOpen(true); }} onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); if (e.key === "Enter" && open) { e.preventDefault(); const item = query.data?.[0]; if (item) { onChange(item.id, item.label); setSearch(""); setOpen(false); } } }} /></div>{open ? <DropdownSurface id={id} role="listbox">{query.data?.map((item) => <button type="button" role="option" aria-selected={item.id === value} key={item.id} className="block w-full px-3 py-2 text-left text-xs hover:bg-emerald-50" onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(item.id, item.label); setSearch(""); setOpen(false); }}>{item.label}</button>)}{query.isFetching ? <p className="p-3 text-xs text-ink/55">Loading...</p> : query.isError ? <p role="alert" className="p-3 text-xs text-red-700">{query.error.message}</p> : !query.data?.length ? <p className="p-3 text-xs text-ink/55">No matching records</p> : null}</DropdownSurface> : null}</label>;
+}

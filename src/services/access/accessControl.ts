@@ -21,6 +21,7 @@ export const permissionModules: ReadonlyArray<PermissionModule> = [
   moduleDefinition("employees.sensitive", "Employee government IDs", ["view", "update"]),
   moduleDefinition("payments", "Payments", ["view", "create", "update", "delete", "import", "export", "approve", "manage"]),
   moduleDefinition("payments.settings", "Payment settings", ["view", "manage"]),
+  moduleDefinition("payroll", "Payroll setup and salary access", ["view", "manage", "approve"]),
   moduleDefinition("organization", "Organization", ["view", "create", "update", "delete", "manage"]),
   moduleDefinition("documents", "Documents", ["view", "create", "update", "delete", "export", "manage"]),
   moduleDefinition("reports", "Reports", ["view", "export"]),

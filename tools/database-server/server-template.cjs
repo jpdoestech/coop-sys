@@ -8,6 +8,8 @@ const { DatabaseSync } = require("node:sqlite");
 const ASSETS = __COOP_EMBEDDED_ASSETS__;
 const maintenance = __COOP_MAINTENANCE__;
 const reports = __COOP_REPORTS__;
+const payroll = __COOP_PAYROLL__;
+const attendance = __COOP_ATTENDANCE__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -130,7 +132,7 @@ const permissionModules = {
   "members.sensitive": ["view","update"], employees: ["view","create","update","delete","import","export","approve","manage"],
   "employees.sensitive": ["view","update"], payments: ["view","create","update","delete","import","export","approve","manage"],
   "payments.settings": ["view","manage"], organization: ["view","create","update","delete","manage"],
-  documents: ["view","create","update","delete","export","manage"], reports: ["view","export"], sync: ["view","manage"],
+  documents: ["view","create","update","delete","export","manage"], reports: ["view","export"], sync: ["view","manage"], payroll: ["view","manage","approve"],
   audit: ["view","export"], settings: ["view","manage"], users: ["view","create","update","delete","manage"], roles: ["view","create","update","delete","manage"],
 };
 const allPermissions = Object.entries(permissionModules).flatMap(([module, actions]) => actions.map((action) => `${module}.${action}`));
@@ -217,6 +219,30 @@ function validateChangedRefunds(current, ledger) {
   }
 }
 function mergeStorageValueDetailed(key, currentValue, incomingValue, currentModifiedAt = "", incomingModifiedAt = "") {
+  if (key === "coop_sys_attendance") {
+    const current = JSON.parse(currentValue || "[]"), incoming = JSON.parse(incomingValue);
+    const immutable = (r) => JSON.stringify(Object.fromEntries(Object.entries(r).filter(([field]) => !["updated_at","review_status","reviewed_by","reviewed_at","deleted_at"].includes(field))));
+    for (const row of incoming) {
+      const previous = current.find((r) => r.id === row.id);
+      if (previous && (immutable(previous) !== immutable(row) || previous.deleted_at && !row.deleted_at || previous.review_status === "approved" && (row.review_status !== "approved" || row.deleted_at || previous.reviewed_by !== row.reviewed_by || previous.reviewed_at !== row.reviewed_at))) throw new Error("Attendance history cannot be overwritten. Correct a draft using a new revision.");
+    }
+    const conflicts = [];
+    const merged = mergeById(current, incoming, { collection: key, conflicts, currentModifiedAt, incomingModifiedAt });
+    attendance.validateAttendanceRecords(merged);
+    return { value: JSON.stringify(merged), conflicts };
+  }
+  if (key === "coop_sys_payroll_setup") {
+    const current = JSON.parse(currentValue || "[]"), incoming = JSON.parse(incomingValue);
+    for (const item of incoming) {
+      const previous = current.find((r) => r.id === item.id);
+      if (previous && JSON.stringify(previous.data) !== JSON.stringify(item.data)) throw new Error("Payroll terms cannot be overwritten. Create an effective-dated version.");
+      if (previous && (previous.kind !== item.kind || previous.created_by !== item.created_by || previous.created_at !== item.created_at || previous.deleted_at && !item.deleted_at)) throw new Error("Payroll history cannot be replaced or restored.");
+    }
+    const conflicts = [];
+    const merged = mergeById(current, incoming, { collection: key, conflicts, currentModifiedAt, incomingModifiedAt });
+    payroll.validatePayrollRecords(merged);
+    return { value: JSON.stringify(merged), conflicts };
+  }
   if (!currentValue) {
     if (key === "coop_sys_payment_ledger") validateChangedRefunds({}, JSON.parse(incomingValue));
     return { value: incomingValue, conflicts: [] };
@@ -274,7 +300,7 @@ function persistConflicts(syncLogId, storageKey, conflicts) {
   for (const conflict of conflicts) insert.run(id(), syncLogId || null, storageKey, conflict.recordKey, conflict.currentUpdatedAt || null, conflict.incomingUpdatedAt || null, conflict.resolution, now());
 }
 
-const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments" };
+const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments", coop_sys_payroll_setup: "payroll", coop_sys_attendance: "payroll" };
 function parseArray(value) { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
 function rolesForUser(user) {
   const roleIds = parseArray(user.role_ids);
@@ -291,6 +317,8 @@ function permissionsForUser(user) {
 }
 function hasPermission(user, permission) { return user.role === "super_admin" || permissionsForUser(user).has(permission); }
 function canWriteStorage(user, key) {
+  if (key === "coop_sys_attendance") return user.scope_type === "organization" && hasPermission(user, "payroll.view") && (hasPermission(user, "payroll.manage") || hasPermission(user, "payroll.approve"));
+  if (key === "coop_sys_payroll_setup") return user.scope_type === "organization" && hasPermission(user, "payroll.view") && hasPermission(user, "payroll.manage");
   const module = storageModules[key]; if (!module) return false;
   return ["create","update","delete","import","manage"].some((action) => hasPermission(user, `${module}.${action}`));
 }
@@ -370,6 +398,7 @@ function nextBodNumber(members) {
   return String(highest + 1).padStart(6, "0");
 }
 function filteredStorageValue(user, key, rawValue) {
+  if (["coop_sys_payroll_setup","coop_sys_attendance"].includes(key) && (user.scope_type !== "organization" || !hasPermission(user, "payroll.view"))) return undefined;
   const module = storageModules[key];
   if (module && !hasPermission(user, `${module}.view`)) return undefined;
   try {
@@ -596,6 +625,49 @@ async function api(req, res, url) {
     if (!canWriteStorage(user, key)) return json(res, 403, { error: "Your effective access does not permit this change." });
     const input = await body(req);
     if (typeof input.value !== "string") return json(res, 400, { error: "Storage value must be a string." });
+    if (key === "coop_sys_attendance") {
+      try {
+        const incoming = JSON.parse(input.value), before = JSON.parse(getStorage.get(key)?.value || "[]");
+        const setup = JSON.parse(getStorage.get("coop_sys_payroll_setup")?.value || "[]");
+        const employees = JSON.parse(getStorage.get("coop_sys_employees")?.value || "[]");
+        for (const row of incoming) {
+          const previous = before.find((r) => r.id === row.id);
+          if (previous && comparable(previous) === comparable(row)) continue;
+          if (!previous && (row.created_by !== user.id || row.deleted_at || row.review_status !== "draft" || row.reviewed_by || row.reviewed_at)) throw new Error("New attendance must be a current-user draft.");
+          if (row.review_status === "approved" && previous?.review_status !== "approved") {
+            if (!hasPermission(user, "payroll.approve") || row.reviewed_by !== user.id || !row.reviewed_at) throw new Error("Payroll approval permission is required.");
+          } else if (!hasPermission(user, "payroll.manage")) throw new Error("Payroll management permission is required.");
+          if (row.deleted_at) {
+            if (!incoming.some((replacement) => !replacement.deleted_at && replacement.supersedes_id === row.id && replacement.employee_id === row.employee_id && replacement.work_date === row.work_date)) throw new Error("Draft corrections require a replacement revision.");
+            continue;
+          }
+          const employee = employees.find((e) => e.id === row.employee_id && !e.deleted_at);
+          if (!employee || employee.date_hired && row.work_date < employee.date_hired || employee.date_separated && row.work_date > employee.date_separated) throw new Error("Attendance date is outside the employment period.");
+          const resolved = payroll.resolvePayrollWorkDate(setup, row.employee_id, row.work_date);
+          if (!resolved.terms || resolved.terms.id !== row.terms_id || JSON.stringify(resolved.terms.data) !== JSON.stringify(row.terms_snapshot)) throw new Error("Pay terms changed or the snapshot is invalid. Reload this work date.");
+          if (row.status === "rest_day" && !resolved.restDay) throw new Error("A rest-day override is required.");
+          if (row.supersedes_id && !before.some((r) => r.id === row.supersedes_id && !r.deleted_at && r.review_status === "draft" && r.employee_id === row.employee_id && r.work_date === row.work_date)) throw new Error("Only a current draft can be corrected.");
+        }
+      } catch (error) { return json(res, 400, { error: error.message }); }
+    }
+    if (key === "coop_sys_payroll_setup") {
+      try {
+        const incoming = JSON.parse(input.value), before = JSON.parse(getStorage.get(key)?.value || "[]");
+        const directory = JSON.parse(getStorage.get("coop_sys_organization_directory")?.value || "{}");
+        const employees = JSON.parse(getStorage.get("coop_sys_employees")?.value || "[]");
+        for (const record of incoming) {
+          const previous = before.find((r) => r.id === record.id);
+          if (previous && record.deleted_at && !previous.deleted_at && JSON.parse(getStorage.get("coop_sys_attendance")?.value || "[]").some((r) => r.review_status === "approved" && (r.terms_id === record.id || r.terms_snapshot?.worksite_id === record.id))) throw new Error("Approved attendance references this setup record.");
+          if (previous) continue;
+          if (record.deleted_at) throw new Error("New payroll setup records cannot be archived.");
+          if (record.created_by !== user.id) throw new Error("Payroll creator must match the current user.");
+          if (record.data.employee_id && !employees.some((e) => e.id === record.data.employee_id && !e.deleted_at)) throw new Error("Employee is unavailable.");
+          if (record.kind === "deduction" && record.data.deduction_type === "cooperative" && !employees.some((e) => e.id === record.data.employee_id && e.member_id && !e.deleted_at)) throw new Error("Cooperative deductions require a linked member.");
+          if (record.kind === "worksite" && (!(directory.branches || []).some((b) => b.id === record.data.branch_id && b.isActive) || record.data.client_id && !(directory.clients || []).some((c) => c.id === record.data.client_id && c.branchId === record.data.branch_id && c.isActive))) throw new Error("Invalid worksite branch/client.");
+        }
+        payroll.validatePayrollRecords(incoming);
+      } catch (error) { return json(res, 400, { error: error.message }); }
+    }
     const existing = getStorage.get(key);
     const timestamp = now();
     const merged = mergeStorageValueDetailed(key, existing && existing.value, input.value, existing && existing.modified_at, timestamp).value;

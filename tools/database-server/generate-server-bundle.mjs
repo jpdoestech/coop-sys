@@ -26,5 +26,11 @@ const cleanupModule = `(() => { const exports = {}; ${cleanupCode}\nreturn expor
 const reportsSource = fs.readFileSync(path.join(root, "src", "services", "reports", "sqliteReports.ts"), "utf8");
 const reportsCode = ts.transpileModule(reportsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const reportsModule = `(() => { const exports = {}; ${reportsCode}\nreturn exports; })()`;
-fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))).replace("__COOP_MAINTENANCE__", cleanupModule).replace("__COOP_REPORTS__", reportsModule));
+const payrollSource = fs.readFileSync(path.join(root, "src", "services", "payroll", "payrollSetup.ts"), "utf8");
+const payrollCode = ts.transpileModule(payrollSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const payrollModule = `(() => { const exports = {}; ${payrollCode}\nreturn exports; })()`;
+const attendanceSource = fs.readFileSync(path.join(root, "src", "services", "payroll", "attendanceCore.ts"), "utf8");
+const attendanceCode = ts.transpileModule(attendanceSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const attendanceModule = `(() => { const exports = {}; ${attendanceCode}\nreturn exports; })()`;
+fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))).replace("__COOP_MAINTENANCE__", cleanupModule).replace("__COOP_REPORTS__", reportsModule).replace("__COOP_PAYROLL__", payrollModule).replace("__COOP_ATTENDANCE__", attendanceModule));
 console.log(`Generated ${outputPath}`);

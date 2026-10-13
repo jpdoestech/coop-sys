@@ -11,6 +11,7 @@ const Context = createContext<NavigationContext | null>(null);
 const routes = [
   ["/settings/users", "User Access"], ["/organization/departments", "Departments"], ["/organization/positions", "Positions"],
   ["/members", "Members"], ["/employees", "Employees"], ["/payments", "Payments"], ["/organization", "Organization"],
+  ["/payroll", "Payroll"],
   ["/documents", "Documents"], ["/reports", "Reports"], ["/sync", "Synchronization"], ["/audit-logs", "Audit Logs"], ["/settings", "Settings"],
 ] as const;
 

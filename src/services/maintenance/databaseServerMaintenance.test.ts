@@ -18,7 +18,9 @@ describe("SQLite server maintenance", () => {
     const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const reportsSource = readFileSync(resolve("src/services/reports/sqliteReports.ts"), "utf8");
     const reportsCode = ts.transpileModule(reportsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`);
+    const payrollCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollSetup.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const attendanceCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceCore.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`).replace("__COOP_PAYROLL__", `(() => { const exports = {}; ${payrollCode}; return exports; })()`).replace("__COOP_ATTENDANCE__", `(() => { const exports = {}; ${attendanceCode}; return exports; })()`);
     const serverPath = join(directory, "test-server.cjs");
     writeFileSync(serverPath, template.replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
     child = spawn(process.execPath, [serverPath, `--data-dir=${directory}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
@@ -89,6 +91,21 @@ describe("SQLite server maintenance", () => {
     expect(JSON.parse(storage.coop_sys_members)).toEqual([]);
     expect(JSON.parse(storage.coop_sys_payment_ledger)).toMatchObject({ payments: [], settings: [{ id: "settings" }] });
     expect((await (await api("/users")).json()).total).toBe(2);
+  });
+  it("stores cooperative policies but rejects overwritten history and hides salary setup from ordinary users", async () => {
+    const session = await (await api("/auth/session")).json();
+    const actor = session.session.profile.userId;
+    const record = { id: "10000000-0000-4000-8000-000000000001", kind: "cooperative_policy", data: { label: "Cutoff policy", reason: "Approved policy", effective_from: "2026-10-01", deduction_centavos: 5000 }, created_by: actor, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null };
+    expect((await api("/storage/coop_sys_payroll_setup", "PUT", { value: JSON.stringify([record]) })).status).toBe(200);
+    const altered = { ...record, data: { ...record.data, deduction_centavos: 10000 } };
+    const denied = await api("/storage/coop_sys_payroll_setup", "PUT", { value: JSON.stringify([altered]) });
+    expect(denied.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.parse((await (await api("/storage")).json()).coop_sys_payroll_setup)[0].data.deduction_centavos).toBe(5000);
+    const login = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, "");
+    expect(login.status).toBe(200);
+    const otherCookie = login.headers.get("set-cookie")!.split(";")[0];
+    expect((await (await api("/storage", "GET", undefined, otherCookie)).json()).coop_sys_payroll_setup).toBeUndefined();
+    expect((await api("/storage/coop_sys_payroll_setup", "PUT", { value: "[]" }, otherCookie)).status).toBe(403);
   });
   it("blocks permanent cleanup while a replication remote is configured", async () => {
     expect((await api("/sync/config", "PUT", { deploymentMode: "HYBRID", remoteUrl: "http://127.0.0.1:1", autoSync: false })).status).toBe(200);
