@@ -13,9 +13,9 @@ import { resolvePayrollWorkDate } from "../../services/payroll/payrollSetup";
 import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 import { PayrollLookup } from "./PayrollLookup";
 
-export function AttendanceForm({ repository, payroll, source, onClose, refresh }: { repository: AttendanceRepository; payroll: PayrollRepository; source?: AttendanceRecord; onClose: () => void; refresh: () => Promise<void> }) {
-  const [employee, setEmployee] = useState({ id: source?.employee_id || "", label: source?.employee_label || "" });
-  const [date, setDate] = useState(source?.work_date || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
+export function AttendanceForm({ repository, payroll, source, initial, onClose, refresh }: { repository: AttendanceRepository; payroll: PayrollRepository; source?: AttendanceRecord; initial?: { employeeId: string; employeeLabel: string; date: string }; onClose: () => void; refresh: () => Promise<void> }) {
+  const [employee, setEmployee] = useState({ id: source?.employee_id || initial?.employeeId || "", label: source?.employee_label || initial?.employeeLabel || "" });
+  const [date, setDate] = useState(source?.work_date || initial?.date || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
   const [status, setStatus] = useState<AttendanceStatus>(source?.status || "present"), [segments, setSegments] = useState<AttendanceSegment[]>(source ? structuredClone(source.segments) : []);
   const [reason, setReason] = useState(""), [error, setError] = useState("");
   const query = useQuery({ queryKey: ["attendance-terms", employee.id, date], queryFn: () => payroll.workDateRecords(employee.id, date), enabled: Boolean(employee.id) && attendanceDate(date), refetchOnWindowFocus: false });

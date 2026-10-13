@@ -11,7 +11,7 @@ import { useWorkspacePath } from "../../components/layout/WorkspaceNavigation";
 import { PaginationControls } from "../../components/ui/PaginationControls";
 import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
 import { LoadingProgress } from "../../components/ui/LoadingProgress";
-import { useConfirmation } from "../../components/forms/unsavedChanges";
+import { useConfirmation, useConfirmLeave } from "../../components/forms/unsavedChanges";
 import { PayrollRecordForm } from "./PayrollRecordForm";
 import { payrollLabels } from "./payrollLabels";
 import { PayrollDatePreview } from "./PayrollDatePreview";
@@ -21,6 +21,7 @@ export function PayrollPage() {
   const { profile, can } = useAccess();
   const repository = useMemo(() => createPayrollRepository(profile), [profile]);
   const client = useQueryClient(), confirm = useConfirmation();
+  const leave = useConfirmLeave();
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [kind, setKind] = useState<PayrollKind>("worksite"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1), [size, setSize] = useState(25), [archived, setArchived] = useState(false);
@@ -30,11 +31,11 @@ export function PayrollPage() {
   const query = useQuery({ queryKey: ["payroll-setup", profile.userId, kind, deferred, archived, page, size], queryFn: () => repository.list({ kind, search: deferred, includeArchived: archived, limit: size, offset: (page - 1) * size }), enabled: !accessError && !attendanceOpen });
   const refresh = async () => { await client.invalidateQueries({ queryKey: ["payroll-setup"] }); await client.invalidateQueries({ queryKey: ["payroll-work-date"] }); await client.invalidateQueries({ queryKey: ["payroll-lookup"] }); };
   const archive = useMutation({ mutationFn: (id: string) => repository.archive(id), onSuccess: refresh });
-  function tab(next: PayrollKind) { setAttendanceOpen(false); setKind(next); setSearch(""); setPage(1); setArchived(false); }
+  function tab(next: PayrollKind) { leave(() => { setAttendanceOpen(false); setKind(next); setSearch(""); setPage(1); setArchived(false); }); }
   useWorkspacePath([{ label: "Payroll", onSelect: () => tab("worksite") }, { label: attendanceOpen ? "Attendance" : payrollLabels[kind] }]);
   const headings = ["Name", ...(kind === "worksite" ? ["Region", "Locality", "Wage category", "Wage series"] : kind === "wage" ? ["Region / category", "Order / tranche", "Daily minimum", "Review"] : kind === "cooperative_policy" ? ["Default per cutoff"] : kind === "deduction" ? ["Employee", "Type", "Amount policy", "Per cutoff", "Opening balance"] : ["Employee / worksite", "Pay basis", "Base rate / salary", "Shift", "Rest days"]), ...(kind !== "worksite" ? ["Effective from", "Effective until"] : []), "Reason", "Actions"];
   return <section className="overflow-hidden border border-line bg-white" aria-label="Payroll setup workspace">
-    <nav aria-label="Payroll views" className="flex items-center overflow-x-auto border-b border-line px-2"><button type="button" aria-current={attendanceOpen ? "page" : undefined} className={`h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${attendanceOpen ? "border-moss text-moss" : "border-transparent text-ink/55"}`} onClick={() => setAttendanceOpen(true)}>Attendance</button>{(Object.keys(payrollLabels) as PayrollKind[]).map((item) => <button key={item} type="button" aria-current={!attendanceOpen && kind === item ? "page" : undefined} className={`h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${!attendanceOpen && kind === item ? "border-moss text-moss" : "border-transparent text-ink/55"}`} onClick={() => tab(item)}>{payrollLabels[item]}</button>)}<div className="ml-auto pl-2"><ToolbarDisclosure label="Payroll setup notice" icon={Info}><p className="text-xs text-ink/65">Setup and work-date previews only. Attendance is available separately. Payroll runs, statutory deductions, and payslips are not yet available. Salary access requires organization-wide payroll permissions.</p></ToolbarDisclosure></div></nav>
+    <nav aria-label="Payroll views" className="flex items-center overflow-x-auto border-b border-line px-2"><button type="button" aria-current={attendanceOpen ? "page" : undefined} className={`h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${attendanceOpen ? "border-moss text-moss" : "border-transparent text-ink/55"}`} onClick={() => leave(() => setAttendanceOpen(true))}>Attendance</button>{(Object.keys(payrollLabels) as PayrollKind[]).map((item) => <button key={item} type="button" aria-current={!attendanceOpen && kind === item ? "page" : undefined} className={`h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${!attendanceOpen && kind === item ? "border-moss text-moss" : "border-transparent text-ink/55"}`} onClick={() => tab(item)}>{payrollLabels[item]}</button>)}<div className="ml-auto pl-2"><ToolbarDisclosure label="Payroll setup notice" icon={Info}><p className="text-xs text-ink/65">Setup and work-date previews only. Attendance is available separately. Payroll runs, statutory deductions, and payslips are not yet available. Salary access requires organization-wide payroll permissions.</p></ToolbarDisclosure></div></nav>
     {attendanceOpen ? <AttendancePanel payroll={repository} /> : <>
     <div className="data-toolbar"><label className="relative min-w-[160px] flex-1 sm:max-w-72"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><input className="compact-control w-full pl-8" aria-label="Search payroll setup" placeholder="Search record name" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} /></label>
       <ToolbarDisclosure label="Payroll setup filters" icon={SlidersHorizontal} count={Number(archived)}><label className="filter-toggle"><input type="checkbox" checked={archived} onChange={(e) => { setArchived(e.target.checked); setPage(1); }} />Include archived versions</label></ToolbarDisclosure>

@@ -20,9 +20,10 @@ describe("SQLite server maintenance", () => {
     const reportsCode = ts.transpileModule(reportsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const payrollCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollSetup.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const attendanceCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceCore.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const teamCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceTeam.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`).replace("__COOP_PAYROLL__", `(() => { const exports = {}; ${payrollCode}; return exports; })()`).replace("__COOP_ATTENDANCE__", `(() => { const exports = {}; ${attendanceCode}; return exports; })()`);
     const serverPath = join(directory, "test-server.cjs");
-    writeFileSync(serverPath, template.replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
+    writeFileSync(serverPath, template.replace("__COOP_ATTENDANCE_TEAM__", `(() => { const exports = {}; ${teamCode}; return exports; })()`).replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
     child = spawn(process.execPath, [serverPath, `--data-dir=${directory}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     await new Promise<void>((resolveReady, reject) => {
       const timer = setTimeout(() => reject(new Error("Server startup timed out.")), 10000);
@@ -113,5 +114,15 @@ describe("SQLite server maintenance", () => {
     expect(denied.status).toBe(409);
     expect((await denied.json()).error).toContain("Disconnect replication");
     expect((await api("/maintenance/people", "POST", { kind: "employee", action: "soft", target: "selected", ids: ["e2"], confirmation: "ARCHIVE" })).status).toBe(200);
+  });
+  it("restricts the team worksheet to payroll readers and validates its page filters", async () => {
+    const path = "/attendance/worksheet?date=2026-10-12&worksiteId=10000000-0000-4000-8000-000000000002&limit=25&offset=0";
+    expect((await api(path, "GET", undefined, "")).status).toBe(401);
+    const login = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, "");
+    expect((await api(path, "GET", undefined, login.headers.get("set-cookie")!.split(";")[0])).status).toBe(403);
+    const page = await api(path);
+    expect(page.status).toBe(200);
+    expect(await page.json()).toEqual({ items: [], total: 0 });
+    expect((await api(path.replace("limit=25", "limit=5000"))).status).toBe(400);
   });
 });

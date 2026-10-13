@@ -9,9 +9,23 @@ import { createUuid } from "../../../utils/createUuid";
 import type { AttendanceRepository } from "../AttendanceRepository";
 import { LocalPayrollRepository } from "./LocalPayrollRepository";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
+import { buildAttendanceTeamPage, validateTeamQuery, type AttendanceTeamQuery, type AttendanceTeamPage } from "../../payroll/attendanceTeam";
+import { payrollStorageKey } from "../../payroll/payrollSetup";
+import { serverRequest, usesServerBackend } from "../../server/serverApi";
 
 export class LocalAttendanceRepository implements AttendanceRepository {
   constructor(private profile: AccessProfile) {}
+  async worksheet(q: AttendanceTeamQuery): Promise<AttendanceTeamPage> {
+    assertPayrollAccess(this.profile); validateTeamQuery(q);
+    if (usesServerBackend()) {
+      const params = new URLSearchParams({ date: q.date, worksiteId: q.worksiteId, limit: String(q.limit || 25), offset: String(q.offset || 0) });
+      if (q.departmentId) params.set("departmentId", q.departmentId);
+      if (q.search) params.set("search", q.search);
+      return serverRequest(`/attendance/worksheet?${params}`);
+    }
+    const records = await this.records();
+    return buildAttendanceTeamPage(JSON.parse(readPersistentItem(payrollStorageKey) || "[]"), await new LocalEmployeeRepository().list(), records, q);
+  }
   private async records() { assertPayrollAccess(this.profile); await hydrateDatabaseStorage(); return JSON.parse(readPersistentItem(attendanceStorageKey) || "[]") as AttendanceRecord[]; }
   async list(q: AttendanceQuery) {
     const terms = (q.search || "").toLowerCase().split(/[\s,]+/).filter(Boolean);

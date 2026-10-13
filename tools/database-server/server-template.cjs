@@ -10,6 +10,7 @@ const maintenance = __COOP_MAINTENANCE__;
 const reports = __COOP_REPORTS__;
 const payroll = __COOP_PAYROLL__;
 const attendance = __COOP_ATTENDANCE__;
+const attendanceTeam = __COOP_ATTENDANCE_TEAM__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -544,6 +545,14 @@ async function api(req, res, url) {
   }
 
   const user = requireUser(req, res); if (!user) return;
+  if (req.method === "GET" && url.pathname === "/api/attendance/worksheet") {
+    if (user.scope_type !== "organization" || !hasPermission(user, "payroll.view")) return json(res, 403, { error: "Organization-wide payroll access is required." });
+    try {
+      const q = Object.fromEntries(url.searchParams);
+      const read = (key) => JSON.parse(getStorage.get(key)?.value || "[]");
+      return json(res, 200, attendanceTeam.buildAttendanceTeamPage(read("coop_sys_payroll_setup"), read("coop_sys_employees"), read("coop_sys_attendance"), { ...q, limit: Number(q.limit || 25), offset: Number(q.offset || 0) }));
+    } catch (error) { return json(res, 400, { error: error.message }); }
+  }
   if (url.pathname === "/api/maintenance/people") {
     if (user.role !== "super_admin") return json(res, 403, { error: "Only Super Admin can manage data cleanup." });
     const snapshot = {
