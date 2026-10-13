@@ -1,0 +1,5 @@
+export type PayrollRunInput = { title: string; worksite_id: string; worksite_label: string; payroll_group: string; frequency: "weekly" | "semi_monthly" | "monthly"; period_start: string; period_end: string; pay_date: string; reason: string };
+export type PayrollRun = PayrollRunInput & { id: string; status: "draft" | "cancelled"; created_by: string; created_at: string; updated_at: string; cancelled_by: string | null; cancelled_at: string | null; cancel_reason: string | null };
+export type PayrollRunQuery = { search?: string; includeCancelled?: boolean; limit?: number; offset?: number };
+export type RunCoverageRow = { employeeId: string; employeeLabel: string; expected: number; approved: number; missing: number; drafts: number; missingTerms: number; changedTerms: number; issues: { date: string; message: string }[] };
+export type RunCoverage = { items: RunCoverageRow[]; total: number; summary: { employees: number; expected: number; approved: number; missing: number; drafts: number; missingTerms: number; changedTerms: number } };

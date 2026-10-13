@@ -1,0 +1,30 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { LocalPayrollRunRepository } from "./LocalPayrollRunRepository";
+import { LocalPayrollRepository } from "./LocalPayrollRepository";
+import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
+import { LocalOrganizationDirectoryRepository } from "./LocalOrganizationDirectoryRepository";
+import type { AccessProfile } from "../../access/accessControl";
+const admin: AccessProfile = { userId: "70000000-0000-4000-8000-000000000001", displayName: "Admin", role: "super_admin", scopeType: "organization", branchIds: [] };
+afterEach(() => localStorage.clear());
+describe("local run preparation", () => {
+  it("stores drafts, blocks duplicates, preserves cancellation history, and calculates live period coverage", async () => {
+    const payroll = new LocalPayrollRepository(admin), runs = new LocalPayrollRunRepository(admin);
+    const directory = await new LocalOrganizationDirectoryRepository().getDirectory(), employee = (await new LocalEmployeeRepository().list({ limit: 1 }))[0];
+    const site = await payroll.save({ kind: "worksite", data: { label: "Factory", reason: "Setup", branch_id: directory.branches[0].id, region: "XI", province: "Davao", city: "Davao", category: "Production" } });
+    await payroll.save({ kind: "employee_terms", data: { label: "Operator", reason: "Agreement", employee_id: employee.id, worksite_id: site.id, effective_from: "2026-01-01", pay_basis: "daily", rate_centavos: 60000, frequency: "semi_monthly", payroll_group: "A", shift_start: "08:00", shift_end: "17:00", break_minutes: 60, rest_days: [0], allowances: [] } });
+    const input = { title: "First cutoff", worksite_id: site.id, worksite_label: "Untrusted label", payroll_group: "A", frequency: "semi_monthly" as const, period_start: "2026-10-01", period_end: "2026-10-15", pay_date: "2026-10-20", reason: "Client calendar" };
+    const run = await runs.create(input); expect(run.worksite_label).toBe("Factory");
+    await expect(runs.create(input)).rejects.toThrow("overlaps");
+    expect((await runs.coverage(run.id)).summary).toMatchObject({ employees: 1, expected: 15, missing: 15 });
+    await expect(runs.cancel(run.id, "")).rejects.toThrow("cancellation");
+    await runs.cancel(run.id, "Wrong cutoff calendar");
+    expect((await runs.list({})).total).toBe(0);
+    expect((await runs.list({ includeCancelled: true })).items[0].cancel_reason).toBe("Wrong cutoff calendar");
+    await expect(runs.coverage(run.id)).rejects.toThrow("Cancelled");
+    await expect(runs.create(input)).resolves.toMatchObject({ status: "draft" });
+  });
+  it("requires organization-wide payroll permission", async () => {
+    const limited = new LocalPayrollRunRepository({ ...admin, role: "branch_user", scopeType: "assigned_branches", effectivePermissions: ["payroll.view"] });
+    await expect(limited.list({})).rejects.toThrow();
+  });
+});

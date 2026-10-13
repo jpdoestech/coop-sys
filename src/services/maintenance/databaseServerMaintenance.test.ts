@@ -21,9 +21,10 @@ describe("SQLite server maintenance", () => {
     const payrollCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollSetup.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const attendanceCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceCore.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const teamCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceTeam.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const runsCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollRuns.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`).replace("__COOP_PAYROLL__", `(() => { const exports = {}; ${payrollCode}; return exports; })()`).replace("__COOP_ATTENDANCE__", `(() => { const exports = {}; ${attendanceCode}; return exports; })()`);
     const serverPath = join(directory, "test-server.cjs");
-    writeFileSync(serverPath, template.replace("__COOP_ATTENDANCE_TEAM__", `(() => { const exports = {}; ${teamCode}; return exports; })()`).replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
+    writeFileSync(serverPath, template.replace("__COOP_ATTENDANCE_TEAM__", `(() => { const exports = {}; ${teamCode}; return exports; })()`).replace("__COOP_PAYROLL_RUNS__", `(() => { const exports = {}; ${runsCode}; return exports; })()`).replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
     child = spawn(process.execPath, [serverPath, `--data-dir=${directory}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     await new Promise<void>((resolveReady, reject) => {
       const timer = setTimeout(() => reject(new Error("Server startup timed out.")), 10000);
@@ -124,5 +125,25 @@ describe("SQLite server maintenance", () => {
     expect(page.status).toBe(200);
     expect(await page.json()).toEqual({ items: [], total: 0 });
     expect((await api(path.replace("limit=25", "limit=5000"))).status).toBe(400);
+  });
+  it("creates and cancels preparation runs without allowing overlaps or generic storage writes", async () => {
+    const actor = (await (await api("/auth/session")).json()).session.profile.userId;
+    const branch = "10000000-0000-4000-8000-000000000008", siteId = "10000000-0000-4000-8000-000000000009", now = new Date().toISOString();
+    expect((await api("/storage/coop_sys_organization_directory", "PUT", { value: JSON.stringify({ branches: [{ id: branch, code: "QA", label: "QA", type: "branch", address: "QA", parentId: null, isActive: true }], clients: [], departments: [], positions: [] }) })).status).toBe(200);
+    const setup = JSON.parse((await (await api("/storage")).json()).coop_sys_payroll_setup);
+    setup.push({ id: siteId, kind: "worksite", data: { label: "Run site", reason: "QA", branch_id: branch, region: "XI", province: "Davao", city: "Davao", category: "Production" }, created_by: actor, created_at: now, updated_at: now, deleted_at: null });
+    expect((await api("/storage/coop_sys_payroll_setup", "PUT", { value: JSON.stringify(setup) })).status).toBe(200);
+    const input = { title: "Run test", worksite_id: siteId, worksite_label: "Untrusted", payroll_group: "A", frequency: "semi_monthly", period_start: "2026-10-01", period_end: "2026-10-15", pay_date: "2026-10-20", reason: "Client calendar" };
+    const created = await api("/payroll/runs", "POST", input); expect(created.status).toBe(201);
+    const run = await created.json(); expect(run.worksite_label).toBe("Run site");
+    expect((await api("/payroll/runs", "POST", input)).status).toBe(400);
+    expect((await (await api(`/payroll/runs/${run.id}/coverage`)).json()).summary.expected).toBe(0);
+    expect((await api("/storage/coop_sys_payroll_runs", "PUT", { value: "[]" })).status).toBe(403);
+    expect((await api(`/payroll/runs/${run.id}/cancel`, "POST", { reason: "Incorrect calendar" })).status).toBe(200);
+    expect((await (await api("/payroll/runs")).json()).total).toBe(0);
+    expect((await (await api("/payroll/runs?includeCancelled=true")).json()).items[0].cancel_reason).toBe("Incorrect calendar");
+    const login = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, ""), limited = login.headers.get("set-cookie")!.split(";")[0];
+    expect((await api("/payroll/runs", "GET", undefined, limited)).status).toBe(403);
+    expect((await (await api("/storage", "GET", undefined, limited)).json()).coop_sys_payroll_runs).toBeUndefined();
   });
 });

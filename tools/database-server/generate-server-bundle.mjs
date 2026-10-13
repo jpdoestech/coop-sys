@@ -34,5 +34,7 @@ const attendanceCode = ts.transpileModule(attendanceSource, { compilerOptions: {
 const attendanceModule = `(() => { const exports = {}; ${attendanceCode}\nreturn exports; })()`;
 const teamCode = ts.transpileModule(fs.readFileSync(path.join(root, "src", "services", "payroll", "attendanceTeam.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const teamModule = `(() => { const exports = {}; ${teamCode}\nreturn exports; })()`;
-fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))).replace("__COOP_MAINTENANCE__", cleanupModule).replace("__COOP_REPORTS__", reportsModule).replace("__COOP_PAYROLL__", payrollModule).replace("__COOP_ATTENDANCE__", attendanceModule).replace("__COOP_ATTENDANCE_TEAM__", teamModule));
+const runsCode = ts.transpileModule(fs.readFileSync(path.join(root, "src", "services", "payroll", "payrollRuns.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const runsModule = `(() => { const exports = {}; ${runsCode}\nreturn exports; })()`;
+fs.writeFileSync(outputPath, template.replace("__COOP_EMBEDDED_ASSETS__", JSON.stringify(collect(dist))).replace("__COOP_MAINTENANCE__", cleanupModule).replace("__COOP_REPORTS__", reportsModule).replace("__COOP_PAYROLL__", payrollModule).replace("__COOP_ATTENDANCE__", attendanceModule).replace("__COOP_ATTENDANCE_TEAM__", teamModule).replace("__COOP_PAYROLL_RUNS__", runsModule));
 console.log(`Generated ${outputPath}`);

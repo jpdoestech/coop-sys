@@ -11,6 +11,7 @@ const reports = __COOP_REPORTS__;
 const payroll = __COOP_PAYROLL__;
 const attendance = __COOP_ATTENDANCE__;
 const attendanceTeam = __COOP_ATTENDANCE_TEAM__;
+const payrollRuns = __COOP_PAYROLL_RUNS__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -220,6 +221,16 @@ function validateChangedRefunds(current, ledger) {
   }
 }
 function mergeStorageValueDetailed(key, currentValue, incomingValue, currentModifiedAt = "", incomingModifiedAt = "") {
+  if (key === payrollRuns.payrollRunsKey) {
+    const current = JSON.parse(currentValue || "[]"), incoming = JSON.parse(incomingValue);
+    const immutable = (r) => JSON.stringify(Object.fromEntries(Object.entries(r).filter(([field]) => !["status","updated_at","cancelled_by","cancelled_at","cancel_reason"].includes(field))));
+    for (const r of incoming) {
+      const old = current.find((previous) => previous.id === r.id);
+      if (old && (immutable(old) !== immutable(r) || old.status === "cancelled" && comparable(old) !== comparable(r))) throw new Error("Payroll run history cannot be overwritten or restored.");
+    }
+    const conflicts = [], merged = mergeById(current, incoming, { collection: key, conflicts, currentModifiedAt, incomingModifiedAt });
+    payrollRuns.validateRunRecords(merged); return { value: JSON.stringify(merged), conflicts };
+  }
   if (key === "coop_sys_attendance") {
     const current = JSON.parse(currentValue || "[]"), incoming = JSON.parse(incomingValue);
     const immutable = (r) => JSON.stringify(Object.fromEntries(Object.entries(r).filter(([field]) => !["updated_at","review_status","reviewed_by","reviewed_at","deleted_at"].includes(field))));
@@ -301,7 +312,7 @@ function persistConflicts(syncLogId, storageKey, conflicts) {
   for (const conflict of conflicts) insert.run(id(), syncLogId || null, storageKey, conflict.recordKey, conflict.currentUpdatedAt || null, conflict.incomingUpdatedAt || null, conflict.resolution, now());
 }
 
-const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments", coop_sys_payroll_setup: "payroll", coop_sys_attendance: "payroll" };
+const storageModules = { coop_sys_members: "members", coop_sys_employees: "employees", coop_sys_organization_directory: "organization", coop_sys_payment_ledger: "payments", coop_sys_payroll_setup: "payroll", coop_sys_attendance: "payroll", coop_sys_payroll_runs: "payroll" };
 function parseArray(value) { try { const parsed = JSON.parse(value || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
 function rolesForUser(user) {
   const roleIds = parseArray(user.role_ids);
@@ -318,6 +329,7 @@ function permissionsForUser(user) {
 }
 function hasPermission(user, permission) { return user.role === "super_admin" || permissionsForUser(user).has(permission); }
 function canWriteStorage(user, key) {
+  if (key === payrollRuns.payrollRunsKey) return false;
   if (key === "coop_sys_attendance") return user.scope_type === "organization" && hasPermission(user, "payroll.view") && (hasPermission(user, "payroll.manage") || hasPermission(user, "payroll.approve"));
   if (key === "coop_sys_payroll_setup") return user.scope_type === "organization" && hasPermission(user, "payroll.view") && hasPermission(user, "payroll.manage");
   const module = storageModules[key]; if (!module) return false;
@@ -399,7 +411,7 @@ function nextBodNumber(members) {
   return String(highest + 1).padStart(6, "0");
 }
 function filteredStorageValue(user, key, rawValue) {
-  if (["coop_sys_payroll_setup","coop_sys_attendance"].includes(key) && (user.scope_type !== "organization" || !hasPermission(user, "payroll.view"))) return undefined;
+  if (["coop_sys_payroll_setup","coop_sys_attendance","coop_sys_payroll_runs"].includes(key) && (user.scope_type !== "organization" || !hasPermission(user, "payroll.view"))) return undefined;
   const module = storageModules[key];
   if (module && !hasPermission(user, `${module}.view`)) return undefined;
   try {
@@ -545,6 +557,40 @@ async function api(req, res, url) {
   }
 
   const user = requireUser(req, res); if (!user) return;
+  if (url.pathname === "/api/payroll/runs" || url.pathname.startsWith("/api/payroll/runs/")) {
+    if (user.scope_type !== "organization" || !hasPermission(user, "payroll.view")) return json(res, 403, { error: "Organization-wide payroll access is required." });
+    if (req.method !== "GET" && !hasPermission(user, "payroll.manage")) return json(res, 403, { error: "Payroll management permission is required." });
+    try {
+      const read = (key) => JSON.parse(getStorage.get(key)?.value || "[]");
+      if (url.pathname === "/api/payroll/runs" && req.method === "GET") return json(res, 200, payrollRuns.runPage(read(payrollRuns.payrollRunsKey), { search: url.searchParams.get("search"), includeCancelled: url.searchParams.get("includeCancelled") === "true", limit: Number(url.searchParams.get("limit") || 25), offset: Number(url.searchParams.get("offset") || 0) }));
+      const input = req.method === "POST" ? await body(req) : null;
+      const records = read(payrollRuns.payrollRunsKey), stamp = now();
+      if (url.pathname === "/api/payroll/runs" && req.method === "POST") {
+        payrollRuns.validateRunInput(input);
+        const site = read("coop_sys_payroll_setup").find((r) => r.id === input.worksite_id && r.kind === "worksite" && !r.deleted_at);
+        if (!site) throw new Error("Worksite is unavailable.");
+        const record = { title: input.title, worksite_id: site.id, worksite_label: site.data.label, payroll_group: input.payroll_group, frequency: input.frequency, period_start: input.period_start, period_end: input.period_end, pay_date: input.pay_date, reason: input.reason, id: crypto.randomUUID(), status: "draft", created_by: user.id, created_at: stamp, updated_at: stamp, cancelled_by: null, cancelled_at: null, cancel_reason: null };
+        payrollRuns.validateRunRecords([...records,record]); saveStorage.run(payrollRuns.payrollRunsKey,JSON.stringify([...records,record]),stamp,user.id); return json(res,201,record);
+      }
+      const match = url.pathname.match(/^\/api\/payroll\/runs\/([0-9a-f-]+)\/(cancel|coverage)$/i);
+      const run = match && records.find((r) => r.id === match[1] && r.status === "draft");
+      if (!run) throw new Error("Select an active draft run.");
+      if (match[2] === "cancel" && req.method === "POST") {
+        const next = records.map((r) => r.id === run.id ? { ...r, status: "cancelled", cancelled_by: user.id, cancelled_at: stamp, updated_at: stamp, cancel_reason: input.reason } : r);
+        payrollRuns.validateRunRecords(next); saveStorage.run(payrollRuns.payrollRunsKey,JSON.stringify(next),stamp,user.id); return json(res,200,{});
+      }
+      if (match[2] === "coverage" && req.method === "GET") {
+        const setup = read("coop_sys_payroll_setup"), employees = read("coop_sys_employees"), attendanceRecords = read("coop_sys_attendance");
+        const rows = payrollRuns.runDates(run).flatMap((date) => {
+          const q = { date, worksiteId: run.worksite_id, limit: 100 }, first = attendanceTeam.buildAttendanceTeamPage(setup,employees,attendanceRecords,q), items = [...first.items];
+          for (let start=100;start<first.total;start+=100) items.push(...attendanceTeam.buildAttendanceTeamPage(setup,employees,attendanceRecords,{...q,offset:start}).items);
+          return items;
+        });
+        return json(res,200,payrollRuns.buildRunCoverage(run,rows,Number(url.searchParams.get("limit") || 25),Number(url.searchParams.get("offset") || 0)));
+      }
+      return json(res,405,{ error: "Method not allowed." });
+    } catch (error) { return json(res,400,{error:error.message}); }
+  }
   if (req.method === "GET" && url.pathname === "/api/attendance/worksheet") {
     if (user.scope_type !== "organization" || !hasPermission(user, "payroll.view")) return json(res, 403, { error: "Organization-wide payroll access is required." });
     try {

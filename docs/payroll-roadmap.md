@@ -6,6 +6,8 @@
 - Daily attendance records, Excel imports, correction history and approval locks.
 - Team worksheet: worksite/date and department filters, selected-row defaults,
   bulk absence/leave, inline punches, page-level exceptions and guarded saves.
+- Payroll Runs preparation: explicit cutoff periods/pay dates, draft history,
+  cancellation references, overlap protection and live attendance coverage checks.
 
 ## Next Dependencies
 
@@ -15,7 +17,7 @@ not represent separate paid duties. Next establish client-specific cutoff calend
 monthly proration/conversion policies, reviewed premium rules, leave/holiday
 classification, authorized overtime, statutory tables and deduction ledgers.
 
-## Payroll Runs (Planned)
+## Payroll Runs (Preparation Delivered)
 
 The user's reference image informs the future operational list, not a visual clone.
 The list should show run title, client/payroll group, frequency, period start/end,
@@ -29,6 +31,7 @@ must prevent approval; retroactive rate or attendance corrections require linked
 adjustments rather than overwriting an approved run. Cooperative posting must be
 duplicate-safe per employee/plan/cutoff and use refund-adjusted obligations.
 
-Payroll Runs is not implemented or exposed as an empty tab yet. Attendance review
-does not calculate salaries or authorize payroll release. No compliance claim is
-made by this foundation.
+Payroll Runs is available for preparation, not calculation or release. Employee
+counts are calculated live in the preparation detail. Gross/net totals intentionally
+show Not calculated, not zero. Reviewed attendance does not approve salaries or
+authorize payroll release. See `payroll-runs.md` for deployment and boundaries.
