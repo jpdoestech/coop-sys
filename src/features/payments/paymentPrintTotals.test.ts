@@ -6,6 +6,8 @@ describe("payment print totals", () => {
     expect(totals.summary.find((item) => item.label === "Total Refund")?.value).toContain("6,650.00");
     expect(totals.summary.find((item) => item.label.startsWith("Total Share Capital"))?.value).toContain("5,000.00");
     expect(totals.paid).toContain("12,150.00");
+    expect(totals.summary.find((item) => item.label === "Gross Payments")?.value).toContain("12,150.00");
+    expect(totals.summary.find((item) => item.label === "Total Payments")?.value).toContain("5,500.00");
   });
   it("omits a refund line when none exists", () => {
     expect(paymentPrintTotals([]).summary.some((item) => item.label === "Total Refund")).toBe(false);

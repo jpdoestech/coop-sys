@@ -7,9 +7,9 @@ export function paymentPrintTotals(rows: Pick<PaymentSummaryItem, "membershipFee
   return {
     fee: formatPesos(fee), capital: formatPesos(capital), paid: formatPesos(paid),
     summary: [
-      { label: "Total Payments", value: formatPesos(paid) },
+      { label: "Gross Payments", value: formatPesos(paid) },
       ...(refund > 0 ? [{ label: "Total Refund", value: formatPesos(refund) }] : []),
-      { label: "Net Payments", value: formatPesos(paid - refund) },
+      { label: "Total Payments", value: formatPesos(paid - refund) },
       { label: "Total Share Capital (excluding membership fee)", value: formatPesos(sum("retainedCapitalShareCentavos")) },
       ...(overpaid > 0 ? [{ label: "Remaining Overpayment", value: formatPesos(overpaid) }] : []),
     ],

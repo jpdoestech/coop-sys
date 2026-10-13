@@ -17,12 +17,13 @@ beforeEach(() => {
 describe("amounts report workspace", () => {
   it("shows refund-adjusted overpayment separately from outstanding", async () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ReportsPage /></QueryClientProvider>);
-    fireEvent.click(screen.getByRole("button", { name: "Amounts", exact: true }));
-    await waitFor(() => expect(screen.getByText("Overpayment").nextElementSibling).toHaveTextContent("₱1,250.00"));
-    expect(screen.getByText("Net payments", { selector: "p" }).nextElementSibling).toHaveTextContent("₱6,750.00");
+    fireEvent.click(screen.getByRole("button", { name: /^Amounts$/ }));
+    await waitFor(() => expect(screen.getByText("Remaining overpayment", { selector: "p" }).nextElementSibling).toHaveTextContent("₱1,250.00"));
+    expect(screen.getByText("Total payments", { selector: "p" }).nextElementSibling).toHaveTextContent("₱6,750.00");
+    expect(screen.getByText("Gross payments", { selector: "p" }).nextElementSibling).toHaveTextContent("₱12,150.00");
     expect(screen.getByText("Refunds", { selector: "p" }).nextElementSibling).toHaveTextContent("₱5,400.00");
     expect(screen.getByText("Outstanding", { selector: "p" }).nextElementSibling).toHaveTextContent("₱0.00");
-    expect(screen.getByText("Overpayment").nextElementSibling).toHaveClass("text-red-700");
+    expect(screen.getByText("Remaining overpayment", { selector: "p" }).nextElementSibling).toHaveClass("text-red-700");
     fireEvent.click(screen.getByRole("button", { name: "Report filters" }));
     fireEvent.click(screen.getByRole("combobox", { name: "Payment status" }));
     fireEvent.click(screen.getByRole("option", { name: "Overpaid members" }));
