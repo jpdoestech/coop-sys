@@ -14,14 +14,14 @@ import { PayrollRecordForm } from "./PayrollRecordForm";
 import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 import { validatePayrollInput } from "../../services/payroll/payrollSetup";
 
-export function CutoffEmployeeSetup({ run, repository }: { run: PayrollRun; repository: PayrollRunRepository }) {
+export function CutoffEmployeeSetup({ run, repository, employeeSearch = "" }: { run: PayrollRun; repository: PayrollRunRepository; employeeSearch?: string }) {
   const { profile, can } = useAccess(), client = useQueryClient();
   const payroll = useMemo(() => createPayrollRepository(profile), [profile]);
   const [page, setPage] = useState(1), [size, setSize] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set()), [employees, setEmployees] = useState<Employee[]>([]);
   const [action, setAction] = useState<"terms" | "deduction" | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("");
   const [prepared, setPrepared] = useState<PayrollInput[] | null>(null);
-  const query = useQuery({ queryKey: ["payroll-run-coverage", profile.userId, run.id, page, size], queryFn: () => repository.coverage(run.id, size, (page - 1) * size) });
+  const query = useQuery({ queryKey: ["payroll-run-coverage", profile.userId, run.id, page, size, employeeSearch], queryFn: () => repository.coverage(run.id, size, (page - 1) * size, employeeSearch) });
   const rows = query.data?.items || [];
   async function open(next: "terms" | "deduction") {
     setLoading(true); setError("");

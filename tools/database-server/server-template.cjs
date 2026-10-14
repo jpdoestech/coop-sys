@@ -11,6 +11,8 @@ const reports = __COOP_REPORTS__;
 const payrollSchedule = __COOP_PAYROLL_SCHEDULE__;
 const payroll = __COOP_PAYROLL__;
 const attendance = __COOP_ATTENDANCE__;
+const attendanceAccess = __COOP_ATTENDANCE_ACCESS__;
+const attendanceReview = __COOP_ATTENDANCE_REVIEW__;
 const attendanceTeam = __COOP_ATTENDANCE_TEAM__;
 const payrollRuns = __COOP_PAYROLL_RUNS__;
 const calculation = __COOP_PAYROLL_CALCULATION__;
@@ -668,8 +670,8 @@ async function api(req, res, url) {
           return items;
         });
         const limit=Number(url.searchParams.get("limit") || 25),offset=Number(url.searchParams.get("offset") || 0);
-        if (match[2]==="preview") return json(res,200,calculation.buildCalculationSource(run,rows,setup,read(calculation.calculationRulesKey),Object.fromEntries(employees.map((e)=>[e.id,Boolean(e.member_id)])),limit,offset));
-        return json(res,200,payrollRuns.buildRunCoverage(run,rows,limit,offset));
+        if (match[2]==="preview") return json(res,200,calculation.buildCalculationSource(run,rows,setup,read(calculation.calculationRulesKey),Object.fromEntries(employees.map((e)=>[e.id,Boolean(e.member_id)])),limit,offset,url.searchParams.get("search") || ""));
+        return json(res,200,payrollRuns.buildRunCoverage(run,rows,limit,offset,url.searchParams.get("search") || ""));
       }
       return json(res,405,{ error: "Method not allowed." });
     } catch (error) { return json(res,400,{error:error.message}); }

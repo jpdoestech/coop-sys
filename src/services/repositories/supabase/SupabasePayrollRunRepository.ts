@@ -23,9 +23,9 @@ export class SupabasePayrollRunRepository implements PayrollRunRepository {
     assertPayrollAccess(this.profile, true);
     const { error } = await db().rpc("cancel_payroll_run", { p_id: id, p_reason: reason }); if (error) throw new Error(error.message);
   }
-  async coverage(id: string, limit = 25, offset = 0) {
+  async coverage(id: string, limit = 25, offset = 0, search = "") {
     assertPayrollAccess(this.profile);
-    const { data, error } = await db().rpc("payroll_run_coverage", { p_id: id, p_limit: limit, p_offset: offset });
+    const { data, error } = await db().rpc("payroll_run_coverage_search", { p_id: id, p_limit: limit, p_offset: offset, p_search: search || null });
     if (error) throw new Error(error.message); return data as RunCoverage;
   }
   async listRules(kind: "policy" | "calendar", site: string, limit = 25, offset = 0) {
@@ -39,9 +39,9 @@ export class SupabasePayrollRunRepository implements PayrollRunRepository {
     inputs.forEach(validateCalculationRule);
     const { error } = await db().rpc("save_payroll_calculation_rules", { p_rules: inputs }); if (error) throw new Error(error.message);
   }
-  async previewSource(id: string, limit = 25, offset = 0) {
+  async previewSource(id: string, limit = 25, offset = 0, search = "") {
     assertPayrollAccess(this.profile);
-    const { data, error } = await db().rpc("payroll_run_preview_source", { p_id: id, p_limit: limit, p_offset: offset });
+    const { data, error } = await db().rpc("payroll_run_preview_source_search", { p_id: id, p_limit: limit, p_offset: offset, p_search: search || null });
     if (error) throw new Error(error.message); return data as CalculationSource;
   }
 }

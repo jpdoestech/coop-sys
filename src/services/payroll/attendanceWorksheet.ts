@@ -42,7 +42,7 @@ export function prepareWorksheetSave(rows: AttendanceTeamRow[], edits: Record<st
   for (const row of rows) {
     const edit = edits[row.employeeId];
     if (!selected.has(row.employeeId) || !edit) continue;
-    if (!row.terms || row.attendance?.review_status === "approved") throw new Error(`${row.employeeLabel}: attendance is locked or pay terms are missing.`);
+    if (!row.terms || Boolean(row.attendance?.payroll_posted_at)) throw new Error(`${row.employeeLabel}: attendance is locked or pay terms are missing.`);
     if ((edit.replace_id || null) !== (row.attendance?.id || null) || edit.terms_id !== row.terms.id) throw new Error(`${row.employeeLabel}: the draft or pay terms changed. Reload and review the row.`);
     const input = { ...edit, reason: reference.trim(), terms_id: row.terms.id, replace_id: row.attendance?.id || null };
     try {

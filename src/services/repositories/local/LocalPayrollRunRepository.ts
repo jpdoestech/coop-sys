@@ -39,12 +39,12 @@ export class LocalPayrollRunRepository implements PayrollRunRepository {
     const next = records.map((r) => r.id === id ? { ...r, status: "cancelled" as const, cancelled_by: this.profile.userId, cancelled_at: now, updated_at: now, cancel_reason: reason } : r);
     validateRunRecords(next); localStorage.setItem(payrollRunsKey, JSON.stringify(next));
   }
-  async coverage(id: string, limit = 25, offset = 0): Promise<RunCoverage> {
+  async coverage(id: string, limit = 25, offset = 0, search = ""): Promise<RunCoverage> {
     assertPayrollAccess(this.profile);
-    if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/coverage?limit=${limit}&offset=${offset}`);
+    if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/coverage?limit=${limit}&offset=${offset}&search=${encodeURIComponent(search)}`);
     const run = this.records().find((r) => r.id === id); if (!run) throw new Error("Run is unavailable.");
     const { rows } = await this.context(run);
-    return buildRunCoverage(run, rows, limit, offset);
+    return buildRunCoverage(run, rows, limit, offset, search);
   }
   private async context(run: PayrollRun) {
     await hydrateDatabaseStorage();
@@ -74,11 +74,11 @@ export class LocalPayrollRunRepository implements PayrollRunRepository {
     const next = [...previous, ...inputs.map((i, index) => ({ ...i, id: createUuid(), created_by: this.profile.userId, created_at: new Date(time + index).toISOString() }))];
     validateCalculationRecords(next); localStorage.setItem(calculationRulesKey, JSON.stringify(next));
   }
-  async previewSource(id: string, limit = 25, offset = 0): Promise<CalculationSource> {
+  async previewSource(id: string, limit = 25, offset = 0, search = ""): Promise<CalculationSource> {
     assertPayrollAccess(this.profile);
-    if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/preview?limit=${limit}&offset=${offset}`);
+    if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/preview?limit=${limit}&offset=${offset}&search=${encodeURIComponent(search)}`);
     const run = this.records().find((r) => r.id === id); if (!run) throw new Error("Run is unavailable.");
     const { rows, setup, members } = await this.context(run);
-    return buildCalculationSource(run, rows, setup, JSON.parse(readPersistentItem(calculationRulesKey) || "[]"), members, limit, offset);
+    return buildCalculationSource(run, rows, setup, JSON.parse(readPersistentItem(calculationRulesKey) || "[]"), members, limit, offset, search);
   }
 }

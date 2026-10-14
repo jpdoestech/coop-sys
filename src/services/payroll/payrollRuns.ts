@@ -36,12 +36,14 @@ export function runPage(records: PayrollRun[], q: PayrollRunQuery) {
   const filtered = records.filter((r) => (q.includeCancelled || r.status !== "cancelled") && terms.every((term) => `${r.title} ${r.worksite_label} ${r.payroll_group}`.toLowerCase().includes(term))).sort((a, b) => b.period_start.localeCompare(a.period_start) || b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id));
   return { items: filtered.slice(q.offset || 0, (q.offset || 0) + Math.min(100, q.limit || 25)), total: filtered.length };
 }
-export function buildRunCoverage(run: PayrollRun, rows: AttendanceTeamRow[], limit = 25, offset = 0): RunCoverage {
+export function buildRunCoverage(run: PayrollRun, rows: AttendanceTeamRow[], limit = 25, offset = 0, search = ""): RunCoverage {
   validateRunPagination(limit, offset);
   if (run.status !== "draft") throw new Error("Cancelled runs cannot be prepared.");
   validateRunInput(run);
   const employees = new Map<string, RunCoverageRow>();
+  const terms = search.trim().toLowerCase().split(/[\s,]+/).filter(Boolean);
   for (const row of rows) {
+    if (!terms.every((term) => row.employeeLabel.toLowerCase().includes(term))) continue;
     const candidate = row.terms || row.baseTerms;
     if (!candidate || candidate.data.frequency !== run.frequency || candidate.data.payroll_group?.trim().toLowerCase() !== run.payroll_group.trim().toLowerCase()) continue;
     const r = employees.get(row.employeeId) || { employeeId: row.employeeId, employeeLabel: row.employeeLabel, expected: 0, approved: 0, missing: 0, drafts: 0, missingTerms: 0, changedTerms: 0, issues: [] };

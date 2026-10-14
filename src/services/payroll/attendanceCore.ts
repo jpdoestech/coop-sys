@@ -43,7 +43,9 @@ export function validateAttendanceRecords(records: AttendanceRecord[]) {
     if (r.deleted_at) continue;
     validateAttendanceInput(r);
     if (!["draft", "approved"].includes(r.review_status)) throw new Error("Invalid attendance review status.");
-    if (r.review_status === "approved" && (!uuid.test(r.reviewed_by || "") || !r.reviewed_at || !Number.isFinite(Date.parse(r.reviewed_at))) || r.review_status === "draft" && (r.reviewed_by || r.reviewed_at)) throw new Error("Invalid attendance approval metadata.");
+    if (r.approval_mode && !["manual", "automatic"].includes(r.approval_mode)) throw new Error("Invalid attendance review mode.");
+    if (r.review_status === "approved" && (r.approval_mode !== "automatic" && !uuid.test(r.reviewed_by || "") || !r.reviewed_at || !Number.isFinite(Date.parse(r.reviewed_at))) || r.review_status === "draft" && (r.reviewed_by || r.reviewed_at)) throw new Error("Invalid attendance approval metadata.");
+    if (r.payroll_posted_at && (!Number.isFinite(Date.parse(r.payroll_posted_at)) || !uuid.test(r.payroll_run_id || "") || r.review_status !== "approved")) throw new Error("Invalid payroll posting lock.");
     const snapshot = r.terms_snapshot;
     if (!snapshot || snapshot.employee_id !== r.employee_id || !clock.test(snapshot.shift_start || "") || !clock.test(snapshot.shift_end || "") || !Number.isInteger(snapshot.break_minutes) || !Number.isSafeInteger(snapshot.rate_centavos) || Number(snapshot.rate_centavos) <= 0) throw new Error("Invalid attendance pay-term snapshot.");
     const key = `${r.employee_id}:${r.work_date}`;

@@ -6,6 +6,8 @@ import { attendanceStorageKey, validateAttendanceInput, validateAttendanceRecord
 import { resolvePayrollWorkDate } from "../../payroll/payrollSetup";
 import { flushDatabaseStorage, hydrateDatabaseStorage, readPersistentItem, writePersistentItem } from "../../server/databaseStorage";
 import { createUuid } from "../../../utils/createUuid";
+import { AttendanceReviewService } from "../../payroll/AttendanceReviewService";
+import { applyAutomaticReview, attendancePoliciesKey, type AttendanceReviewPolicy } from "../../payroll/attendanceReview";
 import type { AttendanceRepository } from "../AttendanceRepository";
 import { LocalPayrollRepository } from "./LocalPayrollRepository";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
@@ -40,6 +42,8 @@ export class LocalAttendanceRepository implements AttendanceRepository {
   }
   private async persist(records: AttendanceRecord[]) {
     validateAttendanceRecords(records);
+    records = applyAutomaticReview(records, JSON.parse(readPersistentItem(payrollStorageKey) || "[]"), JSON.parse(readPersistentItem(attendancePoliciesKey) || "[]") as AttendanceReviewPolicy[], await new LocalEmployeeRepository().list(), new Date().toISOString());
+    validateAttendanceRecords(records);
     const previous = readPersistentItem(attendanceStorageKey);
     writePersistentItem(attendanceStorageKey, JSON.stringify(records));
     try { await flushDatabaseStorage(); } catch (error) { if (previous) localStorage.setItem(attendanceStorageKey, previous); else localStorage.removeItem(attendanceStorageKey); throw error; }
@@ -57,25 +61,16 @@ export class LocalAttendanceRepository implements AttendanceRepository {
       if (input.status === "rest_day" && !result.restDay) throw new Error("Record a schedule override before marking this date as a rest day.");
       if (input.replace_id) {
         const previous = next.find((r) => r.id === input.replace_id && !r.deleted_at);
-        if (!previous || previous.employee_id !== input.employee_id || previous.work_date !== input.work_date || previous.review_status === "approved") throw new Error("Only the current draft for the same employee/date can be corrected.");
+        if (!previous || previous.employee_id !== input.employee_id || previous.work_date !== input.work_date || previous.payroll_posted_at) throw new Error("Only current unposted attendance for the same employee/date can be corrected.");
         previous.deleted_at = now; previous.updated_at = now;
       }
       const { replace_id, ...values } = input;
-      next.push({ ...structuredClone(values), employee_label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}`, id: createUuid(), terms_snapshot: structuredClone(result.terms.data), review_status: "draft", created_by: this.profile.userId, created_at: now, updated_at: now, reviewed_by: null, reviewed_at: null, deleted_at: null, supersedes_id: replace_id || null });
+      const original = replace_id ? records.find((r) => r.id === replace_id) : undefined;
+      next.push({ ...structuredClone(values), employee_label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}`, id: createUuid(), terms_snapshot: structuredClone(result.terms.data), review_status: original?.review_status || "draft", approval_mode: original?.approval_mode, created_by: this.profile.userId, created_at: now, updated_at: now, reviewed_by: original?.reviewed_by || null, reviewed_at: original?.reviewed_at || null, deleted_at: null, supersedes_id: replace_id || null });
     }
     await this.persist(next);
   }
-  async approve(id: string) {
-    assertPayrollAccess(this.profile); assertPermission(this.profile, "payroll.approve");
-    const records = await this.records(), record = records.find((r) => r.id === id && !r.deleted_at);
-    if (!record || record.review_status !== "draft") throw new Error("Select a current draft attendance record.");
-    const employee = await new LocalEmployeeRepository().getById(record.employee_id);
-    if (!employee || employee.deleted_at || employee.date_hired && record.work_date < employee.date_hired || employee.date_separated && record.work_date > employee.date_separated) throw new Error("Attendance date is outside this employee's employment period.");
-    const resolution = resolvePayrollWorkDate(await new LocalPayrollRepository(this.profile).workDateRecords(record.employee_id, record.work_date), record.employee_id, record.work_date);
-    if (!resolution.terms || resolution.terms.id !== record.terms_id) throw new Error("Pay terms changed. Correct the draft before approval.");
-    const now = new Date().toISOString();
-    await this.persist(records.map((r) => r.id === id ? { ...r, review_status: "approved", reviewed_by: this.profile.userId, reviewed_at: now, updated_at: now } : r));
-  }
+  async approve(id: string) { await new AttendanceReviewService(this.profile).approve({ ids: [id] }); }
   async saveCutoffBatch(runId: string, inputs: AttendanceInput[]) {
     assertPayrollAccess(this.profile, true);
     if (usesServerBackend()) return serverRequest<void>("/attendance/cutoff", { method: "POST", body: JSON.stringify({ runId, inputs }) });
@@ -86,6 +81,8 @@ export class LocalAttendanceRepository implements AttendanceRepository {
     if (!run) throw new Error("Cutoff is unavailable.");
     const setup = JSON.parse(readPersistentItem(payrollStorageKey) || "[]");
     const next = cutoffAttendanceRevisions(run, inputs, records, setup, employees, this.profile.userId, new Date().toISOString(), createUuid);
+    next.attendance = applyAutomaticReview(next.attendance, next.setup, JSON.parse(readPersistentItem(attendancePoliciesKey) || "[]"), employees, new Date().toISOString());
+    validateAttendanceRecords(next.attendance);
     // Both validated collections are committed together without yielding between writes.
     const previousSetup = readPersistentItem(payrollStorageKey), previousAttendance = readPersistentItem(attendanceStorageKey);
     try { localStorage.setItem(payrollStorageKey, JSON.stringify(next.setup)); localStorage.setItem(attendanceStorageKey, JSON.stringify(next.attendance)); }

@@ -20,7 +20,7 @@ export function matrixEmployees(source: CalculationSource) {
   }
   return [...employees.values()].sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
 }
-export function matrixEditable(row?: AttendanceTeamRow) { return Boolean(row?.terms && row.attendance?.review_status !== "approved"); }
+export function matrixEditable(row?: AttendanceTeamRow) { return Boolean(row?.terms && !row.attendance?.payroll_posted_at); }
 export function matrixInput(row: AttendanceTeamRow, status: AttendanceStatus): AttendanceInput {
   if (!matrixEditable(row)) throw new Error("This assignment-day is unavailable or approved attendance is locked.");
   return { employee_id: row.employeeId, employee_label: row.employeeLabel, work_date: row.date, status,
@@ -103,10 +103,10 @@ export function cutoffAttendanceRevisions(run: PayrollRun, inputs: AttendanceInp
       nextSetup.push(terms);
     }
     const previous = next.find((r) => !r.deleted_at && r.employee_id === employee.id && r.work_date === input.work_date);
-    if (previous?.review_status === "approved" || (previous?.id || null) !== (input.replace_id || null)) throw new Error("Only the current draft for the same employee/date can be corrected.");
+    if (previous?.payroll_posted_at || (previous?.id || null) !== (input.replace_id || null)) throw new Error("Only the current unposted attendance for the same employee/date can be corrected.");
     if (previous) { previous.deleted_at = stamp; previous.updated_at = stamp; }
     const { replace_id, ...values } = input;
-    next.push({ ...structuredClone(values), terms_id: terms.id, terms_snapshot: structuredClone(terms.data), employee_label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}`, id: uuid(), created_by: actor, created_at: stamp, updated_at: stamp, deleted_at: null, review_status: "draft", reviewed_by: null, reviewed_at: null, supersedes_id: replace_id || null });
+    next.push({ ...structuredClone(values), terms_id: terms.id, terms_snapshot: structuredClone(terms.data), employee_label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}`, id: uuid(), created_by: actor, created_at: stamp, updated_at: stamp, deleted_at: null, review_status: previous?.review_status || "draft", approval_mode: previous?.approval_mode, reviewed_by: previous?.reviewed_by || null, reviewed_at: previous?.reviewed_at || null, supersedes_id: replace_id || null });
   }
   validatePayrollRecords(nextSetup); validateAttendanceRecords(next);
   return { attendance: next, setup: nextSetup };

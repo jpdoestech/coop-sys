@@ -32,8 +32,8 @@ function roundedRatio(amount: number, numerator: number, denominator: number) {
   if (!Number.isSafeInteger(value)) throw new Error("Calculation exceeds supported precision.");
   return value;
 }
-export function buildCalculationSource(run: PayrollRun, rows: AttendanceTeamRow[], setup: PayrollRecord[], rules: CalculationRule[], members: Record<string, boolean>, limit: number, offset: number): CalculationSource {
-  const coverage = buildRunCoverage(run, rows, limit, offset), selected = new Set(coverage.items.map((r) => r.employeeId));
+export function buildCalculationSource(run: PayrollRun, rows: AttendanceTeamRow[], setup: PayrollRecord[], rules: CalculationRule[], members: Record<string, boolean>, limit: number, offset: number, search = ""): CalculationSource {
+  const coverage = buildRunCoverage(run, rows, limit, offset, search), selected = new Set(coverage.items.map((r) => r.employeeId));
   const site = setup.find((r) => r.id === run.worksite_id), applicable = rules.filter((r) => r.worksite_id === run.worksite_id), used = new Set<string>();
   for (const date of runDates(run)) for (const kind of ["policy", "calendar"] as const) { const rule = currentCalculationRule(applicable, date, kind, run.payroll_group); if (rule) used.add(rule.id); }
   return { run, total: coverage.total, rows: rows.filter((r) => selected.has(r.employeeId)), setup: setup.filter((r) => !r.deleted_at && (r.id === run.worksite_id || r.kind === "cooperative_policy" || r.kind === "wage" && r.data.series === site?.data.wage_series || r.data.employee_id && selected.has(r.data.employee_id))), rules: applicable.filter((r) => used.has(r.id)), members: Object.fromEntries([...selected].map((id) => [id, Boolean(members[id])])) };

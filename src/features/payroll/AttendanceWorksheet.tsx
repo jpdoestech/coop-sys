@@ -17,7 +17,7 @@ import type { PayrollRepository } from "../../services/repositories/PayrollRepos
 import { PayrollLookup } from "./PayrollLookup";
 import { AttendanceForm } from "./AttendanceForm";
 
-export function AttendanceWorksheet({ repository, payroll, onImport, run }: { repository: AttendanceRepository; payroll: PayrollRepository; onImport?: () => void; run?: import("../../types/payrollRun").PayrollRun }) {
+export function AttendanceWorksheet({ repository, payroll, onImport, run, employeeSearch = "" }: { repository: AttendanceRepository; payroll: PayrollRepository; onImport?: () => void; run?: import("../../types/payrollRun").PayrollRun; employeeSearch?: string }) {
   const { profile, can } = useAccess(), organization = useOrganization(), client = useQueryClient();
   const [date, setDate] = useState(run?.period_start || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
   const [site, setSite] = useState({ id: run?.worksite_id || "", label: run?.worksite_label || "" }), [department, setDepartment] = useState(""), [search, setSearch] = useState("");
@@ -26,10 +26,10 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
   const [reference, setReference] = useState(""), [error, setError] = useState(""), [detail, setDetail] = useState<AttendanceTeamRow | null>(null);
   const deferred = useDeferredValue(search), editable = can("payroll.manage");
   const validDate = attendanceDate(date) && (!run || date >= run.period_start && date <= run.period_end);
-  const query = useQuery({ queryKey: ["attendance-team", profile.userId, run?.id, date, site.id, department, deferred, page, size], queryFn: () => repository.worksheet({ date, worksiteId: site.id, runId: run?.id, departmentId: department || undefined, search: deferred, limit: size, offset: (page - 1) * size }), enabled: Boolean(site.id) && validDate, refetchOnWindowFocus: false });
+  const query = useQuery({ queryKey: ["attendance-team", profile.userId, run?.id, date, site.id, department, employeeSearch, deferred, page, size], queryFn: () => repository.worksheet({ date, worksiteId: site.id, runId: run?.id, departmentId: department || undefined, search: `${employeeSearch} ${deferred}`.trim(), limit: size, offset: (page - 1) * size }), enabled: Boolean(site.id) && validDate, refetchOnWindowFocus: false });
   const rows = query.data?.items || [];
   const visible = rows.filter((row) => !exceptionsOnly || teamExceptions(row, edits[row.employeeId] || teamInput(row)).length > 0);
-  const changeable = (row: AttendanceTeamRow) => editable && Boolean(row.terms) && row.attendance?.review_status !== "approved";
+  const changeable = (row: AttendanceTeamRow) => editable && Boolean(row.terms) && !row.attendance?.payroll_posted_at;
   const refresh = async () => { await client.invalidateQueries({ queryKey: ["attendance-team"] }); await client.invalidateQueries({ queryKey: ["attendance"] }); await client.invalidateQueries({ queryKey: ["payroll-run-coverage"] }); };
   const save = useMutation({ mutationFn: async () => {
     const inputs = prepareWorksheetSave(rows, edits, selected, reference);
@@ -102,7 +102,7 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
           <td className="px-3 py-2"><input aria-label={`Break minutes ${row.employeeLabel}`} type="number" min="0" step="1" className="compact-control w-20" value={segment?.break_minutes ?? ""} disabled={locked || multi || !segment} onChange={(e) => punch({ break_minutes: Number(e.target.value) })} /></td>
           <td className="px-3 py-2 font-mono">{metrics && Number.isFinite(metrics.worked) ? (metrics.worked / 60).toFixed(2) : "-"}</td>
           <td className="min-w-48 max-w-72 px-3 py-2"><p className={`text-[11px] font-semibold ${row.attendance?.review_status === "approved" ? "text-moss" : "text-ink/50"}`}>{edits[row.employeeId] ? "Unsaved changes" : row.attendance?.review_status || "Not recorded"}</p><p className="mt-1 text-[10px] text-amber-800">{flags.join(" · ")}</p></td>
-          <td className="px-3 py-2">{editable && row.terms && row.attendance?.review_status !== "approved" ? <button type="button" className="icon-button" aria-label={`Attendance details ${row.employeeLabel}`} title="Work segments / correction details" disabled={save.isPending} onClick={() => leave(() => setDetail(row))}><MoreHorizontal className="h-4 w-4" /></button> : null}</td>
+          <td className="px-3 py-2">{editable && row.terms && !row.attendance?.payroll_posted_at ? <button type="button" className="icon-button" aria-label={`Attendance details ${row.employeeLabel}`} title="Work segments / correction details" disabled={save.isPending} onClick={() => leave(() => setDetail(row))}><MoreHorizontal className="h-4 w-4" /></button> : null}</td>
         </tr>;
       })}{!visible.length ? <tr><td colSpan={10} className="px-3 py-12 text-center text-ink/45">{!site.id ? "Select a worksite to load its dated team" : query.isFetching ? "Loading team..." : exceptionsOnly ? "No exceptions on this page" : "No dated payroll assignments for these filters"}</td></tr> : null}</tbody>
     </table></div>
