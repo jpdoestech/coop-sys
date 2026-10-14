@@ -44,6 +44,15 @@ select {
     margin-inline: auto;
   }
 
+  .payroll-workspace {
+    height: calc(100dvh - 3.5rem - 1px - 1rem);
+  }
+
+  .payroll-workspace .data-toolbar,
+  .payroll-workspace > nav {
+    flex-shrink: 0;
+  }
+
   .responsive-fields {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));

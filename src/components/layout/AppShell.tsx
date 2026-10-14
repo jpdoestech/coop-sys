@@ -4,6 +4,8 @@ import {
   FileText,
   Gauge,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   ShieldCheck,
   Users,
@@ -53,6 +55,7 @@ export function AppShell({ children }: AppShellProps) {
 
 function AppShellLayout({ children }: AppShellProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const online = useOnlineStatus();
   const appMode = getAppMode();
   const { profile, can } = useAccess();
@@ -106,7 +109,7 @@ function AppShellLayout({ children }: AppShellProps) {
       <ActivityIndicator />
       <TransactionSuccessDialog />
       <div className="flex min-h-screen">
-        <div className="sticky top-0 hidden h-dvh shrink-0 lg:block">{sidebar}</div>
+        <div id="desktop-sidebar" className={clsx("sticky top-0 hidden h-dvh shrink-0", !sidebarCollapsed && "lg:block")}>{sidebar}</div>
         {isOpen ? (
           <div className="fixed inset-0 z-40 lg:hidden">
             <button
@@ -121,6 +124,9 @@ function AppShellLayout({ children }: AppShellProps) {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur">
             <div className="workspace-width flex h-14 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
+              <button type="button" className="icon-button hidden lg:inline-flex" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!sidebarCollapsed} aria-controls="desktop-sidebar">
+                {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              </button>
               <button
                 className="focus-ring rounded-md border border-line bg-white p-2 lg:hidden"
                 onClick={() => setIsOpen(true)}

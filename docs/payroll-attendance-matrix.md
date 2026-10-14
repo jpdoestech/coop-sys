@@ -2,7 +2,12 @@
 
 Payroll opens on Payroll Runs. Select branch/client, worksite and payroll group,
 enter the attendance cutoff and payout date, and create the cutoff. Creation opens
-attendance immediately. Optional titles and references live under Additional
+attendance immediately in the main page, replacing the runs list without a modal,
+overlay or decorative frame. Back to Payroll Runs restores the list's filters and
+page and guards unsaved attendance. The shell's desktop sidebar can be collapsed
+without unmounting the cutoff or discarding its drafts. The payroll workspace has
+a viewport-bound height and scrollable table area; few or zero rows do not shrink
+the workspace or move pagination up. Optional titles and references live under Additional
 details; blank titles use the payout month and worksite. Cutoffs may cross months
 and years, with a maximum of 31 inclusive calendar days. Payout cannot precede the
 last attendance date.

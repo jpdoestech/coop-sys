@@ -82,7 +82,7 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
       <button type="button" className="primary-button" disabled={!pending || save.isPending || query.isFetching} onClick={() => { setError(""); save.mutate(); }}><Save className="h-3.5 w-3.5" />{save.isPending ? "Saving..." : `Save ${pending} changed`}</button>
     </div> : null}
     {query.isError || save.isError || error || !validDate ? <p role="alert" className="border-b border-line bg-red-50 px-3 py-2 text-xs text-red-700">{query.error?.message || save.error?.message || error || "Select a valid work date within this cutoff."}</p> : null}
-    <div className="max-h-[65vh] overflow-auto" aria-busy={query.isFetching}><table className="w-full min-w-[1250px] text-left text-xs">
+    <div className={run ? "min-h-0 flex-1 overflow-auto" : "max-h-[65vh] overflow-auto"} aria-busy={query.isFetching}><table className="w-full min-w-[1250px] text-left text-xs">
       <thead className="sticky top-0 z-10 bg-[#f6f8f6]"><tr><th className="px-3 py-2"><input type="checkbox" aria-label="Select editable rows on this page" checked={allSelected} disabled={!eligible.length || save.isPending} onChange={(e) => setSelected(e.target.checked ? new Set(eligible.map((r) => r.employeeId)) : new Set())} /></th>{["Employee / duty", "Scheduled shift", "Status", "Time in", "Time out", "Break min", "Hours", "Review / exceptions", ""].map((h) => <th key={h} className="whitespace-nowrap px-3 py-2 text-[10px] uppercase text-ink/50">{h}</th>)}</tr></thead>
       <tbody className="divide-y divide-line">{visible.map((row) => {
         const input = edits[row.employeeId] || teamInput(row), flags = teamExceptions(row, input), segment = input?.segments[0];
