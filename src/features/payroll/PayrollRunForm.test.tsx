@@ -10,7 +10,7 @@ import { AccessContextValue } from "../../services/access/accessContextValue";
 import { OrganizationContextValue } from "../../services/organization/organizationContextValue";
 vi.mock("../../services/activity/transactionNotifications", () => ({ showTransactionSuccess: vi.fn().mockResolvedValue(undefined) }));
 const id = "10000000-0000-4000-8000-000000000001";
-const run = { id, title: "October cutoff", worksite_id: id, worksite_label: "Factory", payroll_group: "A", frequency: "semi_monthly", period_start: "2026-10-01", period_end: "2026-10-15", pay_date: "2026-10-20", reason: "Client calendar", status: "draft" } as PayrollRun;
+const run = { id, title: "January 2026 payroll", worksite_id: id, worksite_label: "Factory", payroll_group: "A", frequency: "semi_monthly", period_start: "2025-12-26", period_end: "2026-01-10", pay_date: "2026-01-15", reason: "Client calendar", status: "draft" } as PayrollRun;
 describe("run preparation UI", () => {
   it("saves the explicitly entered cutoff and responds to native date input events", async () => {
     const create = vi.fn().mockResolvedValue(run), close = vi.fn();
@@ -24,7 +24,9 @@ describe("run preparation UI", () => {
     fireEvent.focus(screen.getByRole("combobox", { name: "Run worksite" }));
     fireEvent.click(await screen.findByRole("option", { name: "Factory" }));
     fireEvent.change(screen.getByLabelText("Payroll group"), { target: { value: "A" } });
-    for (const [label, value] of [["Period start", run.period_start], ["Period end", run.period_end], ["Pay date", run.pay_date]]) fireEvent.input(screen.getByLabelText(label), { target: { value } });
+    for (const [label, value] of [["Cutoff start", run.period_start], ["Cutoff end", run.period_end], ["Payout date", run.pay_date]]) fireEvent.input(screen.getByLabelText(label), { target: { value } });
+    expect(screen.getByLabelText("Cutoff end")).toHaveAttribute("min", run.period_start);
+    expect(screen.getByLabelText("Payout date")).toHaveAttribute("min", run.period_end);
     fireEvent.change(screen.getByLabelText("Preparation reference"), { target: { value: run.reason } });
     fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());

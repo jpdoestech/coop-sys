@@ -9,6 +9,18 @@ const run: PayrollRun = { id, title: "October first cutoff", worksite_id: id, wo
 const terms = { id, kind: "employee_terms", data: { payroll_group: "production", frequency: "semi_monthly" } } as PayrollRecord;
 const row: AttendanceTeamRow = { employeeId: employee, employeeLabel: "000001 - Dela Cruz, Juan", date: "2026-10-01", terms, baseTerms: terms, attendance: null, restDay: false, neighbors: [] };
 describe("payroll preparation", () => {
+  it("keeps cross-year attendance cutoffs independent from the run title and payout date", () => {
+    const january = { ...run, title: "January 2026 payroll", period_start: "2025-12-26", period_end: "2026-01-10", pay_date: "2026-01-15" };
+    expect(() => validateRunRecords([january])).not.toThrow();
+    const dates = runDates(january);
+    expect(dates).toHaveLength(16);
+    expect(dates[0]).toBe("2025-12-26");
+    expect(dates[dates.length - 1]).toBe("2026-01-10");
+    expect(dates).not.toContain(january.pay_date);
+    expect(() => validateRunInput({ ...january, pay_date: "2026-01-09" })).toThrow("pay date");
+    expect(() => validateRunRecords([january, { ...january, id: employee, period_start: "2026-01-01" }])).toThrow("overlaps");
+    expect(() => validateRunInput({ ...january, period_start: "2025-12-11" })).not.toThrow();
+  });
   it("validates explicit period boundaries and permits flexible cutoff dates", () => {
     expect(runDates(run)).toHaveLength(15);
     expect(() => validateRunInput({ ...run, period_end: "2026-11-01", pay_date: "2026-11-05" })).toThrow("31");
