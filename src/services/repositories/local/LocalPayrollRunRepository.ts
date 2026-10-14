@@ -11,6 +11,8 @@ import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
 import type { PayrollRunRepository } from "../PayrollRunRepository";
 import type { PayrollRun, PayrollRunInput, PayrollRunQuery, RunCoverage } from "../../../types/payrollRun";
 import type { PayrollRecord } from "../../../types/payroll";
+import { buildCalculationSource, calculationRulesKey, rulePage, validateCalculationRule, validateCalculationRecords } from "../../payroll/payrollCalculation";
+import type { CalculationRule, CalculationRuleInput, CalculationSource } from "../../../types/payrollCalculation";
 export class LocalPayrollRunRepository implements PayrollRunRepository {
   constructor(private profile: AccessProfile) {}
   private records(): PayrollRun[] { assertPayrollAccess(this.profile); return JSON.parse(readPersistentItem(payrollRunsKey) || "[]"); }
@@ -41,6 +43,10 @@ export class LocalPayrollRunRepository implements PayrollRunRepository {
     assertPayrollAccess(this.profile);
     if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/coverage?limit=${limit}&offset=${offset}`);
     const run = this.records().find((r) => r.id === id); if (!run) throw new Error("Run is unavailable.");
+    const { rows } = await this.context(run);
+    return buildRunCoverage(run, rows, limit, offset);
+  }
+  private async context(run: PayrollRun) {
     await hydrateDatabaseStorage();
     const setup = JSON.parse(readPersistentItem(payrollStorageKey) || "[]"), attendance = JSON.parse(readPersistentItem(attendanceStorageKey) || "[]"), employees = await new LocalEmployeeRepository().list();
     const rows = runDates(run).flatMap((date) => {
@@ -49,6 +55,30 @@ export class LocalPayrollRunRepository implements PayrollRunRepository {
       for (let start = 100; start < first.total; start += 100) items.push(...buildAttendanceTeamPage(setup, employees, attendance, { ...q, offset: start }).items);
       return items;
     });
-    return buildRunCoverage(run, rows, limit, offset);
+    return { rows, setup, members: Object.fromEntries(employees.map((e) => [e.id, Boolean(e.member_id)])) };
+  }
+  async listRules(kind: "policy" | "calendar", site: string, limit = 25, offset = 0) {
+    assertPayrollAccess(this.profile);
+    if (usesServerBackend()) return serverRequest<{ items: CalculationRule[]; total: number }>(`/payroll/calculation-rules?kind=${kind}&site=${site}&limit=${limit}&offset=${offset}`);
+    return rulePage(JSON.parse(readPersistentItem(calculationRulesKey) || "[]"), kind, site, limit, offset);
+  }
+  async saveRules(inputs: CalculationRuleInput[]) {
+    assertPayrollAccess(this.profile, true);
+    if (!inputs.length || inputs.length > 31) throw new Error("Save between 1 and 31 calculation rules.");
+    inputs.forEach(validateCalculationRule);
+    if (usesServerBackend()) return serverRequest<void>("/payroll/calculation-rules", { method: "POST", body: JSON.stringify(inputs) });
+    const setup = JSON.parse(readPersistentItem(payrollStorageKey) || "[]") as PayrollRecord[];
+    if (inputs.some((i) => !setup.some((s) => s.id === i.worksite_id && s.kind === "worksite" && !s.deleted_at))) throw new Error("Worksite is unavailable.");
+    const previous = JSON.parse(readPersistentItem(calculationRulesKey) || "[]") as CalculationRule[];
+    const time = previous.reduce((max, r) => Math.max(max, Date.parse(r.created_at) + 1), Date.now());
+    const next = [...previous, ...inputs.map((i, index) => ({ ...i, id: createUuid(), created_by: this.profile.userId, created_at: new Date(time + index).toISOString() }))];
+    validateCalculationRecords(next); localStorage.setItem(calculationRulesKey, JSON.stringify(next));
+  }
+  async previewSource(id: string, limit = 25, offset = 0): Promise<CalculationSource> {
+    assertPayrollAccess(this.profile);
+    if (usesServerBackend()) return serverRequest(`/payroll/runs/${id}/preview?limit=${limit}&offset=${offset}`);
+    const run = this.records().find((r) => r.id === id); if (!run) throw new Error("Run is unavailable.");
+    const { rows, setup, members } = await this.context(run);
+    return buildCalculationSource(run, rows, setup, JSON.parse(readPersistentItem(calculationRulesKey) || "[]"), members, limit, offset);
   }
 }

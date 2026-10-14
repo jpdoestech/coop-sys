@@ -12,7 +12,7 @@ const run = { id, title: "October cutoff", worksite_id: id, worksite_label: "Fac
 describe("run preparation UI", () => {
   it("saves the explicitly entered cutoff and responds to native date input events", async () => {
     const create = vi.fn().mockResolvedValue(run), close = vi.fn();
-    const repository = { create, list: vi.fn(), cancel: vi.fn(), coverage: vi.fn() } as PayrollRunRepository;
+    const repository = { create, list: vi.fn(), cancel: vi.fn(), coverage: vi.fn(), listRules: vi.fn(), saveRules: vi.fn(), previewSource: vi.fn() } as PayrollRunRepository;
     const payroll = { list: vi.fn().mockResolvedValue({ items: [{ id, data: { label: "Factory" } }], total: 1 }), save: vi.fn(), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
     render(<QueryClientProvider client={new QueryClient()}><PayrollRunForm repository={repository} payroll={payroll} refresh={vi.fn().mockResolvedValue(undefined)} onClose={close} /></QueryClientProvider>);
     fireEvent.change(screen.getByLabelText("Run title"), { target: { value: run.title } });

@@ -8,6 +8,8 @@
   bulk absence/leave, inline punches, page-level exceptions and guarded saves.
 - Payroll Runs preparation: explicit cutoff periods/pay dates, draft history,
   cancellation references, overlap protection and live attendance coverage checks.
+- Reviewed calculation policy/calendar versions and ordinary-day daily base plus
+  worked-day allowance previews with source IDs and explicit unsupported-case blocks.
 
 ## Next Dependencies
 
@@ -31,7 +33,9 @@ must prevent approval; retroactive rate or attendance corrections require linked
 adjustments rather than overwriting an approved run. Cooperative posting must be
 duplicate-safe per employee/plan/cutoff and use refund-adjusted obligations.
 
-Payroll Runs is available for preparation, not calculation or release. Employee
+Payroll Runs is available for preparation and restricted ordinary-day estimates,
+not final salary calculation or release. Employee
 counts are calculated live in the preparation detail. Gross/net totals intentionally
 show Not calculated, not zero. Reviewed attendance does not approve salaries or
-authorize payroll release. See `payroll-runs.md` for deployment and boundaries.
+authorize payroll release. See `payroll-runs.md` and `payroll-calculation.md` for
+deployment and boundaries.
