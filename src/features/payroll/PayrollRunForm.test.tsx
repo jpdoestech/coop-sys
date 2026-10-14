@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { PayrollRunForm } from "./PayrollRunForm";
@@ -8,6 +8,8 @@ import type { PayrollRunRepository } from "../../services/repositories/PayrollRu
 import type { PayrollRun } from "../../types/payrollRun";
 import { AccessContextValue } from "../../services/access/accessContextValue";
 import { OrganizationContextValue } from "../../services/organization/organizationContextValue";
+import { MemoryRouter } from "react-router-dom";
+import { WorkspaceBreadcrumbs, WorkspaceNavigationProvider } from "../../components/layout/WorkspaceNavigation";
 vi.mock("../../services/activity/transactionNotifications", () => ({ showTransactionSuccess: vi.fn().mockResolvedValue(undefined) }));
 const id = "10000000-0000-4000-8000-000000000001";
 const run = { id, title: "January 2026 payroll", worksite_id: id, worksite_label: "Factory", payroll_group: "A", frequency: "semi_monthly", period_start: "2025-12-26", period_end: "2026-01-10", pay_date: "2026-01-15", reason: "Client calendar", status: "draft" } as PayrollRun;
@@ -40,5 +42,23 @@ describe("run preparation UI", () => {
     expect(await screen.findByText("Attendance complete")).toBeInTheDocument();
     expect(screen.getByText("Not calculated")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve payroll" })).not.toBeInTheDocument();
+  });
+  it("removes the duplicate title strip and keeps Back inline with preparation tabs", async () => {
+    const coverage = vi.fn().mockResolvedValue({ items: [], total: 0 });
+    const close = vi.fn();
+    render(<MemoryRouter initialEntries={["/payroll"]}><WorkspaceNavigationProvider><WorkspaceBreadcrumbs /><QueryClientProvider client={new QueryClient()}><PayrollRunCoverage run={run} repository={{ coverage } as unknown as PayrollRunRepository} onClose={close} /></QueryClientProvider></WorkspaceNavigationProvider></MemoryRouter>);
+    const navigation = screen.getByRole("navigation", { name: "Run preparation views" });
+    expect(within(navigation).getByRole("button", { name: "Back to Payroll Runs" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("button", { name: "Review" })).toBeInTheDocument();
+    expect(within(navigation).getByRole("button", { name: "Calculate draft" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: run.title })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Workspace breadcrumb" })).getByText(run.title)).toBeInTheDocument();
+    expect(screen.getAllByText(run.title)).toHaveLength(1);
+    expect(screen.queryByText(run.pay_date)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cutoff details" }));
+    expect(await screen.findByText(run.pay_date)).toBeInTheDocument();
+    expect(screen.getByText(`${run.period_start} to ${run.period_end}`)).toBeInTheDocument();
+    fireEvent.click(within(navigation).getByRole("button", { name: "Back to Payroll Runs" }));
+    expect(close).toHaveBeenCalledOnce();
   });
 });
