@@ -25,6 +25,7 @@ export function employeeTermsImportInput(row: SpreadsheetRow, employee: TermsEmp
   }
   if (row.FREQUENCY || row["PAYROLL GROUP"]) { Object.assign(data, { frequency: (row.FREQUENCY || base?.data.frequency)?.toLowerCase(), payroll_group: row["PAYROLL GROUP"] || base?.data.payroll_group }); fields.add("group"); }
   if (row["SHIFT START"] || row["SHIFT END"] || row["BREAK MINUTES"]) {
+    if (mode === "patch" && base?.data.duty_segments) throw new Error("Edit split-duty schedules in the employee profile or bulk terms form; a legacy shift import cannot silently remove duty segments.");
     Object.assign(data, { shift_start: row["SHIFT START"] ? attendanceTime(row["SHIFT START"]) : base?.data.shift_start, shift_end: row["SHIFT END"] ? attendanceTime(row["SHIFT END"]) : base?.data.shift_end, break_minutes: row["BREAK MINUTES"] ? Number(row["BREAK MINUTES"]) : base?.data.break_minutes }); fields.add("schedule");
   }
   if (row["REST DAYS"]) {

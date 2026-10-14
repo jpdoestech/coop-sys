@@ -8,7 +8,7 @@ import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { PaginationControls } from "../../components/ui/PaginationControls";
 import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
-import { attendanceDate, attendanceMetrics, attendanceStatuses } from "../../services/payroll/attendanceCore";
+import { attendanceLabel, attendanceDate, attendanceMetrics, attendanceStatuses } from "../../services/payroll/attendanceCore";
 import { scheduledTeamInput, type AttendanceTeamRow } from "../../services/payroll/attendanceTeam";
 import { prepareWorksheetSave, teamExceptions, teamInput } from "../../services/payroll/attendanceWorksheet";
 import type { AttendanceInput, AttendanceStatus } from "../../types/attendance";
@@ -33,7 +33,7 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
   const refresh = async () => { await client.invalidateQueries({ queryKey: ["attendance-team"] }); await client.invalidateQueries({ queryKey: ["attendance"] }); await client.invalidateQueries({ queryKey: ["payroll-run-coverage"] }); };
   const save = useMutation({ mutationFn: async () => {
     const inputs = prepareWorksheetSave(rows, edits, selected, reference);
-    await repository.saveBatch(inputs);
+    if (run) await repository.saveCutoffBatch(run.id, inputs); else await repository.saveBatch(inputs);
     const saved = new Set(inputs.map((input) => input.employee_id));
     const remaining = Object.fromEntries(Object.entries(edits).filter(([id]) => !saved.has(id)));
     setEdits(remaining); setSelected(new Set()); if (!Object.keys(remaining).length) setReference("");
@@ -96,7 +96,7 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
           <td className="px-3 py-2"><select aria-label={`Status ${row.employeeLabel}`} className="compact-control w-32" value={input?.status || ""} disabled={locked || multi} onChange={(e) => {
             const status = e.target.value as AttendanceStatus;
             edit(row, { status, segments: status === "present" ? input?.segments.length ? input.segments : [{ time_in: "", time_out: "", in_next_day: false, out_next_day: false, break_minutes: row.terms!.data.break_minutes! }] : [] });
-          }}><option value="" disabled>Unrecorded</option>{attendanceStatuses.map((s) => <option value={s} key={s}>{s.replaceAll("_", " ")}</option>)}</select></td>
+          }}><option value="" disabled>Unrecorded</option>{attendanceStatuses.map((s) => <option value={s} key={s}>{attendanceLabel(s)}</option>)}</select></td>
           <td className="px-3 py-2"><input aria-label={`Time in ${row.employeeLabel}`} type="time" className="compact-control w-28" value={segment?.time_in || ""} disabled={locked || multi || input?.status !== "present"} onInput={(e) => punch({ time_in: e.currentTarget.value })} onChange={(e) => punch({ time_in: e.target.value })} /><label className="mt-1 flex items-center gap-1 text-[10px] text-ink/55"><input type="checkbox" aria-label={`Time in next day ${row.employeeLabel}`} checked={segment?.in_next_day || false} disabled={locked || multi || !segment} onChange={(e) => punch({ in_next_day: e.target.checked })} />Next day</label></td>
           <td className="px-3 py-2"><input aria-label={`Time out ${row.employeeLabel}`} type="time" className="compact-control w-28" value={segment?.time_out || ""} disabled={locked || multi || input?.status !== "present"} onInput={(e) => punch({ time_out: e.currentTarget.value })} onChange={(e) => punch({ time_out: e.target.value })} /><label className="mt-1 flex items-center gap-1 text-[10px] text-ink/55"><input type="checkbox" aria-label={`Time out next day ${row.employeeLabel}`} checked={segment?.out_next_day || false} disabled={locked || multi || !segment} onChange={(e) => punch({ out_next_day: e.target.checked })} />Next day</label></td>
           <td className="px-3 py-2"><input aria-label={`Break minutes ${row.employeeLabel}`} type="number" min="0" step="1" className="compact-control w-20" value={segment?.break_minutes ?? ""} disabled={locked || multi || !segment} onChange={(e) => punch({ break_minutes: Number(e.target.value) })} /></td>
@@ -108,6 +108,6 @@ export function AttendanceWorksheet({ repository, payroll, onImport, run }: { re
     </table></div>
     {exceptionsOnly ? <p className="border-t border-line px-3 py-2 text-[11px] text-ink/55">{visible.length} exceptions among {rows.length} employees on this page</p> : null}
     <PaginationControls page={page} pageSize={size} total={query.data?.total || 0} onPageChange={(next) => leave(() => setPage(next))} onPageSizeChange={(next) => leave(() => { setSize(next); setPage(1); })} />
-    {detail ? <AttendanceForm repository={repository} payroll={payroll} source={detail.attendance || undefined} initial={{ employeeId: detail.employeeId, employeeLabel: detail.employeeLabel, date: detail.date }} onClose={() => setDetail(null)} refresh={refresh} /> : null}
+    {detail ? <AttendanceForm run={run} repository={repository} payroll={payroll} source={detail.attendance || undefined} initial={{ employeeId: detail.employeeId, employeeLabel: detail.employeeLabel, date: detail.date }} onClose={() => setDetail(null)} refresh={refresh} /> : null}
   </>;
 }

@@ -2,10 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { attendanceTime, prepareAttendanceImport } from "./attendanceImport";
 import type { Employee } from "../../types/employee";
 import type { PayrollRecord } from "../../types/payroll";
+import type { PayrollRun } from "../../types/payrollRun";
 const employee = { id: "10000000-0000-4000-8000-000000000001", employee_number: "000001", last_name: "Dela Cruz", first_name: "Juan", date_hired: "2026-01-01" } as Employee;
 const terms = [{ id: "10000000-0000-4000-8000-000000000002", kind: "employee_terms", data: { employee_id: employee.id, effective_from: "2026-01-01", shift_start: "08:00", shift_end: "17:00", break_minutes: 60, rest_days: [0], rate_centavos: 60000 } }] as PayrollRecord[];
 const row = { "EMPLOYEE ID": "1", "WORK DATE": "2026-10-12", STATUS: "present", "TIME IN": "08:00", "TIME OUT": "12:00", "BREAK MINUTES": "0", REASON: "Daily log" };
 describe("attendance import", () => {
+  it("accepts AWOP aliases and keeps imported records inside the selected cutoff assignment", async () => {
+    const run = { id: "run", status: "draft", period_start: "2026-10-01", period_end: "2026-10-15", worksite_id: "site", frequency: "semi_monthly", payroll_group: "A" } as PayrollRun;
+    const scoped = [{ ...terms[0], data: { ...terms[0].data, worksite_id: "site", frequency: "semi_monthly" as const, payroll_group: "A" } }];
+    const absent = { ...row, STATUS: "AWOP", "TIME IN": "", "TIME OUT": "" };
+    const prepare = (data: typeof absent[], setup = scoped) => prepareAttendanceImport(data, "cutoff.xlsx", async () => employee, async () => setup, async () => false, undefined, run);
+    expect((await prepare([absent]))[0].input?.status).toBe("awol");
+    expect((await prepare([{ ...absent, "WORK DATE": "2026-10-16" }]))[0].error).toContain("outside");
+    expect((await prepare([absent], [{ ...scoped[0], data: { ...scoped[0].data, payroll_group: "Other" } }]))[0].error).toContain("does not match");
+  });
   it("parses Excel fractions and 12-hour clocks without silently truncating seconds", () => {
     expect(attendanceTime(String(8 / 24))).toBe("08:00");
     expect(attendanceTime("12:00 AM")).toBe("00:00");

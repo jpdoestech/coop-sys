@@ -8,12 +8,14 @@ import { createRepositories } from "../../services/repositories/repositoryFactor
 import type { AttendanceRepository } from "../../services/repositories/AttendanceRepository";
 import type { PayrollRepository } from "../../services/repositories/PayrollRepository";
 import type { AttendanceRecord, AttendanceSegment, AttendanceStatus } from "../../types/attendance";
-import { attendanceDate, attendanceMetrics, attendanceStatuses, validateAttendanceInput } from "../../services/payroll/attendanceCore";
+import { attendanceLabel, attendanceDate, attendanceMetrics, attendanceStatuses, validateAttendanceInput } from "../../services/payroll/attendanceCore";
 import { resolvePayrollWorkDate } from "../../services/payroll/payrollSetup";
 import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 import { PayrollLookup } from "./PayrollLookup";
+import { scheduledSegments } from "../../services/payroll/payrollSchedule";
+import type { PayrollRun } from "../../types/payrollRun";
 
-export function AttendanceForm({ repository, payroll, source, initial, onClose, refresh }: { repository: AttendanceRepository; payroll: PayrollRepository; source?: AttendanceRecord; initial?: { employeeId: string; employeeLabel: string; date: string }; onClose: () => void; refresh: () => Promise<void> }) {
+export function AttendanceForm({ repository, payroll, source, initial, onClose, refresh, run }: { repository: AttendanceRepository; payroll: PayrollRepository; source?: AttendanceRecord; initial?: { employeeId: string; employeeLabel: string; date: string }; onClose: () => void; refresh: () => Promise<void>; run?: PayrollRun }) {
   const [employee, setEmployee] = useState({ id: source?.employee_id || initial?.employeeId || "", label: source?.employee_label || initial?.employeeLabel || "" });
   const [date, setDate] = useState(source?.work_date || initial?.date || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
   const [status, setStatus] = useState<AttendanceStatus>(source?.status || "present"), [segments, setSegments] = useState<AttendanceSegment[]>(source ? structuredClone(source.segments) : []);
@@ -22,11 +24,11 @@ export function AttendanceForm({ repository, payroll, source, initial, onClose, 
   const result = query.data ? resolvePayrollWorkDate(query.data, employee.id, date) : null;
   const terms = result?.terms;
   useEffect(() => {
-    if (!source && terms && status === "present") setSegments([{ time_in: terms.data.shift_start!, time_out: terms.data.shift_end!, in_next_day: false, out_next_day: terms.data.shift_end! <= terms.data.shift_start!, break_minutes: terms.data.break_minutes! }]);
+    if (!source && terms && status === "present") setSegments(scheduledSegments(terms.data));
   }, [source, terms, status]);
   const save = useMutation({ mutationFn: async () => {
     const input = { employee_id: employee.id, employee_label: employee.label, work_date: date, status, segments, reason, terms_id: terms?.id || "", replace_id: source?.id || null };
-    validateAttendanceInput(input); await repository.saveBatch([input]); await refresh();
+    validateAttendanceInput(input); if (run) await repository.saveCutoffBatch(run.id, [input]); else await repository.saveBatch([input]); await refresh();
     await showTransactionSuccess("Attendance saved", "The attendance record is saved as a draft for review."); onClose();
   } });
   const guard = useUnsavedChanges(Boolean(employee.id || reason), save.isPending);
@@ -36,9 +38,9 @@ export function AttendanceForm({ repository, payroll, source, initial, onClose, 
   function update(index: number, values: Partial<AttendanceSegment>) { setSegments((all) => all.map((s, i) => i === index ? { ...s, ...values } : s)); }
   const metrics = terms ? attendanceMetrics({ segments, status }, terms.data) : null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-3"><section role="dialog" aria-modal="true" aria-label="Daily attendance" className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-md bg-white shadow-xl"><header className="flex items-center justify-between border-b border-line px-4 py-3"><h2 className="text-sm font-semibold">{source ? "Correct draft attendance" : "Daily attendance"}</h2><button type="button" className="icon-button" title="Close" aria-label="Close attendance form" disabled={save.isPending} onClick={close}><X className="h-4 w-4" /></button></header><form className="flex min-h-0 flex-col" onSubmit={(e) => { e.preventDefault(); setError(""); save.mutate(); }}><div className="space-y-3 overflow-y-auto p-4">
-    <div className="grid gap-3 sm:grid-cols-2">{source ? <p className="text-xs font-semibold">{employee.label}</p> : <PayrollLookup label="Employee" value={employee.id} selectedLabel={employee.label} load={load} required onChange={(id, label) => setEmployee({ id, label })} />}
-      <label className="field-label">Work date<input className="compact-control mt-1 w-full" type="date" required disabled={Boolean(source)} value={date} onInput={(e) => setDate(e.currentTarget.value)} onChange={(e) => setDate(e.target.value)} /></label>
-      <label className="field-label">Attendance status<SearchableSelect className="compact-control mt-1 w-full" value={status} onChange={(e) => { const next = e.target.value as AttendanceStatus; setStatus(next); if (next !== "present") setSegments([]); }}>{attendanceStatuses.map((s) => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}</SearchableSelect></label>
+    <div className="grid gap-3 sm:grid-cols-2">{source || run ? <p className="text-xs font-semibold">{employee.label}</p> : <PayrollLookup label="Employee" value={employee.id} selectedLabel={employee.label} load={load} required onChange={(id, label) => setEmployee({ id, label })} />}
+      <label className="field-label">Work date<input className="compact-control mt-1 w-full" type="date" min={run?.period_start} max={run?.period_end} required disabled={Boolean(source)} value={date} onInput={(e) => setDate(e.currentTarget.value)} onChange={(e) => setDate(e.target.value)} /></label>
+      <label className="field-label">Attendance status<SearchableSelect className="compact-control mt-1 w-full" value={status} onChange={(e) => { const next = e.target.value as AttendanceStatus; setStatus(next); if (next !== "present") setSegments([]); }}>{attendanceStatuses.map((s) => <option key={s} value={s}>{attendanceLabel(s)}</option>)}</SearchableSelect></label>
       <div className="text-xs"><p className="text-[10px] uppercase text-ink/45">Applicable duty</p><p className="mt-1 font-semibold">{query.isFetching ? "Loading..." : terms?.data.label || "No applicable pay terms"}</p><p className="mt-1 text-ink/55">{terms?.data.worksite_label || ""}</p></div>
     </div>
     {status === "present" ? <fieldset className="border-y border-line py-3"><legend className="text-xs font-semibold">Work segments</legend>{segments.map((segment, index) => <div key={index} className="mb-3 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_100px_32px]">

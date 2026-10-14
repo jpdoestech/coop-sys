@@ -14,6 +14,7 @@ import { payrollRunsKey } from "../../payroll/payrollRuns";
 import type { PayrollRun } from "../../../types/payrollRun";
 import { payrollStorageKey } from "../../payroll/payrollSetup";
 import { serverRequest, usesServerBackend } from "../../server/serverApi";
+import { cutoffAttendanceRevisions } from "../../payroll/attendanceMatrix";
 
 export class LocalAttendanceRepository implements AttendanceRepository {
   constructor(private profile: AccessProfile) {}
@@ -74,5 +75,20 @@ export class LocalAttendanceRepository implements AttendanceRepository {
     if (!resolution.terms || resolution.terms.id !== record.terms_id) throw new Error("Pay terms changed. Correct the draft before approval.");
     const now = new Date().toISOString();
     await this.persist(records.map((r) => r.id === id ? { ...r, review_status: "approved", reviewed_by: this.profile.userId, reviewed_at: now, updated_at: now } : r));
+  }
+  async saveCutoffBatch(runId: string, inputs: AttendanceInput[]) {
+    assertPayrollAccess(this.profile, true);
+    if (usesServerBackend()) return serverRequest<void>("/attendance/cutoff", { method: "POST", body: JSON.stringify({ runId, inputs }) });
+    await this.records();
+    const employees = await new LocalEmployeeRepository().list();
+    const records = JSON.parse(readPersistentItem(attendanceStorageKey) || "[]") as AttendanceRecord[];
+    const run = (JSON.parse(readPersistentItem(payrollRunsKey) || "[]") as PayrollRun[]).find((r) => r.id === runId);
+    if (!run) throw new Error("Cutoff is unavailable.");
+    const setup = JSON.parse(readPersistentItem(payrollStorageKey) || "[]");
+    const next = cutoffAttendanceRevisions(run, inputs, records, setup, employees, this.profile.userId, new Date().toISOString(), createUuid);
+    // Both validated collections are committed together without yielding between writes.
+    const previousSetup = readPersistentItem(payrollStorageKey), previousAttendance = readPersistentItem(attendanceStorageKey);
+    try { localStorage.setItem(payrollStorageKey, JSON.stringify(next.setup)); localStorage.setItem(attendanceStorageKey, JSON.stringify(next.attendance)); }
+    catch (error) { for (const [key, value] of [[payrollStorageKey, previousSetup], [attendanceStorageKey, previousAttendance]]) { if (value !== null) localStorage.setItem(key!, value!); else localStorage.removeItem(key!); } throw error; }
   }
 }

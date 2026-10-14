@@ -43,11 +43,14 @@ Payroll opens on Payroll Runs. Creating a run selects branch, client (or agency)
 worksite and the explicit cutoff. Worksite search is restricted to that placement
 and its query cache is partitioned by the selection.
 
-Run preparation includes Attendance / Workdays and Employee setup. The attendance
-worksheet fixes the run's worksite, restricts dates to the cutoff and filters group
-and frequency before paging. It retains bulk schedule/absence/leave entry and the
-existing approved-record locks. No presence is inferred merely from a schedule.
-Unsaved worksheet edits are guarded when changing views or closing preparation.
+Creating a cutoff opens its Attendance grid immediately. Allowances & deductions,
+Review and Calculate draft stay inside that cutoff. Payroll configuration is
+grouped under Settings instead of separate primary tabs. The attendance grid
+fixes the run's worksite, dates, group and frequency before paging. Blank-day
+assumptions are account preferences and must be confirmed before saving; they
+are not saved or approved attendance merely because a schedule exists. Unsaved
+edits are guarded when changing views or closing preparation. See
+[Cutoff Attendance Grid](payroll-attendance-matrix.md) for entry and deployment.
 
 Employee setup selects cutoff employees across pages for reviewed bulk terms or
 allowance changes and dated deduction plans. Changes to base terms begin within

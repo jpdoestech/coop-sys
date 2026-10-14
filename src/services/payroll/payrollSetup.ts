@@ -1,4 +1,5 @@
 import type { PayrollData, PayrollInput, PayrollRecord } from "../../types/payroll";
+import { validateDutySchedule } from "./payrollSchedule";
 
 export const payrollKinds = ["worksite", "wage", "client_terms", "employee_terms", "override", "cooperative_policy", "deduction"] as const;
 export const payrollStorageKey = "coop_sys_payroll_setup";
@@ -62,6 +63,7 @@ export function validatePayrollInput(input: PayrollInput) {
   const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
   const duration = (minutes(d.shift_end!) - minutes(d.shift_start!) + 1440) % 1440;
   if (!Number.isInteger(d.break_minutes) || Number(d.break_minutes) < 0 || Number(d.break_minutes) >= duration) throw new Error("Unpaid breaks must be shorter than the shift.");
+  validateDutySchedule(d);
   if (!Array.isArray(d.rest_days) || new Set(d.rest_days).size !== d.rest_days.length || d.rest_days.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("Select valid rest days.");
   if (!Array.isArray(d.allowances) || d.allowances.length > 30) throw new Error("A maximum of 30 allowance components is supported.");
   for (const a of d.allowances) {

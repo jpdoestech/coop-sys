@@ -18,14 +18,16 @@ describe("SQLite server maintenance", () => {
     const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const reportsSource = readFileSync(resolve("src/services/reports/sqliteReports.ts"), "utf8");
     const reportsCode = ts.transpileModule(reportsSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const matrixCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceMatrix.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const scheduleCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollSchedule.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const payrollCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollSetup.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const attendanceCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceCore.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const teamCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/attendanceTeam.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const runsCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollRuns.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const calculationCode = ts.transpileModule(readFileSync(resolve("src/services/payroll/payrollCalculation.ts"), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`).replace("__COOP_PAYROLL__", `(() => { const exports = {}; ${payrollCode}; return exports; })()`).replace("__COOP_ATTENDANCE__", `(() => { const exports = {}; ${attendanceCode}; return exports; })()`);
+    const template = readFileSync(resolve("tools/database-server/server-template.cjs"), "utf8").replace("__COOP_EMBEDDED_ASSETS__", "{}").replace("__COOP_MAINTENANCE__", `(() => { const exports = {}; ${code}; return exports; })()`).replace("__COOP_REPORTS__", `(() => { const exports = {}; ${reportsCode}; return exports; })()`).replace("__COOP_PAYROLL_SCHEDULE__", `(() => { const exports={}; ${scheduleCode}; return exports; })()`).replace("__COOP_PAYROLL__", `(() => { const exports = {}; const require = () => payrollSchedule; ${payrollCode}; return exports; })()`).replace("__COOP_ATTENDANCE__", `(() => { const exports = {}; const require = () => payrollSchedule; ${attendanceCode}; return exports; })()`);
     const serverPath = join(directory, "test-server.cjs");
-    writeFileSync(serverPath, template.replace("__COOP_ATTENDANCE_TEAM__", `(() => { const exports = {}; ${teamCode}; return exports; })()`).replace("__COOP_PAYROLL_RUNS__", `(() => { const exports = {}; ${runsCode}; return exports; })()`).replace("__COOP_PAYROLL_CALCULATION__", `(() => { const exports={}; const require=(id)=>({"./attendanceCore":attendance,"./payrollSetup":payroll,"./payrollRuns":payrollRuns})[id]; ${calculationCode}; return exports; })()`).replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
+    writeFileSync(serverPath, template.replace("__COOP_ATTENDANCE_TEAM__", `(() => { const exports = {}; const require = () => payrollSchedule; ${teamCode}; return exports; })()`).replace("__COOP_PAYROLL_RUNS__", `(() => { const exports = {}; ${runsCode}; return exports; })()`).replace("__COOP_PAYROLL_CALCULATION__", `(() => { const exports={}; const require=(id)=>({"./attendanceCore":attendance,"./payrollSetup":payroll,"./payrollRuns":payrollRuns})[id]; ${calculationCode}; return exports; })()`).replace("__COOP_ATTENDANCE_MATRIX__", `(() => { const exports={}; const require=(id)=>({"./attendanceCore":attendance,"./payrollSchedule":payrollSchedule,"./payrollSetup":payroll,"./payrollRuns":payrollRuns})[id]; ${matrixCode}; return exports; })()`).replace('const port = Number(args.port || 8787);', 'const port = 0;').replace('console.log(`READY|${port}|', 'console.log(`READY|${server.address().port}|'));
     child = spawn(process.execPath, [serverPath, `--data-dir=${directory}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     await new Promise<void>((resolveReady, reject) => {
       const timer = setTimeout(() => reject(new Error("Server startup timed out.")), 10000);
@@ -177,5 +179,18 @@ describe("SQLite server maintenance", () => {
     expect((await api(path, "GET", undefined, cookie)).status).toBe(403);
     expect((await api(`/payroll/runs/${run.id}/preview`, "GET", undefined, cookie)).status).toBe(403);
     expect((await (await api("/storage", "GET", undefined, cookie)).json()).coop_sys_payroll_calculation_rules).toBeUndefined();
+  });
+  it("isolates attendance preferences by authenticated account and rejects forged ownership", async () => {
+    expect((await api("/attendance/preferences", "PUT", { blank_mode: "absent" })).status).toBe(200);
+    expect(await (await api("/attendance/preferences")).json()).toEqual({ blank_mode: "absent" });
+    expect((await api("/attendance/preferences", "PUT", { blank_mode: "present", user_id: "forged" })).status).toBe(400);
+    const created = await api("/users", "POST", { display_name: "Payroll reader", email: "payroll-reader@example.test", role: "branch_user", role_ids: ["70000000-0000-4000-8000-000000000007"], branch_ids: [], client_ids: [], scope_type: "organization", direct_grants: ["payroll.view"], direct_denies: [], temporary_password: "TestPassword2026!", is_active: true });
+    expect(created.status).toBe(201);
+    const login = await api("/auth/login", "POST", { email: "payroll-reader@example.test", password: "TestPassword2026!" }, "");
+    const reader = login.headers.get("set-cookie")!.split(";")[0];
+    expect(await (await api("/attendance/preferences", "GET", undefined, reader)).json()).toEqual({ blank_mode: "present" });
+    expect((await api("/attendance/cutoff", "POST", { runId: "anything", inputs: [] }, reader)).status).toBe(403);
+    const limitedLogin = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, "");
+    expect((await api("/attendance/preferences", "GET", undefined, limitedLogin.headers.get("set-cookie")!.split(";")[0])).status).toBe(403);
   });
 });

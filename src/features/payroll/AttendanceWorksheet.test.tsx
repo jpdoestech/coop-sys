@@ -20,7 +20,7 @@ function setup() {
   const rows: AttendanceTeamRow[] = ids.map((id, i) => ({ employeeId: id, employeeLabel: labels[i], date: "2026-10-12", terms: { ...terms, data: { ...terms.data, employee_id: id } }, baseTerms: terms, attendance: null, neighbors: [], restDay: false }));
   rows.push({ ...rows[0], employeeId: "10000000-0000-4000-8000-000000000005", employeeLabel: "Approved employee", attendance: { id: siteId, terms_id: terms.id, review_status: "approved", status: "present", segments: [{ time_in: "08:00", time_out: "17:00", in_next_day: false, out_next_day: false, break_minutes: 60 }] } as AttendanceRecord });
   const saveBatch = vi.fn().mockResolvedValue(undefined);
-  const repository = { worksheet: vi.fn().mockResolvedValue({ items: rows, total: rows.length }), saveBatch, list: vi.fn(), approve: vi.fn() } as AttendanceRepository;
+  const repository = { worksheet: vi.fn().mockResolvedValue({ items: rows, total: rows.length }), saveBatch, saveCutoffBatch: vi.fn(), list: vi.fn(), approve: vi.fn() } as AttendanceRepository;
   const payroll = { list: vi.fn().mockResolvedValue({ items: [{ id: siteId, data: { label: "Production site" } }], total: 1 }), save: vi.fn(), saveBatch: vi.fn(), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const directory = { branches: [], clients: [], departments: [], positions: [], loading: false, error: null, saveBranch: vi.fn(), saveClient: vi.fn(), saveDepartment: vi.fn(), savePosition: vi.fn() };

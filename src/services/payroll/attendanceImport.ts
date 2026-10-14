@@ -1,6 +1,7 @@
 import type { AttendanceInput, AttendanceSegment, AttendanceStatus } from "../../types/attendance";
 import type { Employee } from "../../types/employee";
 import type { PayrollRecord } from "../../types/payroll";
+import type { PayrollRun } from "../../types/payrollRun";
 import type { SpreadsheetRow } from "../imports/excelWorkbook";
 import { attendanceDate, attendanceInputsOverlap, attendanceStatuses, validateAttendanceInput } from "./attendanceCore";
 import { resolvePayrollWorkDate } from "./payrollSetup";
@@ -23,18 +24,20 @@ export function attendanceTime(value: string) {
 }
 function nextDay(value = "") { if (!value || /^(NO|FALSE|0)$/i.test(value)) return false; if (/^(YES|TRUE|1)$/i.test(value)) return true; throw new Error("Next-day flags must be YES or NO."); }
 
-export async function prepareAttendanceImport(rows: SpreadsheetRow[], fileName: string, loadEmployee: (number: string) => Promise<Employee | null>, loadTerms: (id: string, date: string) => Promise<PayrollRecord[]>, exists: (id: string, date: string, input: AttendanceInput) => Promise<boolean>, onProgress?: (done: number, total: number) => void): Promise<AttendanceImportResult[]> {
+export async function prepareAttendanceImport(rows: SpreadsheetRow[], fileName: string, loadEmployee: (number: string) => Promise<Employee | null>, loadTerms: (id: string, date: string) => Promise<PayrollRecord[]>, exists: (id: string, date: string, input: AttendanceInput) => Promise<boolean>, onProgress?: (done: number, total: number) => void, run?: PayrollRun): Promise<AttendanceImportResult[]> {
   if (!rows.length || rows.length > 500) throw new Error("Import between 1 and 500 worksheet rows at a time.");
   const missing = ["EMPLOYEE ID", "WORK DATE", "STATUS"].filter((header) => !(header in rows[0]));
   if (missing.length) throw new Error(`Missing headers: ${missing.join(", ")}.`);
   const groups = new Map<string, { rowNumbers: number[]; number: string; date: string; status: AttendanceStatus; segments: AttendanceSegment[]; reason: string; error: string | null }>();
   rows.forEach((row, index) => {
-    const number = (row["EMPLOYEE ID"] || "").trim().padStart(6, "0"), date = row["WORK DATE"], status = (row.STATUS || "").trim().toLowerCase().replaceAll(" ", "_") as AttendanceStatus;
+    const number = (row["EMPLOYEE ID"] || "").trim().padStart(6, "0"), date = row["WORK DATE"], rawStatus = (row.STATUS || "").trim().toLowerCase().replaceAll(" ", "_");
+    const status = (["awop", "awol/p", "awol/awop"].includes(rawStatus) ? "awol" : rawStatus === "day-off" ? "rest_day" : rawStatus) as AttendanceStatus;
     const key = `${number}:${date}`, previous = groups.get(key);
     const group = previous || { rowNumbers: [], number, date, status, segments: [], reason: "", error: null };
     group.rowNumbers.push(index + 2); groups.set(key, group);
     try {
       if (!row["EMPLOYEE ID"]?.trim() || !/^\d{6}$/.test(number) || !attendanceDate(date || "")) throw new Error("Employee ID and a valid work date are required.");
+      if (run && (run.status !== "draft" || date < run.period_start || date > run.period_end)) throw new Error("Work date is outside this active cutoff.");
       if (!attendanceStatuses.includes(status)) throw new Error("Unknown attendance status.");
       if (previous && (status !== previous.status || status !== "present")) throw new Error("Duplicate non-working record or mixed statuses for one employee/date.");
       const reason = row.REASON?.trim();
@@ -62,7 +65,8 @@ export async function prepareAttendanceImport(rows: SpreadsheetRow[], fileName: 
         if (employee.date_hired && group.date < employee.date_hired || employee.date_separated && group.date > employee.date_separated) throw new Error("Work date is outside the employment period.");
         const resolved = resolvePayrollWorkDate(await loadTerms(employee.id, group.date), employee.id, group.date);
         if (!resolved.terms) throw new Error("No dated employee pay terms apply to this work date.");
-        if (group.status === "rest_day" && !resolved.restDay) throw new Error("A schedule override is required for this rest day.");
+        if (run && (resolved.terms.data.worksite_id !== run.worksite_id || resolved.terms.data.frequency !== run.frequency || resolved.terms.data.payroll_group?.trim().toLowerCase() !== run.payroll_group.trim().toLowerCase())) throw new Error("Employee assignment does not match this cutoff.");
+        if (!run && group.status === "rest_day" && !resolved.restDay) throw new Error("A schedule override is required for this rest day.");
         input = { employee_id: employee.id, employee_label: `${employee.employee_number} - ${employee.last_name}, ${employee.first_name}`, work_date: group.date, status: group.status, segments: group.segments, reason: group.reason, terms_id: resolved.terms.id, source_file: fileName };
         validateAttendanceInput(input);
         if (await exists(employee.id, group.date, input)) throw new Error("Attendance already exists. Correct the draft instead of importing it again.");
@@ -87,7 +91,7 @@ export async function downloadAttendanceTemplate() {
   attendanceHeaders.forEach((header, index) => { const column = sheet.getColumn(index + 1); column.width = header === "REASON" ? 40 : 22; column.numFmt = "@"; });
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } }; sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF247253" } };
   for (let row = 2; row <= 501; row++) {
-    sheet.getCell(row, 3).dataValidation = { type: "list", allowBlank: false, formulae: ['"present,absent,paid_leave,unpaid_leave,rest_day"'] };
+    sheet.getCell(row, 3).dataValidation = { type: "list", allowBlank: false, formulae: ['"present,absent,paid_leave,unpaid_leave,rest_day,awol"'] };
     for (const col of [6, 7]) sheet.getCell(row, col).dataValidation = { type: "list", allowBlank: true, formulae: ['"YES,NO"'] };
   }
   sheet.getCell("A1").note = "Existing six-digit employee ID; names are not used to guess identity.";

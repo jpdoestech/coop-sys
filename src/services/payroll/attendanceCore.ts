@@ -1,7 +1,9 @@
 import type { AttendanceInput, AttendanceRecord, AttendanceSegment } from "../../types/attendance";
 import type { PayrollData } from "../../types/payroll";
+import { scheduledSegments, dutyRange } from "./payrollSchedule";
 export const attendanceStorageKey = "coop_sys_attendance";
-export const attendanceStatuses = ["present", "absent", "paid_leave", "unpaid_leave", "rest_day"] as const;
+export const attendanceStatuses = ["present", "absent", "paid_leave", "unpaid_leave", "rest_day", "awol"] as const;
+export function attendanceLabel(status: string) { return status === "awol" ? "AWOL / AWOP" : status === "rest_day" ? "Day-off" : status.replaceAll("_", " "); }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
 export function attendanceDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value; }
@@ -62,5 +64,13 @@ export function attendanceMetrics(input: Pick<AttendanceInput, "segments" | "sta
   const start = clockMinutes(terms.shift_start!), end = clockMinutes(terms.shift_end!) + (terms.shift_end! <= terms.shift_start! ? 1440 : 0);
   const scheduled = end - start - terms.break_minutes!;
   const segments = input.segments.map(segmentRange).sort((a, b) => a.start - b.start);
-  return { worked: attendanceMinutes(input), scheduled, late: input.status === "present" && segments.length ? Math.max(0, segments[0].start - start) : 0, earlyDeparture: input.status === "present" && segments.length ? Math.max(0, end - segments[segments.length - 1].end) : 0 };
+  let late = 0, earlyDeparture = 0;
+  if (input.status === "present" && segments.length) {
+    if (terms.duty_segments) for (const duty of scheduledSegments(terms)) {
+      const d = dutyRange(duty), overlaps = segments.filter((s) => s.start < d.end && s.end > d.start);
+      if (!overlaps.length) earlyDeparture += d.end - d.start - duty.break_minutes;
+      else { late += Math.max(0, Math.min(...overlaps.map((s) => s.start)) - d.start); earlyDeparture += Math.max(0, d.end - Math.max(...overlaps.map((s) => s.end))); }
+    } else { late = Math.max(0, segments[0].start - start); earlyDeparture = Math.max(0, end - segments.at(-1)!.end); }
+  }
+  return { worked: attendanceMinutes(input), scheduled, late, earlyDeparture };
 }

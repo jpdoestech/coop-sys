@@ -8,11 +8,13 @@ const { DatabaseSync } = require("node:sqlite");
 const ASSETS = __COOP_EMBEDDED_ASSETS__;
 const maintenance = __COOP_MAINTENANCE__;
 const reports = __COOP_REPORTS__;
+const payrollSchedule = __COOP_PAYROLL_SCHEDULE__;
 const payroll = __COOP_PAYROLL__;
 const attendance = __COOP_ATTENDANCE__;
 const attendanceTeam = __COOP_ATTENDANCE_TEAM__;
 const payrollRuns = __COOP_PAYROLL_RUNS__;
 const calculation = __COOP_PAYROLL_CALCULATION__;
+const attendanceMatrix = __COOP_ATTENDANCE_MATRIX__;
 const args = Object.fromEntries(process.argv.slice(2).filter((arg) => arg.startsWith("--")).map((arg) => {
   const [key, ...value] = arg.slice(2).split("=");
   return [key, value.join("=") || "true"];
@@ -47,6 +49,9 @@ db.exec(`
   PRAGMA busy_timeout = 10000;
   CREATE TABLE IF NOT EXISTS server_migrations (
     version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS attendance_preferences (
+    user_id TEXT PRIMARY KEY, blank_mode TEXT NOT NULL CHECK(blank_mode IN ('present','absent')), updated_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS app_storage (
     storage_key TEXT PRIMARY KEY,
@@ -564,6 +569,30 @@ async function api(req, res, url) {
   }
 
   const user = requireUser(req, res); if (!user) return;
+  if (url.pathname === "/api/attendance/preferences") {
+    if (!hasPermission(user,"payroll.view")) return json(res,403,{error:"Payroll view permission is required."});
+    if (req.method === "GET") return json(res,200,{blank_mode:db.prepare("SELECT blank_mode FROM attendance_preferences WHERE user_id=?").get(user.id)?.blank_mode || "present"});
+    if (req.method === "PUT") {
+      const input=await body(req);
+      if (!["present","absent"].includes(input.blank_mode) || Object.keys(input).some((key)=>key!=="blank_mode")) return json(res,400,{error:"Select an attendance blank-day preference for your own account."});
+      db.prepare("INSERT INTO attendance_preferences(user_id,blank_mode,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET blank_mode=excluded.blank_mode,updated_at=excluded.updated_at").run(user.id,input.blank_mode,now());
+      return json(res,200,{ok:true});
+    }
+    return json(res,405,{error:"Method not allowed."});
+  }
+  if (req.method === "POST" && url.pathname === "/api/attendance/cutoff") {
+    if (user.scope_type !== "organization" || !hasPermission(user,"payroll.view") || !hasPermission(user,"payroll.manage")) return json(res,403,{error:"Organization-wide payroll management permission is required."});
+    try {
+      const input=await body(req), read=(key)=>JSON.parse(getStorage.get(key)?.value||"[]");
+      const run=read(payrollRuns.payrollRunsKey).find((r)=>r.id===input.runId);
+      if (!run) throw new Error("Cutoff is unavailable.");
+      const timestamp=now(), next=attendanceMatrix.cutoffAttendanceRevisions(run,input.inputs,read("coop_sys_attendance"),read("coop_sys_payroll_setup"),read("coop_sys_employees"),user.id,timestamp,()=>crypto.randomUUID());
+      db.exec("BEGIN IMMEDIATE");
+      try { saveStorage.run("coop_sys_payroll_setup",JSON.stringify(next.setup),timestamp,user.id); saveStorage.run("coop_sys_attendance",JSON.stringify(next.attendance),timestamp,user.id); db.exec("COMMIT"); }
+      catch(error) { db.exec("ROLLBACK"); throw error; }
+      return json(res,200,{ok:true});
+    } catch(error) { return json(res,400,{error:error.message}); }
+  }
   if (url.pathname === "/api/payroll/setup/batch" && req.method === "POST") {
     if (user.scope_type !== "organization" || !hasPermission(user,"payroll.view") || !hasPermission(user,"payroll.manage")) return json(res,403,{ error:"Organization-wide payroll management access is required." });
     try {

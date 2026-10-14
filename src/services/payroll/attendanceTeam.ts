@@ -1,6 +1,7 @@
 import type { AttendanceInput, AttendanceRecord } from "../../types/attendance";
 import type { PayrollRecord } from "../../types/payroll";
 import type { PayrollRun } from "../../types/payrollRun";
+import { scheduledSegments } from "./payrollSchedule";
 
 export type AttendanceTeamQuery = { date: string; worksiteId: string; runId?: string; payrollGroup?: string; frequency?: string; departmentId?: string; search?: string; limit?: number; offset?: number };
 export function cutoffTeamQuery(q: AttendanceTeamQuery, run?: PayrollRun): AttendanceTeamQuery {
@@ -52,5 +53,5 @@ export function buildAttendanceTeamPage(setup: PayrollRecord[], employees: TeamE
 export function scheduledTeamInput(row: AttendanceTeamRow, reason: string): AttendanceInput {
   if (!row.terms || row.attendance?.review_status === "approved") throw new Error("Applicable terms and an unlocked attendance record are required.");
   const d = row.terms.data;
-  return { employee_id: row.employeeId, employee_label: row.employeeLabel, work_date: row.date, status: row.restDay ? "rest_day" : "present", segments: row.restDay ? [] : [{ time_in: d.shift_start!, time_out: d.shift_end!, in_next_day: false, out_next_day: d.shift_end! <= d.shift_start!, break_minutes: d.break_minutes! }], reason, terms_id: row.terms.id, replace_id: row.attendance?.id || null };
+  return { employee_id: row.employeeId, employee_label: row.employeeLabel, work_date: row.date, status: row.restDay ? "rest_day" : "present", segments: row.restDay ? [] : scheduledSegments(d), reason, terms_id: row.terms.id, replace_id: row.attendance?.id || null };
 }

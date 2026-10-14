@@ -1,5 +1,6 @@
 export type PayrollKind = "worksite" | "wage" | "client_terms" | "employee_terms" | "override" | "cooperative_policy" | "deduction";
 export type PayrollAllowance = { name: string; amount_centavos: number; basis: "worked_day" | "cutoff" | "month"; tax_treatment: "unreviewed" | "taxable" | "non_taxable" };
+export type PayrollDutySegment = { time_in: string; time_out: string; in_next_day: boolean; out_next_day: boolean; break_minutes: number };
 export type PayrollData = {
   label: string;
   reason: string;
@@ -32,6 +33,7 @@ export type PayrollData = {
   shift_start?: string;
   shift_end?: string;
   break_minutes?: number;
+  duty_segments?: PayrollDutySegment[];
   rest_days?: number[];
   allowances?: PayrollAllowance[];
   source_terms_id?: string | null;

@@ -7,16 +7,17 @@ import { PaginationControls } from "../../components/ui/PaginationControls";
 import { createRepositories } from "../../services/repositories/repositoryFactory";
 import type { AttendanceRepository } from "../../services/repositories/AttendanceRepository";
 import type { PayrollRepository } from "../../services/repositories/PayrollRepository";
+import type { PayrollRun } from "../../types/payrollRun";
 import { readSpreadsheet } from "../../services/imports/excelWorkbook";
 import { downloadAttendanceTemplate, prepareAttendanceImport, type AttendanceImportResult } from "../../services/payroll/attendanceImport";
 import { attendanceInputsOverlap, attendanceMinutes } from "../../services/payroll/attendanceCore";
 import { showTransactionSuccess } from "../../services/activity/transactionNotifications";
 
-export function AttendanceImportDialog({ repository, payroll, onClose, refresh }: { repository: AttendanceRepository; payroll: PayrollRepository; onClose: () => void; refresh: () => Promise<void> }) {
+export function AttendanceImportDialog({ repository, payroll, onClose, refresh, run }: { repository: AttendanceRepository; payroll: PayrollRepository; onClose: () => void; refresh: () => Promise<void>; run?: PayrollRun }) {
   const [rows, setRows] = useState<AttendanceImportResult[]>([]), [error, setError] = useState(""), [reading, setReading] = useState(false), [saved, setSaved] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 }), [page, setPage] = useState(1), [size, setSize] = useState(25);
   const inputs = rows.flatMap((row) => row.input && !row.error ? [row.input] : []);
-  const mutation = useMutation({ mutationFn: async () => { await repository.saveBatch(inputs); setSaved(true); await refresh(); await showTransactionSuccess("Attendance imported", `${inputs.length} daily records saved as drafts. ${rows.length - inputs.length} records were not imported.`); } });
+  const mutation = useMutation({ mutationFn: async () => { if (run) await repository.saveCutoffBatch(run.id, inputs); else await repository.saveBatch(inputs); setSaved(true); await refresh(); await showTransactionSuccess("Attendance imported", `${inputs.length} daily records saved as drafts. ${rows.length - inputs.length} records were not imported.`); } });
   const guard = useUnsavedChanges(rows.length > 0 && !saved, reading || mutation.isPending);
   const close = () => { if (!reading && !mutation.isPending) guard.confirmDiscard(onClose); };
   useWorkspaceDialog("Import Attendance", close);
@@ -30,7 +31,7 @@ export function AttendanceImportDialog({ repository, payroll, onClose, refresh }
         if (existing.some((record) => record.work_date === date)) return true;
         if (existing.some((record) => attendanceInputsOverlap(input, record))) throw new Error("Punches overlap an existing adjacent work date.");
         return false;
-      }, (done, total) => setProgress({ done, total })));
+      }, (done, total) => setProgress({ done, total }), run));
     } catch (reason) { setError((reason as Error).message); } finally { setReading(false); }
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 p-3"><section role="dialog" aria-modal="true" aria-label="Import daily attendance" className="flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-md bg-white shadow-xl"><header className="flex items-center justify-between border-b border-line px-4 py-3"><h2 className="text-sm font-semibold">Import daily attendance</h2><button type="button" className="icon-button" title="Close" aria-label="Close attendance import" disabled={reading || mutation.isPending} onClick={close}><X className="h-4 w-4" /></button></header>

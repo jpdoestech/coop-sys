@@ -6,7 +6,7 @@ export const termsFieldGroups = {
   basis: { label: "Pay basis / monthly factor", keys: ["pay_basis", "monthly_mode", "monthly_factor"] },
   worksite: { label: "Worksite / region", keys: ["worksite_id", "worksite_label"] },
   duty: { label: "Department / position", keys: ["department_id", "position_id"] },
-  schedule: { label: "Shift / break", keys: ["shift_start", "shift_end", "break_minutes"] },
+  schedule: { label: "Shift / break", keys: ["shift_start", "shift_end", "break_minutes", "duty_segments"] },
   rest: { label: "Rest days", keys: ["rest_days"] },
   allowances: { label: "Allowances", keys: ["allowances"] },
   group: { label: "Payroll group / frequency", keys: ["payroll_group", "frequency"] },

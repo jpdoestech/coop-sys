@@ -34,4 +34,11 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
     const { error } = await db().rpc("approve_attendance", { p_id: id });
     if (error) throw new Error(error.message);
   }
+  async saveCutoffBatch(runId: string, inputs: AttendanceInput[]) {
+    assertPayrollAccess(this.profile, true);
+    if (!inputs.length || inputs.length > 3100) throw new Error("Save between 1 and 3,100 cutoff assignment-days.");
+    inputs.forEach(validateAttendanceInput);
+    const { error } = await db().rpc("save_cutoff_attendance", { p_run_id: runId, p_records: inputs });
+    if (error) throw new Error(error.message);
+  }
 }

@@ -5,6 +5,7 @@ import { LocalAttendanceRepository } from "./LocalAttendanceRepository";
 import { LocalPayrollRepository } from "./LocalPayrollRepository";
 import { LocalOrganizationDirectoryRepository } from "./LocalOrganizationDirectoryRepository";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
+import { LocalPayrollRunRepository } from "./LocalPayrollRunRepository";
 
 const admin: AccessProfile = { userId: "70000000-0000-4000-8000-000000000001", displayName: "Admin", role: "super_admin", scopeType: "organization", branchIds: [] };
 afterEach(() => localStorage.clear());
@@ -18,6 +19,21 @@ async function setup() {
   return { payroll, attendance, input, terms };
 }
 describe("local attendance persistence", () => {
+  it("saves a cutoff day-off and its override atomically and rolls back every record on failure", async () => {
+    const { payroll, attendance, input, terms } = await setup();
+    const run = await new LocalPayrollRunRepository(admin).create({ title: "QA cutoff", worksite_id: terms.data.worksite_id!, worksite_label: "Attendance site", payroll_group: "A", frequency: "semi_monthly", period_start: "2026-10-01", period_end: "2026-10-15", pay_date: "2026-10-20", reason: "QA" });
+    const dayOff = { ...input, status: "rest_day" as const, segments: [] };
+    await expect(attendance.saveCutoffBatch(run.id, [dayOff, { ...input, work_date: "2026-10-16" }])).rejects.toThrow("outside");
+    expect((await attendance.list({})).total).toBe(0);
+    expect((await payroll.list({ kind: "override" })).total).toBe(0);
+    await attendance.saveCutoffBatch(run.id, [dayOff]);
+    const saved = (await attendance.list({})).items[0];
+    expect(saved.status).toBe("rest_day");
+    expect((await payroll.list({ kind: "override" })).items[0].id).toBe(saved.terms_id);
+    await attendance.approve(saved.id);
+    await expect(attendance.saveCutoffBatch(run.id, [{ ...input, work_date: "2026-10-13", status: "awol", segments: [] }, { ...dayOff, terms_id: saved.terms_id, replace_id: saved.id }])).rejects.toThrow("current draft");
+    expect((await attendance.list({})).total).toBe(1);
+  });
   it("preserves correction history, locks approved records, and protects their referenced terms", async () => {
     const { payroll, attendance, input, terms } = await setup();
     await attendance.saveBatch([input]);

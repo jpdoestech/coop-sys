@@ -12,25 +12,27 @@ vi.mock("../../services/activity/transactionNotifications", () => ({ showTransac
 const id = "10000000-0000-4000-8000-000000000001";
 const run = { id, title: "January 2026 payroll", worksite_id: id, worksite_label: "Factory", payroll_group: "A", frequency: "semi_monthly", period_start: "2025-12-26", period_end: "2026-01-10", pay_date: "2026-01-15", reason: "Client calendar", status: "draft" } as PayrollRun;
 describe("run preparation UI", () => {
-  it("saves the explicitly entered cutoff and responds to native date input events", async () => {
-    const create = vi.fn().mockResolvedValue(run), close = vi.fn();
+  it.each([true, false])("saves the cutoff and opens it immediately, with custom details: %s", async (customDetails) => {
+    const create = vi.fn().mockResolvedValue(run), close = vi.fn(), opened = vi.fn();
     const repository = { create, list: vi.fn(), cancel: vi.fn(), coverage: vi.fn(), listRules: vi.fn(), saveRules: vi.fn(), previewSource: vi.fn() } as PayrollRunRepository;
     const payroll = { list: vi.fn().mockResolvedValue({ items: [{ id, data: { label: "Factory" } }], total: 1 }), save: vi.fn(), saveBatch: vi.fn(), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
     const directory = { branches: [{ id, label: "Branch", isActive: true, code: "BR", address: "", type: "branch" as const, parentId: null }], clients: [], departments: [], positions: [], loading: false, error: null, saveBranch: vi.fn(), saveClient: vi.fn(), saveDepartment: vi.fn(), savePosition: vi.fn() };
-    render(<QueryClientProvider client={new QueryClient()}><AccessContextValue.Provider value={{ userId: id, displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" }}><OrganizationContextValue.Provider value={directory}><PayrollRunForm repository={repository} payroll={payroll} refresh={vi.fn().mockResolvedValue(undefined)} onClose={close} /></OrganizationContextValue.Provider></AccessContextValue.Provider></QueryClientProvider>);
+    render(<QueryClientProvider client={new QueryClient()}><AccessContextValue.Provider value={{ userId: id, displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" }}><OrganizationContextValue.Provider value={directory}><PayrollRunForm repository={repository} payroll={payroll} refresh={vi.fn().mockResolvedValue(undefined)} onClose={close} onCreated={opened} /></OrganizationContextValue.Provider></AccessContextValue.Provider></QueryClientProvider>);
     fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
     fireEvent.click(screen.getByRole("option", { name: "Branch" }));
-    fireEvent.change(screen.getByLabelText("Run title"), { target: { value: run.title } });
+    if (customDetails) { fireEvent.click(screen.getByText("Additional details")); fireEvent.change(screen.getByLabelText("Run title"), { target: { value: run.title } }); }
     fireEvent.focus(screen.getByRole("combobox", { name: "Run worksite" }));
     fireEvent.click(await screen.findByRole("option", { name: "Factory" }));
     fireEvent.change(screen.getByLabelText("Payroll group"), { target: { value: "A" } });
     for (const [label, value] of [["Cutoff start", run.period_start], ["Cutoff end", run.period_end], ["Payout date", run.pay_date]]) fireEvent.input(screen.getByLabelText(label), { target: { value } });
     expect(screen.getByLabelText("Cutoff end")).toHaveAttribute("min", run.period_start);
     expect(screen.getByLabelText("Payout date")).toHaveAttribute("min", run.period_end);
-    fireEvent.change(screen.getByLabelText("Preparation reference"), { target: { value: run.reason } });
-    fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
+    if (customDetails) fireEvent.change(screen.getByLabelText("Preparation reference"), { target: { value: run.reason } });
+    fireEvent.click(screen.getByRole("button", { name: "Create cutoff" }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ period_start: run.period_start, period_end: run.period_end, pay_date: run.pay_date }));
+    expect(opened).toHaveBeenCalledExactlyOnceWith(run);
+    if (!customDetails) expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: "2026-01 payroll - Factory", reason: "Payroll cutoff created" }));
   });
   it("labels fully reviewed attendance as attendance complete, not calculated payroll", async () => {
     const coverage = vi.fn().mockResolvedValue({ items: [], total: 0, summary: { employees: 1, expected: 15, approved: 15, missing: 0, drafts: 0, missingTerms: 0, changedTerms: 0 } });

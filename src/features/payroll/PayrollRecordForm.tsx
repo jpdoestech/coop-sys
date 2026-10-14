@@ -15,6 +15,7 @@ import { validatePayrollInput, salaryAmount } from "../../services/payroll/payro
 import { formatPesos } from "../../services/payments/paymentMath";
 import { PayrollLookup } from "./PayrollLookup";
 import { payrollLabels } from "./payrollLabels";
+import { DutyScheduleFields } from "./DutyScheduleFields";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function initialData(kind: PayrollKind, source?: PayrollRecord): PayrollData {
@@ -94,7 +95,7 @@ export function PayrollRecordForm({ kind, source, repository, onClose, onSaved, 
         {visible("rate") ? <Field label={activeGroups && !visible("basis") ? "New rate / salary (PHP)" : data.pay_basis === "monthly" && data.monthly_mode === "direct" ? "Monthly salary (PHP)" : "Daily reference rate (PHP)"}>{money("rate_centavos")}</Field> : null}
         {visible("basis") && data.pay_basis === "monthly" && data.monthly_mode === "daily_factor" ? <Field label="Monthly salary factor"><input className={control} type="number" min="0.01" max="366" step="0.01" required value={data.monthly_factor ?? ""} onChange={(e) => set("monthly_factor", Number(e.target.value))} /></Field> : null}
         {visible("group") ? <><Field label="Payroll frequency"><SearchableSelect className={control} value={data.frequency} onChange={(e) => set("frequency", e.target.value as PayrollData["frequency"])}><option value="weekly">Weekly</option><option value="semi_monthly">Semi-monthly</option><option value="monthly">Monthly</option></SearchableSelect></Field><Field label="Payroll / cutoff group">{text("payroll_group", true)}</Field></> : null}
-        {visible("schedule") ? <><Field label="Shift start">{text("shift_start", true, "time")}</Field><Field label="Shift end">{text("shift_end", true, "time")}</Field><Field label="Unpaid break (minutes)"><input className={control} type="number" min="0" step="1" required value={data.break_minutes} onChange={(e) => set("break_minutes", Number(e.target.value))} /></Field></> : null}
+        {visible("schedule") ? <DutyScheduleFields data={data} onChange={(changes) => { onDraftChange?.(); setData((d) => ({ ...d, ...changes })); }} /> : null}
         {visible("rest") ? <fieldset className="min-w-0"><legend className="field-label">Rest days</legend><div className="mt-2 flex flex-wrap gap-2">{weekdays.map((day, index) => <label key={day} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={data.rest_days?.includes(index)} onChange={(e) => set("rest_days", e.target.checked ? [...data.rest_days!, index].sort() : data.rest_days!.filter((d) => d !== index))} />{day}</label>)}</div></fieldset> : null}
         {visible("allowances") ? <fieldset className="sm:col-span-2"><legend className="mb-2 text-xs font-semibold">Allowances</legend>{data.allowances?.map((a, i) => <div key={i} className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-[1fr_100px_130px_140px_32px]">
           <input className="compact-control w-full" aria-label={`Allowance ${i + 1} name`} placeholder="Allowance name" required value={a.name} onChange={(e) => set("allowances", data.allowances!.map((item, index) => index === i ? { ...item, name: e.target.value } : item))} />
