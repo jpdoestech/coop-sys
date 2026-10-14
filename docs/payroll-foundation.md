@@ -76,6 +76,36 @@ remaining obligation from Payment Settings, cap loans/advances against their
 remaining ledgers, and respect available net pay and authorized deduction rules.
 It must never count the per-cutoff contribution once per attendance day.
 
+## Employee Workflow
+
+Employees now has payroll row actions and a Payroll terms tab in existing employee
+profiles. Salary values remain separate from ordinary employee fields, imports and
+exports. Organization-wide payroll managers may select employees across pages
+(maximum 500), clear the selection, and review a batch before applying it. Changing
+search or placement filters clears selection. Only checked field groups change in
+Update selected fields mode. Each employee's other terms are independently resolved
+on the requested effective date; the first employee is an editing template, not a
+replacement for everybody's current agreement. Assign complete terms is explicit.
+
+Rates, pay basis/monthly factor, allowances, shifts, rest days, worksite/region,
+department/position, and payroll group/frequency are independently selectable.
+Salary imports use their own permission-checked Excel preview and template with a
+Worksites reference sheet. Patch-mode blanks preserve existing fields; explicit
+clear removes allowances, and REST DAYS=none removes rest days. Imports accept one
+effective-dated change per employee per workbook. All rows must pass validation;
+the save is atomic. Stale patch sources and duplicate effective dates are rejected.
+
+Deploy `0040_payroll_setup_batch.sql` after the existing payroll migrations and
+rebuild the LAN server bundle. Source checks are serialized with employee advisory
+locks, including ordinary employee-term inserts. No employee CRUD permission is
+newly granted by this migration. Salary access is still organization-only; UI
+branch/client selectors are not a replacement for backend scoped salary policies.
+
+Employee-term changes are contractual versions, not temporary cutoff earnings.
+An explicit expiry does not revive an older agreement. One-day changes still use
+Daily Overrides. Actual one-off cutoff compensation needs a separate transaction
+ledger and reviewed calculation handling; do not simulate it by expiring base terms.
+
 ## Next Phase
 
 Daily manual attendance, Excel imports, multiple punch segments, draft correction

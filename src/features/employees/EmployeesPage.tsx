@@ -2,7 +2,7 @@ import { FilterField } from "../../components/ui/FilterField";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useConfirmation } from "../../components/forms/unsavedChanges";
 import { useDeferredValue, useEffect, useState } from "react";
-import { ArrowUpDown, BriefcaseBusiness, CircleDotDashed, FileUp, Plus, Search } from "lucide-react";
+import { ArrowUpDown, BriefcaseBusiness, CircleDotDashed, FileUp, Plus, Search, Wallet } from "lucide-react";
 import { ToolbarDisclosure } from "../../components/ui/ToolbarDisclosure";
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -21,6 +21,10 @@ import { placementOptions } from "../../services/access/placementOptions";
 import { MEMBER_STATUS } from "../../services/lookups/statuses";
 import { useAliasManagement } from "../payments/hooks/useAliasManagement";
 import { AliasEditor } from "../../components/forms/AliasEditor";
+import { assertPayrollAccess } from "../../services/payroll/payrollAccess";
+import { EmployeePayrollTermsDialog } from "../payroll/EmployeePayrollTermsDialog";
+import { PayrollTermsImportDialog } from "../payroll/PayrollTermsImportDialog";
+import { EmployeePayrollTermsPanel } from "../payroll/EmployeePayrollTermsPanel";
 
 export function EmployeesPage() {
   const confirm = useConfirmation();
@@ -34,6 +38,12 @@ export function EmployeesPage() {
   const canImport = can("employees.import");
   const canEdit = can("employees.update");
   const canDelete = can("employees.delete");
+  let canManagePayroll = true;
+  try { assertPayrollAccess(profile, true); } catch { canManagePayroll = false; }
+  const [selectedEmployees, setSelectedEmployees] = useState<Map<string, Employee>>(new Map());
+  const [payrollEmployees, setPayrollEmployees] = useState<Employee[] | null>(null);
+  const [payrollImportOpen, setPayrollImportOpen] = useState(false);
+  const [selectionError, setSelectionError] = useState("");
   const { branches, clients, departments, positions } = useOrganization();
   const { branches: scopedBranches, clients: scopedClients } = placementOptions(profile, branches, clients);
   const [attentionOnly, setAttentionOnly] = useState(false);
@@ -47,6 +57,7 @@ const [pageSize, setPageSize] = useState(25);
   const { query, members, formerEmployees, personNumber, saveEmployee, archiveEmployee, importEmployees } = useEmployees({ search: deferredSearch, attentionOnly, statusId: statusFilter, branchId: branchFilter, clientId: clientFilter, departmentId: departmentFilter, sort, limit: pageSize, offset: (page - 1) * pageSize });
   const aliasManagement = useAliasManagement("employees.update");
   useEffect(() => setPage(1), [deferredSearch, attentionOnly, statusFilter, branchFilter, clientFilter, departmentFilter, sort, pageSize]);
+  useEffect(() => { setSelectedEmployees(new Map()); setSelectionError(""); }, [deferredSearch, attentionOnly, statusFilter, branchFilter, clientFilter, departmentFilter, profile]);
   const pageEmployees = query.data?.items ?? [];
 
   function save(submission: EmployeeSubmission) {
@@ -68,12 +79,16 @@ const [pageSize, setPageSize] = useState(25);
           </div></ToolbarDisclosure>
           <button type="button" className="icon-button" title="Reset filters" aria-label="Reset filters" onClick={() => { setStatusFilter(""); setDepartmentFilter(""); setBranchFilter(""); setClientFilter(""); setAttentionOnly(false); setSort("name-asc"); setSearch(""); }}><RotateCcw className="h-4 w-4" /></button>
           <span className="hidden whitespace-nowrap text-[11px] text-ink/40 sm:block">{query.data?.total ?? 0} records</span>
+          {canManagePayroll ? <><button className="secondary-button" disabled={!selectedEmployees.size} onClick={() => setPayrollEmployees([...selectedEmployees.values()])}><Wallet className="h-4 w-4" />Payroll terms{selectedEmployees.size ? ` (${selectedEmployees.size})` : ""}</button><button className="icon-button" title="Import employee payroll terms" aria-label="Import employee payroll terms" onClick={() => setPayrollImportOpen(true)}><FileUp className="h-4 w-4" /></button>{selectedEmployees.size ? <button className="icon-button" title="Clear employee selection" aria-label="Clear employee selection" onClick={() => setSelectedEmployees(new Map())}><RotateCcw className="h-4 w-4" /></button> : null}</> : null}
           {canCreate || canImport ? <div className="toolbar-actions">{canImport ? <button className="icon-button" title="Import employees from Excel" aria-label="Import employees from Excel" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /></button> : null}{canCreate ? <button className="primary-button" title="New employee" aria-label="New employee" onClick={() => { saveEmployee.reset(); setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" /><span className="hidden sm:inline">New employee</span></button> : null}</div> : null}
         </div>
-        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { confirm(`Archive ${employee.first_name} ${employee.last_name}?`, () => archiveEmployee.mutate(employee.id), "Archive employee", "Archive"); }} />}
+        {selectionError ? <p role="alert" className="px-3 py-2 text-xs text-red-700">{selectionError}</p> : null}
+        {query.isError ? <div className="border-t border-line px-5 py-8 text-sm text-red-700">Unable to load employee records.</div> : <EmployeeTable employees={pageEmployees} loading={query.isLoading} canEdit={canEdit} canDelete={canDelete} selected={new Set(selectedEmployees.keys())} onPayroll={canManagePayroll ? (employee) => setPayrollEmployees([employee]) : undefined} onSelect={canManagePayroll ? (employees, checked) => { const next = new Map(selectedEmployees); for (const employee of employees) { if (checked) next.set(employee.id, employee); else next.delete(employee.id); } if (next.size > 500) { setSelectionError("Select no more than 500 employees."); return; } setSelectedEmployees(next); setSelectionError(""); } : undefined} onEdit={(employee) => { saveEmployee.reset(); setEditing(employee); setFormOpen(true); }} onArchive={(employee) => { confirm(`Archive ${employee.first_name} ${employee.last_name}?`, () => archiveEmployee.mutate(employee.id), "Archive employee", "Archive"); }} />}
         <PaginationControls page={page} pageSize={pageSize} total={query.data?.total ?? 0} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </section>
-      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} canViewSensitive={can("employees.sensitive.view")} canEditSensitive={can("employees.sensitive.update")} aliasEditor={canEdit ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
+      {formOpen ? <EmployeeForm employee={editing} suggestedNumber={personNumber.data ?? ""} members={members.data ?? []} formerEmployees={formerEmployees.data ?? []} saving={saveEmployee.isPending} saveError={saveEmployee.error?.message} canViewSensitive={can("employees.sensitive.view")} canEditSensitive={can("employees.sensitive.update")} payrollEditor={canManagePayroll && editing ? <EmployeePayrollTermsPanel employee={editing} onEdit={() => setPayrollEmployees([editing])} /> : undefined} aliasEditor={canEdit ? <AliasEditor employeeId={editing?.id ?? null} clientId={editing?.active_assignment?.client_id ?? null} aliases={aliasManagement.query.data ?? []} clients={scopedClients} saving={aliasManagement.save.isPending} onSave={aliasManagement.save.mutateAsync} onArchive={aliasManagement.archive.mutateAsync} /> : undefined} onCancel={() => setFormOpen(false)} onSubmit={save} /> : null}
+      {payrollEmployees && canManagePayroll ? <EmployeePayrollTermsDialog employees={payrollEmployees} onClose={() => setPayrollEmployees(null)} /> : null}
+      {payrollImportOpen && canManagePayroll ? <PayrollTermsImportDialog onClose={() => setPayrollImportOpen(false)} /> : null}
       {importOpen ? <PersonImportDialog kind="employee" branches={scopedBranches} clients={scopedClients} lookups={{ departments, positions }} requireClient={profile.scopeType === "assigned_clients"} linkOptions={(members.data ?? []).map((member) => ({ id: member.id, number: member.membership_number, name: `${member.last_name}, ${member.first_name}`, isActive: member.membership_status_id === MEMBER_STATUS.active }))} importing={importEmployees.isPending} importError={importEmployees.error?.message} onClose={() => setImportOpen(false)} onImport={(rows, branchId, clientId, onProgress) => importEmployees.mutateAsync({ rows, branchId, clientId, onProgress })} /> : null}
     </>
   );

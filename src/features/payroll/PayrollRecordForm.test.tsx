@@ -5,12 +5,13 @@ import { OrganizationContextValue } from "../../services/organization/organizati
 import { PayrollRecordForm } from "./PayrollRecordForm";
 import type { PayrollKind, PayrollRecord } from "../../types/payroll";
 import type { PayrollRepository } from "../../services/repositories/PayrollRepository";
+import { AccessContextValue } from "../../services/access/accessContextValue";
 
 const directory = { branches: [], clients: [], departments: [], positions: [], loading: false, error: null, saveBranch: vi.fn(), saveClient: vi.fn(), saveDepartment: vi.fn(), savePosition: vi.fn() };
 function setup(kind: PayrollKind, source?: PayrollRecord) {
   const save = vi.fn().mockResolvedValue({}), onSaved = vi.fn();
-  const repository = { save, list: vi.fn().mockResolvedValue({ items: [], total: 0 }), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
-  render(<QueryClientProvider client={new QueryClient()}><OrganizationContextValue.Provider value={directory}><PayrollRecordForm kind={kind} source={source} repository={repository} onClose={vi.fn()} onSaved={onSaved} /></OrganizationContextValue.Provider></QueryClientProvider>);
+  const repository = { save, saveBatch: vi.fn(), list: vi.fn().mockResolvedValue({ items: [], total: 0 }), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
+  render(<QueryClientProvider client={new QueryClient()}><AccessContextValue.Provider value={{ userId: "admin", displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" }}><OrganizationContextValue.Provider value={directory}><PayrollRecordForm kind={kind} source={source} repository={repository} onClose={vi.fn()} onSaved={onSaved} /></OrganizationContextValue.Provider></AccessContextValue.Provider></QueryClientProvider>);
   return { save, onSaved };
 }
 describe("payroll setup forms", () => {

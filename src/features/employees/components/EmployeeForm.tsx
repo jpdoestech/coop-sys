@@ -13,6 +13,7 @@ import {
   UserRound,
   UsersRound,
   X,
+  Wallet,
 } from "lucide-react";
 import { AddressFields, type AddressValue } from "../../../components/forms/AddressFields";
 import { addressValidationError } from "../../../address/addressService";
@@ -40,7 +41,7 @@ import { MemberSearchField } from "./MemberSearchField";
 import { createUuid } from "../../../utils/createUuid";
 
 type MembershipMode = "none" | "existing" | "create";
-type EmployeeTab = "personal" | "employment" | "government" | "beneficiaries" | "additional";
+type EmployeeTab = "personal" | "employment" | "government" | "beneficiaries" | "additional" | "payroll";
 
 const employeeTabs: Array<{ id: EmployeeTab; label: string; icon: typeof UserRound }> = [
   { id: "personal", label: "Personal info", icon: UserRound },
@@ -58,6 +59,7 @@ type Props = {
   saving: boolean;
   saveError?: string;
   aliasEditor?: ReactNode;
+  payrollEditor?: ReactNode;
   canViewSensitive?: boolean;
   canEditSensitive?: boolean;
   onCancel: () => void;
@@ -144,7 +146,7 @@ function toInput(employee: Employee | null, suggestedNumber = ""): EmployeeInput
   return { ...input, mobile_number: normalizeStoredMobileNumber(input.mobile_number) };
 }
 
-export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
+export function EmployeeForm({ employee, suggestedNumber, members, formerEmployees, saving, saveError, aliasEditor, payrollEditor, canViewSensitive = true, canEditSensitive = true, onCancel, onSubmit }: Props) {
   useWorkspaceDialog(employee ? "Edit Employee" : "New Employee", onCancel);
   const { branches } = useOrganization();
   const [draft, setDraft] = useState<EmployeeInput>(() => toInput(employee, suggestedNumber));
@@ -337,7 +339,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
           </header>
           <nav className="sticky top-20 z-[9] overflow-x-auto border-b border-line bg-white/95 px-4 backdrop-blur sm:px-8" aria-label="Employee information sections">
             <div className="flex min-w-max gap-1">
-              {employeeTabs.map((item) => {
+              {[...employeeTabs, ...(payrollEditor ? [{ id: "payroll" as const, label: "Payroll terms", icon: Wallet }] : [])].map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
@@ -411,6 +413,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
             <Field label="Email"><input type="email" disabled={Boolean(linkedMember)} className={inputClass} value={draft.email ?? ""} onChange={(event) => setValue("email", event.target.value || null)} /></Field>
           </Section> : null}
 
+          {tab === "payroll" ? <div className="border-t border-line px-6 py-4">{payrollEditor}</div> : null}
           {aliasEditor ? <div className={tab === "additional" ? "" : "hidden"}><Section title="Payroll aliases" description="Alternate payroll names are maintained here and can also be matched during payroll imports.">{aliasEditor}</Section></div> : null}
 
           {tab === "government" && canViewSensitive ? <Section title="Government numbers" description="Government-issued identifiers synchronize in both directions with the linked membership record.">
@@ -459,7 +462,7 @@ export function EmployeeForm({ employee, suggestedNumber, members, formerEmploye
           </Section> : null}
 
           {tab === "additional" ? <Section title="Notes" description="Optional internal context for authorized staff."><div className="sm:col-span-2"><textarea className={`${inputClass} min-h-24 resize-y`} value={draft.notes ?? ""} onChange={(event) => setValue("notes", event.target.value || null)} /></div></Section> : null}
-          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={cancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" /> Cancel</button><button type="submit" disabled={saving || validatingAddress} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : validatingAddress ? "Validating..." : "Save employee"}</button></footer>
+          <footer className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-white/95 px-6 py-4 backdrop-blur sm:px-8"><button type="button" onClick={cancel} className="focus-ring inline-flex items-center gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm font-semibold"><X className="h-4 w-4" />{tab === "payroll" ? "Close" : "Cancel"}</button>{tab !== "payroll" ? <button type="submit" disabled={saving || validatingAddress} className="primary-button"><Save className="h-4 w-4" />{saving ? "Saving..." : validatingAddress ? "Validating..." : "Save employee"}</button> : null}</footer>
         </form>
       </div>
     </div>

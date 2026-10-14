@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildAttendanceTeamPage, scheduledTeamInput, type AttendanceTeamRow } from "./attendanceTeam";
+import { buildAttendanceTeamPage, cutoffTeamQuery, scheduledTeamInput, type AttendanceTeamRow } from "./attendanceTeam";
+import type { PayrollRun } from "../../types/payrollRun";
 import { prepareWorksheetSave, teamExceptions } from "./attendanceWorksheet";
 import type { PayrollRecord } from "../../types/payroll";
 import type { AttendanceRecord } from "../../types/attendance";
@@ -10,6 +11,16 @@ const base = { id: "10000000-0000-4000-8000-000000000003", kind: "employee_terms
 const query = { date: "2026-10-12", worksiteId: site.id };
 const row = () => buildAttendanceTeamPage([site, base], [employee], [], query).items[0];
 describe("team attendance worksheet", () => {
+  it("filters cutoff group and frequency before paging and rejects dates outside a cancelled or active run", () => {
+    const run = { id: site.id, status: "draft", worksite_id: site.id, payroll_group: "A", frequency: "semi_monthly", period_start: "2026-10-01", period_end: "2026-10-15" } as PayrollRun;
+    const included = { ...base, data: { ...base.data, payroll_group: "A", frequency: "semi_monthly" as const } };
+    const other = { ...employee, id: "10000000-0000-4000-8000-000000000004", employee_number: "000002" };
+    const excluded = { ...included, id: "10000000-0000-4000-8000-000000000005", data: { ...included.data, employee_id: other.id, payroll_group: "B" } };
+    const page = buildAttendanceTeamPage([site, included, excluded], [employee, other], [], cutoffTeamQuery({ ...query, limit: 1 }, run));
+    expect(page.total).toBe(1); expect(page.items[0].employeeId).toBe(employee.id);
+    expect(() => cutoffTeamQuery({ ...query, date: "2026-10-16" }, run)).toThrow("active cutoff");
+    expect(() => cutoffTeamQuery(query, { ...run, status: "cancelled" })).toThrow("active cutoff");
+  });
   it("pages the dated team and supports comma searches in either name order", () => {
     expect(buildAttendanceTeamPage([site, base], [employee], [], { ...query, search: "Dela Cruz, Juan" }).total).toBe(1);
     expect(buildAttendanceTeamPage([site, base], [employee], [], { ...query, search: "Juan Cruz", offset: 1 }).items).toEqual([]);

@@ -10,8 +10,20 @@
   cancellation references, overlap protection and live attendance coverage checks.
 - Reviewed calculation policy/calendar versions and ordinary-day daily base plus
   worked-day allowance previews with source IDs and explicit unsupported-case blocks.
+- Employee profile payroll terms, multi-page employee selection, reviewed bulk
+  field updates, and atomic salary-terms Excel imports (maximum 500 employees).
+- Branch/client selectors for worksite defaults and cutoff creation; cutoff-bound
+  attendance worksheets and employee selection for terms, allowances and deduction plans.
 
 ## Next Dependencies
+
+Branch/client-scoped payroll authorization is still pending. Salary setup, runs,
+attendance and calculation sources continue to require organization-wide payroll
+permissions on every backend. Before enabling scoped roles, add worksite-owned RLS
+and guard all SECURITY DEFINER RPCs, LAN endpoints and offline reads/writes. Do not
+simply relax the current organization-only access check or grant branch roles salary
+access by default. Cutoff-specific compensation transactions and actual deduction
+posting/repayment ledgers remain separate from dated contractual setup plans.
 
 Multiple independently assigned duties within a day require effective assignment
 segments and an explicit premium/rate allocation policy. Punch segments alone do

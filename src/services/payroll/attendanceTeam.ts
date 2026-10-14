@@ -1,7 +1,12 @@
 import type { AttendanceInput, AttendanceRecord } from "../../types/attendance";
 import type { PayrollRecord } from "../../types/payroll";
+import type { PayrollRun } from "../../types/payrollRun";
 
-export type AttendanceTeamQuery = { date: string; worksiteId: string; departmentId?: string; search?: string; limit?: number; offset?: number };
+export type AttendanceTeamQuery = { date: string; worksiteId: string; runId?: string; payrollGroup?: string; frequency?: string; departmentId?: string; search?: string; limit?: number; offset?: number };
+export function cutoffTeamQuery(q: AttendanceTeamQuery, run?: PayrollRun): AttendanceTeamQuery {
+  if (!run || run.status !== "draft" || q.worksiteId !== run.worksite_id || q.date < run.period_start || q.date > run.period_end) throw new Error("Select a date and worksite within the active cutoff.");
+  return { ...q, payrollGroup: run.payroll_group, frequency: run.frequency };
+}
 export type AttendanceTeamRow = { employeeId: string; employeeLabel: string; date: string; terms: PayrollRecord | null; baseTerms: PayrollRecord | null; attendance: AttendanceRecord | null; neighbors: AttendanceRecord[]; restDay: boolean };
 export type AttendanceTeamPage = { items: AttendanceTeamRow[]; total: number };
 type TeamEmployee = { id: string; employee_number: string; first_name: string; last_name: string; middle_name?: string | null; date_hired?: string | null; date_separated?: string | null; deleted_at?: string | null };
@@ -33,6 +38,7 @@ export function buildAttendanceTeamPage(setup: PayrollRecord[], employees: TeamE
     if (e.deleted_at || e.date_hired && e.date_hired > q.date || e.date_separated && e.date_separated < q.date) continue;
     const base = bases.get(e.id) || null, candidate = overrides.get(e.id) || base;
     if (!candidate || candidate.data.worksite_id !== q.worksiteId || q.departmentId && candidate.data.department_id !== q.departmentId) continue;
+    if (q.payrollGroup && candidate.data.payroll_group !== q.payrollGroup || q.frequency && candidate.data.frequency !== q.frequency) continue;
     const employeeLabel = `${e.employee_number} - ${e.last_name}, ${e.first_name}${e.middle_name ? ` ${e.middle_name}` : ""}`;
     if (!search.every((term) => employeeLabel.toLowerCase().includes(term))) continue;
     const terms = sites.has(q.worksiteId) && (!candidate.data.effective_to || candidate.data.effective_to >= q.date) ? candidate : null;

@@ -6,6 +6,8 @@ import { PayrollRunCoverage } from "./PayrollRunCoverage";
 import type { PayrollRepository } from "../../services/repositories/PayrollRepository";
 import type { PayrollRunRepository } from "../../services/repositories/PayrollRunRepository";
 import type { PayrollRun } from "../../types/payrollRun";
+import { AccessContextValue } from "../../services/access/accessContextValue";
+import { OrganizationContextValue } from "../../services/organization/organizationContextValue";
 vi.mock("../../services/activity/transactionNotifications", () => ({ showTransactionSuccess: vi.fn().mockResolvedValue(undefined) }));
 const id = "10000000-0000-4000-8000-000000000001";
 const run = { id, title: "October cutoff", worksite_id: id, worksite_label: "Factory", payroll_group: "A", frequency: "semi_monthly", period_start: "2026-10-01", period_end: "2026-10-15", pay_date: "2026-10-20", reason: "Client calendar", status: "draft" } as PayrollRun;
@@ -13,8 +15,11 @@ describe("run preparation UI", () => {
   it("saves the explicitly entered cutoff and responds to native date input events", async () => {
     const create = vi.fn().mockResolvedValue(run), close = vi.fn();
     const repository = { create, list: vi.fn(), cancel: vi.fn(), coverage: vi.fn(), listRules: vi.fn(), saveRules: vi.fn(), previewSource: vi.fn() } as PayrollRunRepository;
-    const payroll = { list: vi.fn().mockResolvedValue({ items: [{ id, data: { label: "Factory" } }], total: 1 }), save: vi.fn(), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
-    render(<QueryClientProvider client={new QueryClient()}><PayrollRunForm repository={repository} payroll={payroll} refresh={vi.fn().mockResolvedValue(undefined)} onClose={close} /></QueryClientProvider>);
+    const payroll = { list: vi.fn().mockResolvedValue({ items: [{ id, data: { label: "Factory" } }], total: 1 }), save: vi.fn(), saveBatch: vi.fn(), archive: vi.fn(), workDateRecords: vi.fn() } as PayrollRepository;
+    const directory = { branches: [{ id, label: "Branch", isActive: true, code: "BR", address: "", type: "branch" as const, parentId: null }], clients: [], departments: [], positions: [], loading: false, error: null, saveBranch: vi.fn(), saveClient: vi.fn(), saveDepartment: vi.fn(), savePosition: vi.fn() };
+    render(<QueryClientProvider client={new QueryClient()}><AccessContextValue.Provider value={{ userId: id, displayName: "Admin", role: "super_admin", branchIds: [], scopeType: "organization" }}><OrganizationContextValue.Provider value={directory}><PayrollRunForm repository={repository} payroll={payroll} refresh={vi.fn().mockResolvedValue(undefined)} onClose={close} /></OrganizationContextValue.Provider></AccessContextValue.Provider></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("combobox", { name: "Branch" }));
+    fireEvent.click(screen.getByRole("option", { name: "Branch" }));
     fireEvent.change(screen.getByLabelText("Run title"), { target: { value: run.title } });
     fireEvent.focus(screen.getByRole("combobox", { name: "Run worksite" }));
     fireEvent.click(await screen.findByRole("option", { name: "Factory" }));

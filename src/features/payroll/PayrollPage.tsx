@@ -24,7 +24,7 @@ export function PayrollPage() {
   const client = useQueryClient(), confirm = useConfirmation();
   const leave = useConfirmLeave();
   const [attendanceOpen, setAttendanceOpen] = useState(false);
-  const [runsOpen, setRunsOpen] = useState(false);
+  const [runsOpen, setRunsOpen] = useState(true);
   const [kind, setKind] = useState<PayrollKind>("worksite"), [search, setSearch] = useState("");
   const [page, setPage] = useState(1), [size, setSize] = useState(25), [archived, setArchived] = useState(false);
   const [editing, setEditing] = useState<{ source?: PayrollRecord } | null>(null), [preview, setPreview] = useState(false);

@@ -11,7 +11,8 @@ export class SupabaseAttendanceRepository implements AttendanceRepository {
   constructor(private profile: AccessProfile) {}
   async worksheet(q: AttendanceTeamQuery): Promise<AttendanceTeamPage> {
     assertPayrollAccess(this.profile); validateTeamQuery(q);
-    const { data, error } = await db().rpc("attendance_team_page", { p_date: q.date, p_worksite_id: q.worksiteId, p_department_id: q.departmentId || null, p_search: q.search || null, p_limit: q.limit || 25, p_offset: q.offset || 0 });
+    const params = { p_date: q.date, p_department_id: q.departmentId || null, p_search: q.search || null, p_limit: q.limit || 25, p_offset: q.offset || 0 };
+    const { data, error } = q.runId ? await db().rpc("attendance_cutoff_page", { ...params, p_run_id: q.runId }) : await db().rpc("attendance_team_page", { ...params, p_worksite_id: q.worksiteId });
     if (error) throw new Error(error.message);
     return data as AttendanceTeamPage;
   }

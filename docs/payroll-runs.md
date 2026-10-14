@@ -36,3 +36,27 @@ LAN database-server bundle. Cloud/LAN return paged employee coverage and full
 run totals, but local/LAN JSON scans are not certified for 500,000-row workloads.
 Run data is excluded from generic employee imports and exports; LAN writes use
 dedicated permission-checked endpoints, not generic storage replacement.
+
+## Cutoff Workspace
+
+Payroll opens on Payroll Runs. Creating a run selects branch, client (or agency),
+worksite and the explicit cutoff. Worksite search is restricted to that placement
+and its query cache is partitioned by the selection.
+
+Run preparation includes Attendance / Workdays and Employee setup. The attendance
+worksheet fixes the run's worksite, restricts dates to the cutoff and filters group
+and frequency before paging. It retains bulk schedule/absence/leave entry and the
+existing approved-record locks. No presence is inferred merely from a schedule.
+Unsaved worksheet edits are guarded when changing views or closing preparation.
+
+Employee setup selects cutoff employees across pages for reviewed bulk terms or
+allowance changes and dated deduction plans. Changes to base terms begin within
+the cutoff but remain contractual versions beyond it unless explicitly expired.
+Cooperative, loan and advance plans are still setup, not posted deductions. A
+cutoff-limited plan does not silently restore an earlier employee-specific plan
+after expiry; following cooperative defaults remains the fallback behavior.
+
+Deploy `0041_attendance_cutoff_workspace.sql` after 0040 and rebuild the LAN server.
+Organization-wide payroll permission remains required. Branch/client-scoped salary
+RBAC, cutoff-only compensation transactions, loan repayment balances and deduction
+posting are not implemented by these workflow controls.

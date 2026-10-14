@@ -147,6 +147,19 @@ describe("SQLite server maintenance", () => {
     expect((await api("/payroll/runs", "GET", undefined, limited)).status).toBe(403);
     expect((await (await api("/storage", "GET", undefined, limited)).json()).coop_sys_payroll_runs).toBeUndefined();
   });
+  it("saves payroll setup batches atomically and refuses unauthorized salary imports", async () => {
+    const policy = { kind: "cooperative_policy", data: { label: "Batch default", reason: "Approved", effective_from: "2026-12-01", deduction_centavos: 7500 } };
+    const failed = await api("/payroll/setup/batch", "POST", { inputs: [policy, { ...policy, data: { ...policy.data, effective_from: "2026-12-02", deduction_centavos: 0 } }] });
+    expect(failed.status).toBe(400);
+    const storage = await (await api("/storage")).json();
+    expect(JSON.parse(storage.coop_sys_payroll_setup).some((r: { data: { effective_from: string } }) => r.data.effective_from === "2026-12-01")).toBe(false);
+    const saved = await api("/payroll/setup/batch", "POST", { inputs: [policy] });
+    expect(saved.status).toBe(200); expect(await saved.json()).toMatchObject([{ kind: "cooperative_policy", data: { deduction_centavos: 7500 } }]);
+    expect((await api("/payroll/setup/batch", "POST", { inputs: [policy] })).status).toBe(400);
+    const login = await api("/auth/login", "POST", { email: "limited@example.test", password: "TestPassword2026!" }, "");
+    expect((await api("/payroll/setup/batch", "POST", { inputs: [policy] }, login.headers.get("set-cookie")!.split(";")[0])).status).toBe(403);
+    expect((await api("/attendance/worksheet?runId=10000000-0000-4000-8000-000000000099&date=2026-10-01&worksiteId=10000000-0000-4000-8000-000000000009")).status).toBe(400);
+  });
   it("saves calculation rule versions atomically and protects private preview sources", async () => {
     const site = "10000000-0000-4000-8000-000000000009";
     const policy = { kind: "policy", worksite_id: site, effective_from: "2026-10-01", payroll_group: "A", regular_minutes: 480, short_day: "block", worked_allowance: "full", reviewed: true, reference: "Approved rule" };

@@ -42,5 +42,5 @@ export type PayrollData = {
   deduction_reference?: string;
 };
 export type PayrollRecord = { id: string; kind: PayrollKind; data: PayrollData; created_at: string; created_by: string; updated_at: string; deleted_at: string | null };
-export type PayrollInput = { kind: PayrollKind; data: PayrollData };
+export type PayrollInput = { kind: PayrollKind; data: PayrollData; expected_source_id?: string | null };
 export type PayrollPage = { items: PayrollRecord[]; total: number };

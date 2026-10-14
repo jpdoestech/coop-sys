@@ -9,7 +9,9 @@ import { createUuid } from "../../../utils/createUuid";
 import type { AttendanceRepository } from "../AttendanceRepository";
 import { LocalPayrollRepository } from "./LocalPayrollRepository";
 import { LocalEmployeeRepository } from "./LocalEmployeeRepository";
-import { buildAttendanceTeamPage, validateTeamQuery, type AttendanceTeamQuery, type AttendanceTeamPage } from "../../payroll/attendanceTeam";
+import { buildAttendanceTeamPage, cutoffTeamQuery, validateTeamQuery, type AttendanceTeamQuery, type AttendanceTeamPage } from "../../payroll/attendanceTeam";
+import { payrollRunsKey } from "../../payroll/payrollRuns";
+import type { PayrollRun } from "../../../types/payrollRun";
 import { payrollStorageKey } from "../../payroll/payrollSetup";
 import { serverRequest, usesServerBackend } from "../../server/serverApi";
 
@@ -21,10 +23,13 @@ export class LocalAttendanceRepository implements AttendanceRepository {
       const params = new URLSearchParams({ date: q.date, worksiteId: q.worksiteId, limit: String(q.limit || 25), offset: String(q.offset || 0) });
       if (q.departmentId) params.set("departmentId", q.departmentId);
       if (q.search) params.set("search", q.search);
+      if (q.runId) params.set("runId", q.runId);
       return serverRequest(`/attendance/worksheet?${params}`);
     }
     const records = await this.records();
-    return buildAttendanceTeamPage(JSON.parse(readPersistentItem(payrollStorageKey) || "[]"), await new LocalEmployeeRepository().list(), records, q);
+    const runs = JSON.parse(readPersistentItem(payrollRunsKey) || "[]") as PayrollRun[];
+    const filters = q.runId ? cutoffTeamQuery(q, runs.find((r) => r.id === q.runId)) : q;
+    return buildAttendanceTeamPage(JSON.parse(readPersistentItem(payrollStorageKey) || "[]"), await new LocalEmployeeRepository().list(), records, filters);
   }
   private async records() { assertPayrollAccess(this.profile); await hydrateDatabaseStorage(); return JSON.parse(readPersistentItem(attendanceStorageKey) || "[]") as AttendanceRecord[]; }
   async list(q: AttendanceQuery) {

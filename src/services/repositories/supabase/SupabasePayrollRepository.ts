@@ -16,6 +16,8 @@ export class SupabasePayrollRepository implements PayrollRepository {
     if (options.search) query = query.ilike("data->>label", `%${options.search.replace(/[%,_]/g, " ")}%`);
     if (options.employeeId) query = query.eq("employee_id", options.employeeId);
     if (options.worksiteId) query = query.eq("worksite_id", options.worksiteId);
+    if (options.branchId) query = query.eq("data->>branch_id", options.branchId);
+    if (options.clientId !== undefined) query = options.clientId === null ? query.is("data->>client_id", null) : query.eq("data->>client_id", options.clientId);
     const { data, error, count } = await query.range(options.offset || 0, (options.offset || 0) + Math.min(100, options.limit || 25) - 1);
     if (error) throw new Error(error.message);
     return { items: (data || []) as PayrollRecord[], total: count || 0 };
@@ -29,6 +31,14 @@ export class SupabasePayrollRepository implements PayrollRepository {
     assertPayrollAccess(this.profile, true);
     const { error } = await db().rpc("archive_payroll_setup", { p_id: id });
     if (error) throw new Error(error.message);
+  }
+  async saveBatch(inputs: PayrollInput[]) {
+    assertPayrollAccess(this.profile, true);
+    if (!inputs.length || inputs.length > 500) throw new Error("Select between 1 and 500 payroll records.");
+    inputs.forEach(validatePayrollInput);
+    const { data, error } = await db().rpc("save_payroll_setup_batch", { p_inputs: inputs });
+    if (error) throw new Error(error.message);
+    return (data || []) as PayrollRecord[];
   }
   async workDateRecords(employeeId: string, date: string) {
     assertPayrollAccess(this.profile);

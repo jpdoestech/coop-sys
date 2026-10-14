@@ -17,19 +17,20 @@ import type { PayrollRepository } from "../../services/repositories/PayrollRepos
 import { PayrollLookup } from "./PayrollLookup";
 import { AttendanceForm } from "./AttendanceForm";
 
-export function AttendanceWorksheet({ repository, payroll, onImport }: { repository: AttendanceRepository; payroll: PayrollRepository; onImport: () => void }) {
+export function AttendanceWorksheet({ repository, payroll, onImport, run }: { repository: AttendanceRepository; payroll: PayrollRepository; onImport?: () => void; run?: import("../../types/payrollRun").PayrollRun }) {
   const { profile, can } = useAccess(), organization = useOrganization(), client = useQueryClient();
-  const [date, setDate] = useState(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
-  const [site, setSite] = useState({ id: "", label: "" }), [department, setDepartment] = useState(""), [search, setSearch] = useState("");
+  const [date, setDate] = useState(run?.period_start || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()));
+  const [site, setSite] = useState({ id: run?.worksite_id || "", label: run?.worksite_label || "" }), [department, setDepartment] = useState(""), [search, setSearch] = useState("");
   const [page, setPage] = useState(1), [size, setSize] = useState(25), [exceptionsOnly, setExceptionsOnly] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set()), [edits, setEdits] = useState<Record<string, AttendanceInput>>({});
   const [reference, setReference] = useState(""), [error, setError] = useState(""), [detail, setDetail] = useState<AttendanceTeamRow | null>(null);
   const deferred = useDeferredValue(search), editable = can("payroll.manage");
-  const query = useQuery({ queryKey: ["attendance-team", profile.userId, date, site.id, department, deferred, page, size], queryFn: () => repository.worksheet({ date, worksiteId: site.id, departmentId: department || undefined, search: deferred, limit: size, offset: (page - 1) * size }), enabled: Boolean(site.id) && attendanceDate(date), refetchOnWindowFocus: false });
+  const validDate = attendanceDate(date) && (!run || date >= run.period_start && date <= run.period_end);
+  const query = useQuery({ queryKey: ["attendance-team", profile.userId, run?.id, date, site.id, department, deferred, page, size], queryFn: () => repository.worksheet({ date, worksiteId: site.id, runId: run?.id, departmentId: department || undefined, search: deferred, limit: size, offset: (page - 1) * size }), enabled: Boolean(site.id) && validDate, refetchOnWindowFocus: false });
   const rows = query.data?.items || [];
   const visible = rows.filter((row) => !exceptionsOnly || teamExceptions(row, edits[row.employeeId] || teamInput(row)).length > 0);
   const changeable = (row: AttendanceTeamRow) => editable && Boolean(row.terms) && row.attendance?.review_status !== "approved";
-  const refresh = async () => { await client.invalidateQueries({ queryKey: ["attendance-team"] }); await client.invalidateQueries({ queryKey: ["attendance"] }); };
+  const refresh = async () => { await client.invalidateQueries({ queryKey: ["attendance-team"] }); await client.invalidateQueries({ queryKey: ["attendance"] }); await client.invalidateQueries({ queryKey: ["payroll-run-coverage"] }); };
   const save = useMutation({ mutationFn: async () => {
     const inputs = prepareWorksheetSave(rows, edits, selected, reference);
     await repository.saveBatch(inputs);
@@ -62,15 +63,15 @@ export function AttendanceWorksheet({ repository, payroll, onImport }: { reposit
   const pending = rows.filter((row) => selected.has(row.employeeId) && edits[row.employeeId]).length;
   return <>
     <div className="data-toolbar items-end">
-      <div className="w-full sm:w-64"><PayrollLookup label="Attendance worksite" value={site.id} selectedLabel={site.label} load={loadSites} onChange={(id, label) => leave(() => { setSite({ id, label }); setPage(1); })} /></div>
-      <label className="field-label w-40">Work date<input type="date" className="compact-control mt-1 w-full" value={date} disabled={save.isPending} onChange={(e) => leave(() => { setDate(e.target.value); setPage(1); })} /></label>
+      {!run ? <div className="w-full sm:w-64"><PayrollLookup label="Attendance worksite" value={site.id} selectedLabel={site.label} load={loadSites} onChange={(id, label) => leave(() => { setSite({ id, label }); setPage(1); })} /></div> : null}
+      <label className="field-label w-40">Work date<input type="date" min={run?.period_start} max={run?.period_end} className="compact-control mt-1 w-full" value={date} disabled={save.isPending} onChange={(e) => leave(() => { setDate(e.target.value); setPage(1); })} /></label>
       <label className="relative min-w-40 flex-1 sm:max-w-64"><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" /><input className="compact-control w-full pl-8" aria-label="Search worksheet employee" placeholder="Search employee" value={search} disabled={save.isPending} onChange={(e) => leave(() => { setSearch(e.target.value); setPage(1); })} /></label>
       <ToolbarDisclosure label="Worksheet filters" icon={SlidersHorizontal} count={Number(Boolean(department))}><label className="field-label">Department<SearchableSelect className="compact-control mt-1 w-full" value={department} onChange={(e) => leave(() => { setDepartment(e.target.value); setPage(1); })}><option value="">All departments</option>{organization.departments.filter((d) => d.isActive).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</SearchableSelect></label></ToolbarDisclosure>
       <div className="toolbar-actions">
         <button type="button" className={`secondary-button ${exceptionsOnly ? "bg-amber-50 text-amber-800" : ""}`} aria-pressed={exceptionsOnly} onClick={() => { setExceptionsOnly(!exceptionsOnly); setSelected(new Set()); }}><ListFilter className="h-4 w-4" />Exceptions</button>
         <ToolbarDisclosure label="Worksheet notice" icon={Info}><p className="text-xs text-ink/65">Roster follows dated payroll assignments, including expired terms requiring correction. Schedule defaults are planned times, not verified punches. Exceptions apply to this page; payroll amounts are not calculated. Approved records stay locked. Independent duties within one day require a later assignment-segment workflow.</p></ToolbarDisclosure>
         <button type="button" className="icon-button" aria-label="Refresh worksheet" title="Refresh worksheet" disabled={save.isPending || query.isFetching} onClick={() => leave(() => void refresh())}><RefreshCw className="h-4 w-4" /></button>
-        {editable ? <button type="button" className="secondary-button" disabled={save.isPending} onClick={() => leave(onImport)}><FileUp className="h-4 w-4" />Import</button> : null}
+        {editable && onImport ? <button type="button" className="secondary-button" disabled={save.isPending} onClick={() => leave(onImport)}><FileUp className="h-4 w-4" />Import</button> : null}
       </div>
     </div>
     {editable && site.id ? <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
@@ -80,7 +81,7 @@ export function AttendanceWorksheet({ repository, payroll, onImport }: { reposit
       <input className="compact-control min-w-48 flex-1" maxLength={1000} aria-label="Worksheet attendance reference" placeholder="Attendance / correction reference" value={reference} disabled={save.isPending} onChange={(e) => setReference(e.target.value)} />
       <button type="button" className="primary-button" disabled={!pending || save.isPending || query.isFetching} onClick={() => { setError(""); save.mutate(); }}><Save className="h-3.5 w-3.5" />{save.isPending ? "Saving..." : `Save ${pending} changed`}</button>
     </div> : null}
-    {query.isError || save.isError || error || !attendanceDate(date) ? <p role="alert" className="border-b border-line bg-red-50 px-3 py-2 text-xs text-red-700">{query.error?.message || save.error?.message || error || "Select a valid work date."}</p> : null}
+    {query.isError || save.isError || error || !validDate ? <p role="alert" className="border-b border-line bg-red-50 px-3 py-2 text-xs text-red-700">{query.error?.message || save.error?.message || error || "Select a valid work date within this cutoff."}</p> : null}
     <div className="max-h-[65vh] overflow-auto" aria-busy={query.isFetching}><table className="w-full min-w-[1250px] text-left text-xs">
       <thead className="sticky top-0 z-10 bg-[#f6f8f6]"><tr><th className="px-3 py-2"><input type="checkbox" aria-label="Select editable rows on this page" checked={allSelected} disabled={!eligible.length || save.isPending} onChange={(e) => setSelected(e.target.checked ? new Set(eligible.map((r) => r.employeeId)) : new Set())} /></th>{["Employee / duty", "Scheduled shift", "Status", "Time in", "Time out", "Break min", "Hours", "Review / exceptions", ""].map((h) => <th key={h} className="whitespace-nowrap px-3 py-2 text-[10px] uppercase text-ink/50">{h}</th>)}</tr></thead>
       <tbody className="divide-y divide-line">{visible.map((row) => {

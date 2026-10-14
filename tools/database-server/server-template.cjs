@@ -564,6 +564,33 @@ async function api(req, res, url) {
   }
 
   const user = requireUser(req, res); if (!user) return;
+  if (url.pathname === "/api/payroll/setup/batch" && req.method === "POST") {
+    if (user.scope_type !== "organization" || !hasPermission(user,"payroll.view") || !hasPermission(user,"payroll.manage")) return json(res,403,{ error:"Organization-wide payroll management access is required." });
+    try {
+      const { inputs } = await body(req);
+      if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 500) throw new Error("Select between 1 and 500 payroll records.");
+      const key = "coop_sys_payroll_setup", records = JSON.parse(getStorage.get(key)?.value || "[]");
+      const employees = JSON.parse(getStorage.get("coop_sys_employees")?.value || "[]"), directory = JSON.parse(getStorage.get("coop_sys_organization_directory")?.value || "{}");
+      const timestamp = now(), additions = [];
+      for (const input of inputs) {
+        payroll.validatePayrollInput(input);
+        if (input.data.employee_id && !employees.some((e) => e.id === input.data.employee_id && !e.deleted_at)) throw new Error("Employee is unavailable.");
+        if (input.kind === "deduction" && input.data.deduction_type === "cooperative" && !employees.some((e) => e.id === input.data.employee_id && e.member_id && !e.deleted_at)) throw new Error("Cooperative deductions require a linked member.");
+        if (input.kind === "worksite" && (!(directory.branches || []).some((b) => b.id === input.data.branch_id && b.isActive) || input.data.client_id && !(directory.clients || []).some((c) => c.id === input.data.client_id && c.branchId === input.data.branch_id && c.isActive))) throw new Error("Invalid worksite branch/client.");
+        if (input.data.department_id && !(directory.departments || []).some((d) => d.id === input.data.department_id && d.isActive)) throw new Error("Department is unavailable.");
+        if (input.data.position_id && !(directory.positions || []).some((p) => p.id === input.data.position_id && p.isActive && (!input.data.department_id || p.departmentId === input.data.department_id))) throw new Error("Position must belong to the selected department.");
+        if (input.expected_source_id !== undefined) {
+          if (input.kind !== "employee_terms") throw new Error("Source checks require employee terms.");
+          const base = payroll.effectivePayrollRecord(records.filter((r) => r.kind === "employee_terms" && r.data.employee_id === input.data.employee_id), input.data.effective_from);
+          if ((base?.id || null) !== input.expected_source_id) throw new Error("Employee terms changed. Reload the preview before saving.");
+        }
+        additions.push({ kind:input.kind, data:input.data, id:crypto.randomUUID(), created_by:user.id, created_at:timestamp, updated_at:timestamp, deleted_at:null });
+      }
+      const next = [...records,...additions]; payroll.validatePayrollRecords(next);
+      saveStorage.run(key,JSON.stringify(next),timestamp,user.id);
+      return json(res,200,additions);
+    } catch (error) { return json(res,400,{ error:error.message }); }
+  }
   if (url.pathname === "/api/payroll/calculation-rules") {
     if (user.scope_type !== "organization" || !hasPermission(user,"payroll.view")) return json(res,403,{error:"Organization-wide payroll access is required."});
     try {
@@ -623,7 +650,8 @@ async function api(req, res, url) {
     try {
       const q = Object.fromEntries(url.searchParams);
       const read = (key) => JSON.parse(getStorage.get(key)?.value || "[]");
-      return json(res, 200, attendanceTeam.buildAttendanceTeamPage(read("coop_sys_payroll_setup"), read("coop_sys_employees"), read("coop_sys_attendance"), { ...q, limit: Number(q.limit || 25), offset: Number(q.offset || 0) }));
+      const filters = q.runId ? attendanceTeam.cutoffTeamQuery(q,read(payrollRuns.payrollRunsKey).find((r) => r.id === q.runId)) : q;
+      return json(res, 200, attendanceTeam.buildAttendanceTeamPage(read("coop_sys_payroll_setup"), read("coop_sys_employees"), read("coop_sys_attendance"), { ...filters, limit: Number(q.limit || 25), offset: Number(q.offset || 0) }));
     } catch (error) { return json(res, 400, { error: error.message }); }
   }
   if (url.pathname === "/api/maintenance/people") {
